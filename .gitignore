@@ -2,4 +2,6 @@
 data/
 node_modules/
 dist/
+dist-server/
+logs/
 *.log

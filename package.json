@@ -1,11 +1,14 @@
 {
   "name": "hys-tutor",
   "private": true,
-  "version": "0.8.0",
+  "version": "0.9.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
+    "build:server": "vite build --ssr server/standalone.ts --outDir dist-server",
+    "serve": "node --env-file=.env dist-server/standalone.js",
+    "deploy": "bash scripts/deploy.sh",
     "preview": "vite preview",
     "typecheck": "vue-tsc -b --noEmit",
     "test": "vitest run",

@@ -45,6 +45,15 @@ const reportingQid = ref<string | null>(null)
 const reportNote = ref('')
 const reportToast = ref<string | null>(null)
 
+function toggleReport(qid: string) {
+  reportingQid.value = reportingQid.value === qid ? null : qid
+  reportNote.value = ''
+}
+
+function onShortInput(q: Question, e: Event) {
+  pick(q, (e.target as HTMLTextAreaElement).value)
+}
+
 async function submitQuestionReport(q: Question) {
   try {
     await submitReport({
@@ -127,10 +136,7 @@ async function submit() {
         </span>
         <button
           class="question__report"
-          @click="
-            reportingQid = reportingQid === q.id ? null : q.id
-            reportNote = ''
-          "
+          @click="toggleReport(q.id)"
         >
           ⚠ 这里有错
         </button>
@@ -210,7 +216,7 @@ async function submit() {
         placeholder="写出你的推导/思路…"
         :value="answers[q.id] ?? ''"
         :disabled="graded"
-        @input="pick(q, ($event.target as HTMLTextAreaElement).value)"
+        @input="onShortInput(q, $event)"
       />
 
       <!-- 批改反馈 -->
