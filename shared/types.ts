@@ -1,11 +1,19 @@
 import { z } from 'zod'
 
 // ---------- 课题 ----------
+export const topicProfileSchema = z.object({
+  style: z.string().optional().describe('偏好的教学风格，如：通俗直观/严谨推导/实战代码/案例驱动'),
+  level: z.string().optional().describe('当前掌握程度，如：完全新手/有一定基础/比较熟悉想精进'),
+  extra: z.string().optional().describe('用户自定义的额外要求'),
+})
+export type TopicProfile = z.infer<typeof topicProfileSchema>
+
 export const topicSchema = z.object({
   id: z.string(),
   name: z.string(),
   createdAt: z.string(),
   llmModel: z.string().optional(),
+  profile: topicProfileSchema.optional(),
 })
 export type Topic = z.infer<typeof topicSchema>
 

@@ -47,6 +47,26 @@ export async function listLessons(topicId: string): Promise<LessonMeta[]> {
   return metas.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 }
 
+// 课题统计（首页卡片展示）：知识点数 / 课程数 / 最近一课时间
+export interface TopicStats {
+  nodeCount: number
+  lessonCount: number
+  lastLessonAt: string | null
+}
+
+export async function getTopicStats(topicId: string): Promise<TopicStats> {
+  const graph = await readJson<{ nodes?: unknown[] } | null>(
+    dataPath('topics', topicId, 'graph.json'),
+    null,
+  )
+  const lessons = await listLessons(topicId)
+  return {
+    nodeCount: graph?.nodes?.length ?? 0,
+    lessonCount: lessons.length,
+    lastLessonAt: lessons[0]?.createdAt ?? null,
+  }
+}
+
 // 按 lessonId 反查所属课题（课题数极少，逐个探测即可）
 export async function findLesson(lessonId: string): Promise<LessonDetail | null> {
   const topics = await listTopics()

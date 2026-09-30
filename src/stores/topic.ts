@@ -1,11 +1,11 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import type { Graph, KnowledgeNode, Topic } from '@shared/types'
-import type { LessonMeta } from '@shared/api'
+import type { Graph, KnowledgeNode, Topic, TopicProfile } from '@shared/types'
+import type { LessonMeta, TopicWithStats } from '@shared/api'
 import { postSse } from '@/utils/sse'
 
 export const useTopicStore = defineStore('topic', () => {
-  const topics = ref<Topic[]>([])
+  const topics = ref<TopicWithStats[]>([])
   const topic = ref<Topic | null>(null)
   const graph = ref<Graph | null>(null)
   const lessons = ref<LessonMeta[]>([])
@@ -19,7 +19,7 @@ export const useTopicStore = defineStore('topic', () => {
 
   async function fetchTopics() {
     const res = await fetch('/api/topics')
-    const data = (await res.json()) as { topics: Topic[] }
+    const data = (await res.json()) as { topics: TopicWithStats[] }
     topics.value = data.topics
   }
 
@@ -46,16 +46,16 @@ export const useTopicStore = defineStore('topic', () => {
   }
 
   // 返回新课题供路由跳转；失败返回 null（错误在 error 中）
-  async function createTopic(name: string): Promise<Topic | null> {
+  async function createTopic(name: string, profile?: TopicProfile): Promise<Topic | null> {
     loading.value = true
     error.value = null
-    stageText.value = 'AI 正在调研并生成知识图谱…'
+    stageText.value = 'AI 正在联网调研并生成知识图谱…'
     let created: Topic | null = null
     try {
       await new Promise<void>((resolve, reject) => {
         postSse(
           '/api/topics',
-          { name },
+          { name, profile },
           {
             onEvent(event, data) {
               if (event === 'stage') {
@@ -78,7 +78,6 @@ export const useTopicStore = defineStore('topic', () => {
                 created = r.topic
                 topic.value = r.topic
                 graph.value = r.graph
-                topics.value = [...topics.value, r.topic]
                 lessons.value = []
                 resolve()
               } else if (event === 'error') {
@@ -94,6 +93,7 @@ export const useTopicStore = defineStore('topic', () => {
       stageText.value = null
       loading.value = false
     }
+    if (created) await fetchTopics()
     return created
   }
 

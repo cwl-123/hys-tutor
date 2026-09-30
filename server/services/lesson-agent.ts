@@ -36,6 +36,17 @@ interface LearnerContext {
   wrongAnswers: string[]
   reports: ErrorReport[]
   nodeNames: Record<string, string>
+  profileText: string
+}
+
+// 方向个性化设置文本：备课（大纲+写作）全程注入
+function profileTextOf(profile?: { style?: string; level?: string; extra?: string }): string {
+  if (!profile) return ''
+  const lines: string[] = []
+  if (profile.level) lines.push(`学习者当前程度：${profile.level}`)
+  if (profile.style) lines.push(`偏好教学风格：${profile.style}`)
+  if (profile.extra) lines.push(`用户额外要求：${profile.extra}`)
+  return lines.length ? `方向个性化设置：\n- ${lines.join('\n- ')}` : ''
 }
 
 const WRONG_SCORE_THRESHOLD = 0.6
@@ -73,7 +84,7 @@ async function buildLearnerContext(topicId: string, nodes: KnowledgeNode[]): Pro
   }
 
   const reports = await readJson<ErrorReport[]>(dataPath('topics', topicId, 'reports.json'), [])
-  return { masterySnapshot, wrongAnswers, reports, nodeNames }
+  return { masterySnapshot, wrongAnswers, reports, nodeNames, profileText: '' }
 }
 
 // 研究阶段：Agent 自主搜索+精读+保存笔记；已有笔记则跳过（缓存命中，备课 < 1 分钟的关键）
@@ -205,11 +216,13 @@ export async function prepareLesson(
   onStage({ stage: 'scheduled', detail: { nodeId: node.id, nodeName: node.name, reason: sched.reason } })
 
   const ctx = await buildLearnerContext(topicId, graph.nodes)
+  ctx.profileText = profileTextOf(topic.profile)
   const learnerCtx = learnerContextText({
     masterySnapshot: ctx.masterySnapshot,
     wrongAnswers: ctx.wrongAnswers,
     reports: ctx.reports.filter((r) => r.nodeId === node.id || node.deps.includes(r.nodeId)),
     nodeNames: ctx.nodeNames,
+    profileText: ctx.profileText,
   })
 
   // 2. 研究（Agent 工具循环，笔记缓存命中则跳过）

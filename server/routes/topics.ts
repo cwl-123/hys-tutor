@@ -4,7 +4,13 @@ import { sendJson } from '../index'
 import { startSse } from '../sse'
 import { createTopic, getGraph, getTopic, listTopics, saveGraph } from '../services/graph-service'
 import { chatGraphEdit } from '../services/graph-chat-service'
-import { knowledgeNodeSchema } from '../../shared/types'
+import { getTopicStats } from '../services/lesson-service'
+import { knowledgeNodeSchema, topicProfileSchema } from '../../shared/types'
+
+const createTopicBodySchema = z.object({
+  name: z.string().min(1).max(100),
+  profile: topicProfileSchema.optional(),
+})
 
 export async function readBody<T>(req: IncomingMessage): Promise<T> {
   const chunks: Buffer[] = []
@@ -22,23 +28,27 @@ export async function handleTopics(
   topicId: string | undefined,
   sub: string | undefined,
 ): Promise<void> {
-  // GET /api/topics — 课题列表
+  // GET /api/topics — 课题列表（带统计，供首页卡片）
   if (!topicId && req.method === 'GET') {
-    sendJson(res, 200, { topics: await listTopics() })
+    const topics = await listTopics()
+    const withStats = await Promise.all(
+      topics.map(async (t) => ({ ...t, stats: await getTopicStats(t.id) })),
+    )
+    sendJson(res, 200, { topics: withStats })
     return
   }
 
   // POST /api/topics — 创建课题并生成图谱（SSE 推进度）
   if (!topicId && req.method === 'POST') {
-    const body = await readBody<{ name?: string }>(req)
-    const name = (body.name ?? '').trim()
-    if (!name) {
-      sendJson(res, 400, { error: '课题名不能为空' })
+    const body = createTopicBodySchema.safeParse(await readBody(req))
+    if (!body.success) {
+      sendJson(res, 400, { error: body.error.issues.map((i) => i.message).join('；') })
       return
     }
+    const { name, profile } = body.data
     const send = startSse(res)
     try {
-      const result = await createTopic(name, (stage, detail) => send('stage', { stage, detail }))
+      const result = await createTopic(name, (stage, detail) => send('stage', { stage, detail }), profile)
       send('result', result)
     } catch (err) {
       send('error', { message: err instanceof Error ? err.message : String(err) })

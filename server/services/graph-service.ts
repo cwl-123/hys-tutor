@@ -12,7 +12,7 @@ import { runAgent, type AgentTool } from '../agent/loop'
 import { searchWeb } from '../agent/tools/web-search'
 import { fetchPage } from '../agent/tools/web-fetch'
 import { repairNodes, validateGraphNodes } from '../../shared/dag'
-import type { Graph, KnowledgeNode, Topic } from '../../shared/types'
+import type { Graph, KnowledgeNode, Topic, TopicProfile } from '../../shared/types'
 
 const MIN_NODES = 15
 const MAX_NODES = 40
@@ -154,12 +154,17 @@ async function runTopicResearch(
 export async function createTopic(
   name: string,
   onStage: (stage: string, detail?: unknown) => void,
+  profile?: TopicProfile,
 ): Promise<{ topic: Topic; graph: Graph }> {
   const topic: Topic = {
     id: newId('t'),
     name,
     createdAt: nowIso(),
     llmModel: getLLMModel(),
+    profile:
+      profile && (profile.style || profile.level || profile.extra)
+        ? { style: profile.style, level: profile.level, extra: profile.extra }
+        : undefined,
   }
 
   const research = await runTopicResearch(topic.id, name, onStage)
@@ -172,7 +177,7 @@ export async function createTopic(
   for (let attempt = 0; attempt < 2; attempt++) {
     const llm = await completeJson({
       system: GRAPH_SYSTEM_PROMPT,
-      prompt: graphUserPrompt(name, researchBlock, hints),
+      prompt: graphUserPrompt(name, researchBlock, hints, topic.profile),
       schema: llmGraphSchema,
     })
     nodes = repairNodes(toKnowledgeNodes(llm.nodes), MAX_NODES)

@@ -1,4 +1,12 @@
-import type { GradeResult, MasteryLogEntry, Question } from './types'
+import type { GradeResult, MasteryLogEntry, Question, Topic } from './types'
+
+// 课题统计（首页卡片展示）
+export interface TopicStats {
+  nodeCount: number
+  lessonCount: number
+  lastLessonAt: string | null
+}
+export type TopicWithStats = Topic & { stats: TopicStats }
 
 // 课程列表项（不含正文，供图谱页挂载展示）
 export interface LessonMeta {
