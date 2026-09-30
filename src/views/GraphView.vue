@@ -18,26 +18,15 @@ const route = useRoute()
 const store = useTopicStore()
 
 const topicId = computed(() => String(route.params.id))
-
-// 本地可编辑副本，保存后才写回 store
-const editNodes = ref<KnowledgeNode[]>([])
-const dirty = ref(false)
 const selectedId = ref<string | null>(null)
-const saveError = ref<string | null>(null)
 const chatVisible = ref(false)
+const applyError = ref<string | null>(null)
 
 onMounted(async () => {
   await store.loadTopic(topicId.value)
-  syncFromStore()
 })
 
-function syncFromStore() {
-  editNodes.value = store.nodes.map((n) => ({ ...n, deps: [...n.deps] }))
-  dirty.value = false
-  selectedId.value = null
-}
-
-const positions = computed(() => layoutGraph(editNodes.value))
+const positions = computed(() => layoutGraph(store.nodes))
 
 const lessonCountByNode = computed(() => {
   const counts = new Map<string, number>()
@@ -48,7 +37,7 @@ const lessonCountByNode = computed(() => {
 })
 
 const flowNodes = computed<Node[]>(() =>
-  editNodes.value.map((n) => ({
+  store.nodes.map((n) => ({
     id: n.id,
     type: 'knode',
     position: positions.value.get(n.id) ?? { x: 0, y: 0 },
@@ -58,8 +47,8 @@ const flowNodes = computed<Node[]>(() =>
 )
 
 const flowEdges = computed<Edge[]>(() => {
-  const ids = new Set(editNodes.value.map((n) => n.id))
-  return editNodes.value.flatMap((n) =>
+  const ids = new Set(store.nodes.map((n) => n.id))
+  return store.nodes.flatMap((n) =>
     n.deps
       .filter((d) => ids.has(d) && d !== n.id)
       .map<Edge>((d) => ({
@@ -71,7 +60,7 @@ const flowEdges = computed<Edge[]>(() => {
   )
 })
 
-const selectedNode = computed(() => editNodes.value.find((n) => n.id === selectedId.value) ?? null)
+const selectedNode = computed(() => store.nodes.find((n) => n.id === selectedId.value) ?? null)
 
 const selectedNodeLessons = computed(() =>
   selectedNode.value ? store.lessons.filter((l) => l.nodeIds.includes(selectedNode.value!.id)) : [],
@@ -81,50 +70,13 @@ function onNodeClick(event: NodeMouseEvent) {
   selectedId.value = event.node.id
 }
 
-function applyPatch(patch: Partial<KnowledgeNode>) {
-  if (!selectedId.value) return
-  editNodes.value = editNodes.value.map((n) =>
-    n.id === selectedId.value ? { ...n, ...patch } : n,
-  )
-  dirty.value = true
-}
-
-function removeNode(id: string) {
-  editNodes.value = editNodes.value
-    .filter((n) => n.id !== id)
-    .map((n) => ({ ...n, deps: n.deps.filter((d) => d !== id), manualEdited: true }))
-  selectedId.value = null
-  dirty.value = true
-}
-
-function addNode() {
-  const id = `n_${Date.now().toString(36)}`
-  editNodes.value = [
-    ...editNodes.value,
-    { id, name: '新知识点', description: '', deps: [], mastery: 0, manualEdited: true },
-  ]
-  selectedId.value = id
-  dirty.value = true
-}
-
-async function save() {
-  saveError.value = null
-  try {
-    await store.saveGraph(editNodes.value)
-    syncFromStore()
-  } catch (err) {
-    saveError.value = err instanceof Error ? err.message : String(err)
-  }
-}
-
-// AI 建议的图谱直接保存（面板在有未保存修改时禁用，服务端图谱与本地一致）
+// AI 建议的图谱确认后直接落盘
 async function applyAiProposal(nodes: KnowledgeNode[]) {
-  saveError.value = null
+  applyError.value = null
   try {
     await store.saveGraph(nodes.map((n) => ({ ...n, deps: [...n.deps] })))
-    syncFromStore()
   } catch (err) {
-    saveError.value = err instanceof Error ? err.message : String(err)
+    applyError.value = err instanceof Error ? err.message : String(err)
   }
 }
 </script>
@@ -162,7 +114,7 @@ async function applyAiProposal(nodes: KnowledgeNode[]) {
           ←
         </RouterLink>
         <strong>{{ store.topic.name }}</strong>
-        <span class="toolbar__count">{{ editNodes.length }} 个知识点</span>
+        <span class="toolbar__count">{{ store.nodes.length }} 个知识点</span>
         <div class="toolbar__legend">
           <span class="legend"><i class="legend__dot legend__dot--red" />未掌握 &lt;40</span>
           <span class="legend"><i class="legend__dot legend__dot--yellow" />学习中 40-79</span>
@@ -182,26 +134,13 @@ async function applyAiProposal(nodes: KnowledgeNode[]) {
           >
             🤖 AI 调整
           </button>
-          <button
-            class="btn"
-            @click="addNode"
-          >
-            + 新增知识点
-          </button>
-          <button
-            class="btn btn--primary"
-            :disabled="!dirty"
-            @click="save"
-          >
-            {{ dirty ? '保存修改' : '已保存' }}
-          </button>
         </div>
       </div>
       <p
-        v-if="saveError"
+        v-if="applyError"
         class="toolbar__error"
       >
-        {{ saveError }}
+        {{ applyError }}
       </p>
 
       <div class="canvas-wrap">
@@ -223,17 +162,14 @@ async function applyAiProposal(nodes: KnowledgeNode[]) {
         <NodePanel
           v-if="selectedNode"
           :node="selectedNode"
-          :all-nodes="editNodes"
+          :all-nodes="store.nodes"
           :lessons="selectedNodeLessons"
-          @save="applyPatch"
-          @remove="removeNode"
           @close="selectedId = null"
         />
 
         <GraphChatPanel
           v-if="chatVisible"
           :topic-id="topicId"
-          :disabled="dirty"
           @apply="applyAiProposal"
           @close="chatVisible = false"
         />
