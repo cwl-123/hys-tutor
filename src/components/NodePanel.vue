@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import type { LessonMeta } from '@shared/api'
 import type { KnowledgeNode } from '@shared/types'
 
@@ -19,16 +19,32 @@ const name = ref(props.node.name)
 const description = ref(props.node.description)
 const deps = ref<string[]>([...props.node.deps])
 
+// 切换节点时重置表单，且不触发 emit
+const syncing = ref(false)
 watch(
   () => props.node.id,
-  () => {
+  async () => {
+    syncing.value = true
     name.value = props.node.name
     description.value = props.node.description
     deps.value = [...props.node.deps]
+    confirmRemove.value = false
+    await nextTick()
+    syncing.value = false
   },
 )
 
-const depCandidates = computed(() => props.allNodes.filter((n) => n.id !== props.node.id))
+// 面板改动实时写回画布工作副本（落盘仍由工具栏「保存修改」负责）
+function emitPatch() {
+  if (syncing.value) return
+  emit('save', {
+    name: name.value,
+    description: description.value,
+    deps: [...deps.value],
+    manualEdited: true,
+  })
+}
+watch([name, description], emitPatch)
 
 // 当前节点的下游（直接/间接依赖它的节点）：选作前置会成环，从候选中排除
 const descendants = computed(() => {
@@ -57,8 +73,9 @@ const depDropdown = ref(false)
 
 const addCandidates = computed(() => {
   const kw = depSearch.value.trim().toLowerCase()
-  return depCandidates.value.filter(
+  return props.allNodes.filter(
     (n) =>
+      n.id !== props.node.id &&
       !deps.value.includes(n.id) &&
       !descendants.value.has(n.id) &&
       (!kw || n.name.toLowerCase().includes(kw) || n.description.toLowerCase().includes(kw)),
@@ -67,63 +84,69 @@ const addCandidates = computed(() => {
 
 function removeDep(id: string) {
   deps.value = deps.value.filter((d) => d !== id)
+  emitPatch()
 }
 
 function addDep(id: string) {
   if (!deps.value.includes(id)) deps.value = [...deps.value, id]
   depSearch.value = ''
   depDropdown.value = false
+  emitPatch()
 }
+
+// 删除：次要操作 + 二次确认
+const confirmRemove = ref(false)
+const dependents = computed(() => props.allNodes.filter((n) => n.deps.includes(props.node.id)))
 
 function fmtDate(iso: string): string {
   return new Date(iso).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
-
-function onSave() {
-  emit('save', {
-    name: name.value.trim(),
-    description: description.value.trim(),
-    deps: [...deps.value],
-    manualEdited: true,
-  })
 }
 </script>
 
 <template>
   <aside class="panel">
     <header class="panel__header">
-      <span>编辑知识点</span>
+      <div>
+        <div class="panel__title">
+          知识点
+        </div>
+        <div class="panel__subtitle">
+          {{ node.name }}
+        </div>
+      </div>
       <button
         class="panel__close"
+        title="关闭"
         @click="emit('close')"
       >
         ×
       </button>
     </header>
 
-    <label class="panel__field">
-      <span>名称</span>
-      <input
-        v-model="name"
-        type="text"
-      >
-    </label>
+    <section class="panel__section">
+      <label class="field">
+        <span class="field__label">名称</span>
+        <input
+          v-model="name"
+          type="text"
+        >
+      </label>
+      <label class="field">
+        <span class="field__label">描述</span>
+        <textarea
+          v-model="description"
+          rows="3"
+        />
+      </label>
+    </section>
 
-    <label class="panel__field">
-      <span>描述</span>
-      <textarea
-        v-model="description"
-        rows="3"
-      />
-    </label>
-
-    <div class="panel__field">
-      <span>前置依赖</span>
-      <div class="panel__deps">
+    <section class="panel__section">
+      <span class="field__label">前置依赖</span>
+      <div class="deps">
         <span
           v-for="d in selectedDeps"
           :key="d.id"
-          class="dep-chip dep-chip--on"
+          class="dep-chip"
         >
           {{ d.name }}
           <button
@@ -136,7 +159,7 @@ function onSave() {
         </span>
         <span
           v-if="selectedDeps.length === 0"
-          class="panel__empty"
+          class="panel__muted"
         >
           无前置依赖（入门节点）
         </span>
@@ -145,7 +168,7 @@ function onSave() {
         <input
           v-model="depSearch"
           type="text"
-          placeholder="搜索并添加依赖…"
+          placeholder="+ 搜索并添加依赖"
           @focus="depDropdown = true"
           @blur="depDropdown = false"
         >
@@ -164,21 +187,27 @@ function onSave() {
           </button>
           <p
             v-if="addCandidates.length === 0"
-            class="panel__empty dep-add__none"
+            class="panel__muted dep-add__none"
           >
-            无匹配节点（下游节点不可作为前置，避免成环）
+            无匹配（下游节点不可作前置，避免成环）
           </p>
         </div>
       </div>
-    </div>
+    </section>
 
-    <div class="panel__meta">
-      掌握分：{{ node.mastery }}（由练习批改更新，不可手改）
-    </div>
+    <section class="panel__section">
+      <div class="mastery-row">
+        <span class="field__label">掌握分</span>
+        <span class="mastery-row__value">{{ node.mastery }}</span>
+      </div>
+      <p class="panel__muted">
+        由练习批改自动更新，不可手动修改
+      </p>
+    </section>
 
-    <div class="panel__field">
-      <span>历史课程（{{ lessons.length }}）</span>
-      <div class="panel__lessons">
+    <section class="panel__section">
+      <span class="field__label">历史课程（{{ lessons.length }}）</span>
+      <div class="lessons">
         <RouterLink
           v-for="l in lessons"
           :key="l.id"
@@ -190,86 +219,137 @@ function onSave() {
         </RouterLink>
         <p
           v-if="lessons.length === 0"
-          class="panel__empty"
+          class="panel__muted"
         >
           还没有该知识点的课程
         </p>
       </div>
-    </div>
+    </section>
 
-    <footer class="panel__actions">
+    <footer class="panel__footer">
       <button
-        class="btn btn--danger"
-        @click="emit('remove', node.id)"
+        v-if="!confirmRemove"
+        class="panel__danger-link"
+        @click="confirmRemove = true"
       >
-        删除节点
+        删除该知识点…
       </button>
-      <button
-        class="btn btn--primary"
-        :disabled="!name.trim()"
-        @click="onSave"
+      <div
+        v-else
+        class="remove-confirm"
       >
-        应用
-      </button>
+        <p>
+          确认删除「{{ node.name }}」？
+          <template v-if="dependents.length">
+            {{ dependents.length }} 个下游节点对它的依赖将一并移除。
+          </template>
+          <template v-if="lessons.length">
+            该节点已有 {{ lessons.length }} 节历史课程。
+          </template>
+        </p>
+        <div class="remove-confirm__actions">
+          <button
+            class="btn"
+            @click="confirmRemove = false"
+          >
+            取消
+          </button>
+          <button
+            class="btn btn--danger"
+            @click="emit('remove', node.id)"
+          >
+            确认删除
+          </button>
+        </div>
+      </div>
+      <p class="panel__muted panel__save-hint">
+        修改已实时反映到画布，点工具栏「保存修改」落盘
+      </p>
     </footer>
   </aside>
 </template>
 
 <style scoped>
 .panel {
-  width: 300px;
+  width: 320px;
   border-left: 1px solid var(--border);
-  padding: 16px;
+  background: #fff;
   display: flex;
   flex-direction: column;
-  gap: 14px;
   overflow-y: auto;
 }
 .panel__header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.panel__title {
+  font-size: 12px;
+  color: var(--text-dim);
+  letter-spacing: 0.5px;
+}
+.panel__subtitle {
+  margin-top: 2px;
+  font-size: 16px;
   font-weight: 600;
 }
 .panel__close {
   border: none;
   background: none;
   font-size: 20px;
+  line-height: 1;
   cursor: pointer;
   color: var(--text-dim);
 }
-.panel__field {
+.panel__close:hover {
+  color: var(--text);
+}
+.panel__section {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.field {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 13px;
+}
+.field__label {
+  font-size: 12px;
   color: var(--text-dim);
 }
-.panel__field input,
-.panel__field textarea {
+.field input,
+.field textarea {
   font: inherit;
+  font-size: 13px;
   color: var(--text);
-  padding: 6px 8px;
+  padding: 7px 10px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
+  resize: vertical;
 }
-.panel__deps {
+.field input:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+.deps {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 .dep-chip {
-  font-size: 12px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: #fff;
-}
-.dep-chip--on {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border-color: #3b82f6;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid #bfdbfe;
   background: #eff6ff;
   color: #1d4ed8;
 }
@@ -289,13 +369,15 @@ function onSave() {
   width: 100%;
   font: inherit;
   font-size: 13px;
-  padding: 6px 10px;
+  padding: 7px 10px;
   border: 1px dashed var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
+  color: var(--text);
 }
 .dep-add input:focus {
-  border-color: #3b82f6;
   outline: none;
+  border-color: #3b82f6;
+  border-style: solid;
 }
 .dep-add__dropdown {
   position: absolute;
@@ -336,15 +418,16 @@ function onSave() {
   padding: 8px 10px;
   margin: 0;
 }
-.panel__empty {
-  font-size: 12px;
-  color: var(--text-dim);
+.mastery-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
 }
-.panel__meta {
-  font-size: 12px;
-  color: var(--text-dim);
+.mastery-row__value {
+  font-size: 20px;
+  font-weight: 700;
 }
-.panel__lessons {
+.lessons {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -353,7 +436,7 @@ function onSave() {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 6px 10px;
+  padding: 7px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
   text-decoration: none;
@@ -373,29 +456,64 @@ function onSave() {
   font-size: 11px;
   color: var(--text-dim);
 }
-.panel__actions {
+.panel__muted {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.panel__footer {
   margin-top: auto;
+  padding: 14px 20px 18px;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 10px;
+}
+.panel__danger-link {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-dim);
+  text-decoration: underline dotted;
+  cursor: pointer;
+  padding: 0;
+}
+.panel__danger-link:hover {
+  color: var(--mastery-red);
+}
+.remove-confirm {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: #991b1b;
+}
+.remove-confirm p {
+  margin: 0 0 8px;
+  line-height: 1.6;
+}
+.remove-confirm__actions {
+  display: flex;
+  justify-content: flex-end;
   gap: 8px;
+}
+.panel__save-hint {
+  line-height: 1.6;
 }
 .btn {
   font: inherit;
-  padding: 6px 14px;
+  font-size: 12px;
+  padding: 5px 12px;
   border-radius: 6px;
   border: 1px solid var(--border);
+  background: #fff;
   cursor: pointer;
 }
-.btn--primary {
-  background: #3b82f6;
-  border-color: #3b82f6;
-  color: #fff;
-}
-.btn--primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
 .btn--danger {
-  color: var(--mastery-red);
+  border-color: var(--mastery-red);
+  color: #fff;
+  background: var(--mastery-red);
 }
 </style>

@@ -2,9 +2,11 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { VueFlow, type Node, type Edge, type NodeMouseEvent } from '@vue-flow/core'
+import { Controls } from '@vue-flow/controls'
 import { Background } from '@vue-flow/background'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
+import '@vue-flow/controls/dist/style.css'
 import { useTopicStore } from '@/stores/topic'
 import { layoutGraph } from '@/utils/layout'
 import GraphNode from '@/components/GraphNode.vue'
@@ -162,9 +164,9 @@ async function applyAiProposal(nodes: KnowledgeNode[]) {
         <strong>{{ store.topic.name }}</strong>
         <span class="toolbar__count">{{ editNodes.length }} 个知识点</span>
         <div class="toolbar__legend">
-          <span class="legend legend--red">&lt;40</span>
-          <span class="legend legend--yellow">40-79</span>
-          <span class="legend legend--green">≥80</span>
+          <span class="legend"><i class="legend__dot legend__dot--red" />未掌握 &lt;40</span>
+          <span class="legend"><i class="legend__dot legend__dot--yellow" />学习中 40-79</span>
+          <span class="legend"><i class="legend__dot legend__dot--green" />已掌握 ≥80</span>
         </div>
         <div class="toolbar__actions">
           <RouterLink
@@ -207,10 +209,12 @@ async function applyAiProposal(nodes: KnowledgeNode[]) {
           :nodes="flowNodes"
           :edges="flowEdges"
           :default-viewport="{ zoom: 0.85 }"
+          :default-edge-options="{ style: { stroke: '#cbd5e1' } }"
           fit-view-on-init
           @node-click="onNodeClick"
         >
           <Background />
+          <Controls :show-interactive="false" />
           <template #node-knode="nodeProps">
             <GraphNode :data="nodeProps.data" />
           </template>
@@ -273,25 +277,28 @@ async function applyAiProposal(nodes: KnowledgeNode[]) {
 }
 .toolbar__legend {
   display: flex;
-  gap: 6px;
+  gap: 14px;
 }
 .legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 12px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid;
+  color: var(--text-dim);
 }
-.legend--red {
-  color: var(--mastery-red);
-  border-color: var(--mastery-red);
+.legend__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
 }
-.legend--yellow {
-  color: var(--mastery-yellow);
-  border-color: var(--mastery-yellow);
+.legend__dot--red {
+  background: var(--mastery-red);
 }
-.legend--green {
-  color: var(--mastery-green);
-  border-color: var(--mastery-green);
+.legend__dot--yellow {
+  background: var(--mastery-yellow);
+}
+.legend__dot--green {
+  background: var(--mastery-green);
 }
 .toolbar__actions {
   margin-left: auto;

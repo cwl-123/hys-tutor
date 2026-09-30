@@ -21,7 +21,9 @@ const level = computed(() => masteryLevel(props.data.node.mastery))
       {{ data.node.name }}
     </div>
     <div class="knode__row">
-      <span class="knode__mastery">{{ data.node.mastery }} 分</span>
+      <span class="knode__mastery">
+        <i class="knode__dot" />{{ data.node.mastery }} 分
+      </span>
       <span
         v-if="data.lessonCount > 0"
         class="knode__lessons"
@@ -37,45 +39,67 @@ const level = computed(() => masteryLevel(props.data.node.mastery))
 
 <style scoped>
 .knode {
-  width: 200px;
-  padding: 10px 12px;
+  width: 190px;
+  padding: 10px 14px;
   border-radius: 10px;
-  border: 2px solid var(--border);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--border);
   background: #fff;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
+  box-shadow: 0 1px 3px rgb(15 23 42 / 6%);
+  transition: box-shadow 0.15s;
+}
+.knode:hover {
+  box-shadow: 0 4px 12px rgb(15 23 42 / 10%);
 }
 .knode--red {
-  border-color: var(--mastery-red);
-  background: #fef2f2;
+  border-left-color: var(--mastery-red);
 }
 .knode--yellow {
-  border-color: var(--mastery-yellow);
-  background: #fffbeb;
+  border-left-color: var(--mastery-yellow);
 }
 .knode--green {
-  border-color: var(--mastery-green);
-  background: #f0fdf4;
+  border-left-color: var(--mastery-green);
 }
 .knode--selected {
-  outline: 2px solid #3b82f6;
-  outline-offset: 1px;
+  border-color: #3b82f6;
+  border-left-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgb(59 130 246 / 15%);
 }
 .knode__name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
+  color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .knode__row {
-  margin-top: 4px;
+  margin-top: 5px;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 .knode__mastery {
-  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
   color: var(--text-dim);
+}
+.knode__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--border);
+}
+.knode--red .knode__dot {
+  background: var(--mastery-red);
+}
+.knode--yellow .knode__dot {
+  background: var(--mastery-yellow);
+}
+.knode--green .knode__dot {
+  background: var(--mastery-green);
 }
 .knode__lessons {
   font-size: 11px;
