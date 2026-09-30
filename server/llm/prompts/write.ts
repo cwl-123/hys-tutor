@@ -4,6 +4,35 @@ import type { LlmOutline } from './outline'
 export const WRITE_SYSTEM_PROMPT = `你是一位优秀的技术讲师，擅长把复杂概念讲得循序渐进、贴近听众。
 你直接输出课程 markdown 正文，不输出任何前后缀说明。`
 
+export const REVISE_SYSTEM_PROMPT = `你是一位严格的课程修订编辑。你会收到已生成的课程正文、研究笔记和用户的修改意见，输出修订后的完整课程 markdown。
+修订原则：忠于研究笔记的事实与来源引用；保留原课程中正确的部分；针对用户意见做实质调整而非表面改写。
+你直接输出修订后的完整 markdown，不输出任何前后缀说明。`
+
+export function reviseLessonPrompt(opts: {
+  contentMd: string
+  instruction: string
+  noteJson: string
+  sources: string
+}): string {
+  return `请根据用户意见修订以下课程。
+
+用户意见：
+${opts.instruction.trim() || '（未填写具体意见：请自行检查并改进讲解清晰度、例子贴合度与篇幅节奏）'}
+
+研究笔记（事实依据）：
+${opts.noteJson}
+
+来源列表（正文中用 [1] [2] 形式引用）：
+${opts.sources}
+
+原课程正文：
+<<<CONTENT
+${opts.contentMd}
+CONTENT>>>
+
+输出修订后的完整课程 markdown（保持 15 分钟微课篇幅与原有章节结构风格）。`
+}
+
 export function writeLessonPrompt(opts: {
   topicName: string
   node: KnowledgeNode

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { LessonMeta } from '@shared/api'
 import { masteryLevel, type KnowledgeNode } from '@shared/types'
 
@@ -12,6 +12,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   learn: [id: string]
+  deleteLesson: [id: string]
 }>()
 
 const level = computed(() => masteryLevel(props.node.mastery))
@@ -31,6 +32,15 @@ const lockedDeps = computed(() => deps.value.filter((d) => d.mastery < 80))
 function fmtDate(iso: string): string {
   return new Date(iso).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
+
+function statusLabel(status: string): string {
+  if (status === 'failed') return '失败'
+  if (status === 'revising') return '优化中'
+  if (status === 'generated') return ''
+  return '备课中'
+}
+
+const confirmDeleteId = ref<string | null>(null)
 </script>
 
 <template>
@@ -99,21 +109,56 @@ function fmtDate(iso: string): string {
     <section class="panel__section">
       <span class="panel__label">历史课程（{{ lessons.length }}）</span>
       <div class="lessons">
-        <RouterLink
+        <div
           v-for="l in lessons"
           :key="l.id"
-          :to="`/lesson/${l.id}`"
           class="lesson-item"
         >
-          <span class="lesson-item__title">
-            {{ l.title }}
-            <em
-              v-if="l.status !== 'generated'"
-              class="lesson-item__live"
-            >{{ l.status === 'failed' ? '失败' : '备课中' }}</em>
+          <RouterLink
+            :to="`/lesson/${l.id}`"
+            class="lesson-item__link"
+          >
+            <span class="lesson-item__title">
+              {{ l.title }}
+              <em
+                v-if="l.status !== 'generated'"
+                class="lesson-item__live"
+                :class="{ 'lesson-item__live--bad': l.status === 'failed' }"
+              >{{ statusLabel(l.status) }}</em>
+            </span>
+            <span class="lesson-item__meta">
+              {{ fmtDate(l.createdAt) }}<template v-if="l.status === 'generated'"> · {{ l.wordCount }} 字</template>
+            </span>
+          </RouterLink>
+          <button
+            v-if="confirmDeleteId !== l.id"
+            class="lesson-item__del"
+            title="删除该课件"
+            @click="confirmDeleteId = l.id"
+          >
+            🗑
+          </button>
+          <span
+            v-else
+            class="lesson-item__confirm"
+          >
+            <button
+              class="lesson-item__yes"
+              @click="
+                emit('deleteLesson', l.id)
+                confirmDeleteId = null
+              "
+            >
+              删除
+            </button>
+            <button
+              class="lesson-item__no"
+              @click="confirmDeleteId = null"
+            >
+              取消
+            </button>
           </span>
-          <span class="lesson-item__meta">{{ fmtDate(l.createdAt) }} · {{ l.wordCount }} 字</span>
-        </RouterLink>
+        </div>
         <p
           v-if="lessons.length === 0"
           class="panel__muted"
@@ -269,16 +314,23 @@ function fmtDate(iso: string): string {
 }
 .lesson-item {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 7px 10px;
+  align-items: center;
+  gap: 6px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  text-decoration: none;
+  padding: 7px 10px;
 }
 .lesson-item:hover {
   border-color: #3b82f6;
   background: #eff6ff;
+}
+.lesson-item__link {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-decoration: none;
 }
 .lesson-item__title {
   font-size: 13px;
@@ -296,9 +348,44 @@ function fmtDate(iso: string): string {
   padding: 1px 6px;
   margin-left: 6px;
 }
+.lesson-item__live--bad {
+  color: var(--mastery-red);
+  background: #fef2f2;
+}
 .lesson-item__meta {
   font-size: 11px;
   color: var(--text-dim);
+}
+.lesson-item__del {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 12px;
+  opacity: 0.35;
+}
+.lesson-item:hover .lesson-item__del {
+  opacity: 1;
+}
+.lesson-item__confirm {
+  display: flex;
+  gap: 4px;
+}
+.lesson-item__yes,
+.lesson-item__no {
+  border: none;
+  font: inherit;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.lesson-item__yes {
+  background: var(--mastery-red);
+  color: #fff;
+}
+.lesson-item__no {
+  background: #f1f5f9;
+  color: var(--text);
 }
 .panel__footer {
   margin-top: auto;

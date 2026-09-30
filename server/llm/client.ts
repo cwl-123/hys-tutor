@@ -56,7 +56,7 @@ export async function completeJson<T>(opts: {
     { role: 'user', content: opts.prompt },
   ]
   let lastErr: unknown
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     const res = await llm.chat.completions.create({
       model: getLLMModel(),
       messages,

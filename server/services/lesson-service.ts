@@ -1,4 +1,4 @@
-import { readdir } from 'node:fs/promises'
+import { readdir, rm } from 'node:fs/promises'
 import { dataPath, readJson } from '../repo/json-store'
 import { getTopic, listTopics } from './graph-service'
 import type { LessonMeta } from '../../shared/api'
@@ -65,6 +65,17 @@ export async function getTopicStats(topicId: string): Promise<TopicStats> {
     lessonCount: lessons.length,
     lastLessonAt: lessons[0]?.createdAt ?? null,
   }
+}
+
+// 删除课程（含题目与答题记录）；返回是否删除成功
+export async function deleteLesson(lessonId: string): Promise<boolean> {
+  const detail = await findLesson(lessonId)
+  if (!detail) return false
+  const lessonsDir = dataPath('topics', detail.topic.id, 'lessons')
+  await rm(`${lessonsDir}/${lessonId}.json`, { force: true })
+  await rm(`${lessonsDir}/${lessonId}.questions.json`, { force: true })
+  await rm(dataPath('topics', detail.topic.id, 'attempts', `${lessonId}.json`), { force: true })
+  return true
 }
 
 // 按 lessonId 反查所属课题（课题数极少，逐个探测即可）

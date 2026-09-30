@@ -85,6 +85,21 @@ async function applyAiProposal(nodes: KnowledgeNode[]) {
 function learnNode(nodeId: string) {
   void router.push(`/lesson/new?topic=${topicId.value}&node=${nodeId}`)
 }
+
+// 面板删除课件
+async function deleteLesson(lessonId: string) {
+  applyError.value = null
+  try {
+    const res = await fetch(`/api/lessons/${lessonId}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const data = (await res.json()) as { error?: string }
+      throw new Error(data.error ?? `删除失败：${res.status}`)
+    }
+    await store.fetchLessons(topicId.value)
+  } catch (err) {
+    applyError.value = err instanceof Error ? err.message : String(err)
+  }
+}
 </script>
 
 <template>
@@ -173,6 +188,7 @@ function learnNode(nodeId: string) {
           :lessons="selectedNodeLessons"
           @close="selectedId = null"
           @learn="learnNode"
+          @delete-lesson="deleteLesson"
         />
 
         <GraphChatPanel

@@ -3,10 +3,12 @@ import { healthRoute } from './routes/health'
 import { handleGraphChat, handleTopics } from './routes/topics'
 import {
   handleCreateLesson,
+  handleDeleteLesson,
   handleFindLesson,
   handleGetLesson,
   handleLessonProgress,
   handleListLessons,
+  handleReviseLesson,
   handleSubmitLesson,
 } from './routes/lessons'
 import { handleCreateReport, handleListReports } from './routes/reports'
@@ -39,6 +41,18 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, next:
     const getLessonMatch = url.match(/^\/topics\/([^/]+)\/lessons\/([^/]+)$/)
     if (getLessonMatch && req.method === 'GET') {
       await handleGetLesson(req, res, getLessonMatch[1], getLessonMatch[2])
+      return
+    }
+
+    // POST /api/lessons/:lid/revise — 课件 AI 优化；DELETE — 删除课件
+    const reviseMatch = url.match(/^\/lessons\/([^/]+)\/revise$/)
+    if (reviseMatch && req.method === 'POST') {
+      await handleReviseLesson(req, res, reviseMatch[1])
+      return
+    }
+    const deleteMatch = url.match(/^\/lessons\/([^/]+)$/)
+    if (deleteMatch && req.method === 'DELETE') {
+      await handleDeleteLesson(req, res, deleteMatch[1])
       return
     }
 

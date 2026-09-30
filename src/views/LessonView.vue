@@ -12,6 +12,8 @@ const lessonStore = useLessonStore()
 const topicStore = useTopicStore()
 
 const stageList = ref<HTMLElement | null>(null)
+const reviseOpen = ref(false)
+const reviseInstruction = ref('')
 
 const isNew = computed(() => route.params.id === 'new')
 const nodeName = computed(() => {
@@ -82,6 +84,15 @@ async function retry() {
     return
   }
   await startGeneration()
+}
+
+async function startRevise() {
+  const lesson = lessonStore.lesson
+  if (!lesson) return
+  reviseOpen.value = false
+  await lessonStore.revise(lesson.id, reviseInstruction.value)
+  reviseInstruction.value = ''
+  await lessonStore.load(lesson.id)
 }
 </script>
 
@@ -156,6 +167,21 @@ async function retry() {
         <p class="lesson__reason">
           为什么这节课讲这个：{{ lessonStore.lesson.scheduleReason }}
         </p>
+        <div class="lesson__actions">
+          <button
+            class="btn"
+            :disabled="lessonStore.generating"
+            @click="reviseOpen = true"
+          >
+            ✨ AI 优化本课
+          </button>
+          <span
+            v-if="lessonStore.lesson.revisedAt"
+            class="lesson__revised"
+          >
+            已于 {{ new Date(lessonStore.lesson.revisedAt).toLocaleString('zh-CN') }} 优化
+          </span>
+        </div>
       </header>
 
       <MarkdownRenderer :content="lessonStore.lesson.contentMd" />
@@ -200,6 +226,41 @@ async function retry() {
     >
       <p>加载中…</p>
     </div>
+
+    <!-- AI 优化弹窗 -->
+    <Teleport to="body">
+      <div
+        v-if="reviseOpen"
+        class="revise-mask"
+        @click.self="reviseOpen = false"
+      >
+        <div class="revise-modal">
+          <h3>AI 优化本课</h3>
+          <p class="revise-modal__hint">
+            告诉 AI 哪里不满意（讲得太深/例子不好/想多看推导/篇幅太长…），它会基于原研究笔记重写全文并重新出题；留空则自行检查改进。
+          </p>
+          <textarea
+            v-model="reviseInstruction"
+            rows="4"
+            placeholder="如：公式推导跳步太多，请补全；把例子换成广告出价场景"
+          />
+          <div class="revise-modal__actions">
+            <button
+              class="btn"
+              @click="reviseOpen = false"
+            >
+              取消
+            </button>
+            <button
+              class="btn btn--primary"
+              @click="startRevise"
+            >
+              开始优化
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -247,6 +308,57 @@ async function retry() {
   border-left: 3px solid #3b82f6;
   padding: 8px 12px;
   border-radius: 0 6px 6px 0;
+}
+.lesson__actions {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.lesson__revised {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.revise-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgb(15 23 42 / 35%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.revise-modal {
+  width: 520px;
+  background: #fff;
+  border-radius: 14px;
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.revise-modal h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.revise-modal__hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.7;
+}
+.revise-modal textarea {
+  font: inherit;
+  font-size: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  resize: vertical;
+}
+.revise-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 .lesson__sources {
   margin-top: 40px;

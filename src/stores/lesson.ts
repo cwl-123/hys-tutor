@@ -40,6 +40,8 @@ function stageLabel(stage: string, detail?: unknown): string | null {
     }
     case 'write':
       return '正在写课程正文…'
+    case 'revise':
+      return 'AI 正在按你的意见重写课程…'
     case 'self-check':
       return '对照研究笔记自查 + 出课末题…'
     case 'self-check-done': {
@@ -156,5 +158,20 @@ export const useLessonStore = defineStore('lesson', () => {
     questions.value = data.questions?.questions ?? []
   }
 
-  return { stages, streamingContent, generating, error, topic, lesson, questions, generate, attach, load, reset }
+  // 发起课件 AI 优化并挂接进度
+  async function revise(lessonId: string, instruction: string) {
+    const res = await fetch(`/api/lessons/${lessonId}/revise`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ instruction }),
+    })
+    const data = (await res.json()) as { lessonId?: string; error?: string }
+    if (!res.ok || !data.lessonId) {
+      error.value = data.error ?? `发起优化失败：${res.status}`
+      return
+    }
+    await attach(data.lessonId)
+  }
+
+  return { stages, streamingContent, generating, error, topic, lesson, questions, generate, attach, revise, load, reset }
 })

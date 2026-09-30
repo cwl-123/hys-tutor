@@ -3,8 +3,8 @@ import { z } from 'zod'
 import { sendJson } from '../index'
 import { startSse } from '../sse'
 import { dataPath, nowIso, readJson, writeJson } from '../repo/json-store'
-import { startLessonJob, attachLesson, subscribeJob } from '../services/lesson-jobs'
-import { findLesson, getLessonDetail, listLessons, stripQuestions } from '../services/lesson-service'
+import { startLessonJob, attachLesson, subscribeJob, startReviseJob } from '../services/lesson-jobs'
+import { deleteLesson, findLesson, getLessonDetail, listLessons, stripQuestions } from '../services/lesson-service'
 import { gradeObjective, gradeShort } from '../services/grading-service'
 import { applyMasteryChanges, type ApplyEntry } from '../services/mastery-service'
 import type { SubmitResult } from '../../shared/api'
@@ -205,4 +205,40 @@ export async function handleListLessons(
   topicId: string,
 ): Promise<void> {
   sendJson(res, 200, { lessons: await listLessons(topicId) })
+}
+
+const reviseBodySchema = z.object({ instruction: z.string().max(2000).optional() })
+
+// POST /api/lessons/:id/revise — 发起课件 AI 优化任务（后台，原地覆盖）
+export async function handleReviseLesson(
+  req: IncomingMessage,
+  res: ServerResponse,
+  lessonId: string,
+): Promise<void> {
+  const body = reviseBodySchema.safeParse(await readBody(req))
+  if (!body.success) {
+    sendJson(res, 400, { error: body.error.issues.map((i) => i.message).join('；') })
+    return
+  }
+  try {
+    const result = await startReviseJob(lessonId, body.data.instruction ?? '')
+    sendJson(res, 200, result)
+  } catch (err) {
+    sendJson(res, 409, { error: err instanceof Error ? err.message : String(err) })
+  }
+}
+
+// DELETE /api/lessons/:id — 删除课件（含题目与答题记录）
+export async function handleDeleteLesson(
+  _req: IncomingMessage,
+  res: ServerResponse,
+  lessonId: string,
+): Promise<void> {
+  const { jobsRunningFor } = await import('../services/lesson-jobs')
+  if (jobsRunningFor(lessonId)) {
+    sendJson(res, 409, { error: '该课程正在备课/优化中，完成后再删除' })
+    return
+  }
+  const ok = await deleteLesson(lessonId)
+  sendJson(res, ok ? 200 : 404, ok ? { ok: true } : { error: '课程不存在' })
 }

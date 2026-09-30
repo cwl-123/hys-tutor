@@ -14,7 +14,14 @@ export interface LessonMeta {
   title: string
   nodeIds: string[]
   scheduleReason: string
-  status: 'researching' | 'outlining' | 'writing' | 'self-checking' | 'generated' | 'failed'
+  status:
+    | 'researching'
+    | 'outlining'
+    | 'writing'
+    | 'self-checking'
+    | 'revising'
+    | 'generated'
+    | 'failed'
   createdAt: string
   wordCount: number
 }

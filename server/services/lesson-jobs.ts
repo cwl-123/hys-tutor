@@ -1,5 +1,5 @@
 import { dataPath, nowIso, readJson, writeJson } from '../repo/json-store'
-import { prepareLesson, type StageEvent } from './lesson-agent'
+import { prepareLesson, reviseLesson, type StageEvent } from './lesson-agent'
 import type { Lesson, LessonStatus } from '../../shared/types'
 
 // 备课后台任务：发起即返回 lessonId，进度缓存在内存供任意客户端挂接回放
@@ -24,6 +24,7 @@ const STAGE_TO_STATUS: Record<string, LessonStatus> = {
   researching: 'researching',
   outline: 'outlining',
   write: 'writing',
+  revise: 'revising',
   'self-check': 'self-checking',
 }
 
@@ -101,6 +102,50 @@ export interface AttachResult {
   lesson: Lesson | null
 }
 
+// 发起课件优化任务（原地覆盖该课程）
+export async function startReviseJob(
+  lessonId: string,
+  instruction: string,
+): Promise<{ lessonId: string; reused: boolean }> {
+  const running = jobsByLesson.get(lessonId)
+  if (running && running.status === 'running') return { lessonId, reused: true }
+
+  const { findLesson } = await import('./lesson-service')
+  const detail = await findLesson(lessonId)
+  if (!detail) throw new Error('课程不存在')
+  if (detail.lesson.status !== 'generated') throw new Error('仅生成完成的课程可以优化')
+  const topicId = detail.topic.id
+
+  const job: Job = { topicId, lessonId, stages: [], status: 'running', listeners: new Set() }
+  jobsByLesson.set(lessonId, job)
+  runningByTopic.set(topicId, job)
+  await patchLessonStatus(topicId, lessonId, 'revising')
+
+  void (async () => {
+    try {
+      await reviseLesson(lessonId, instruction, (e) => {
+        job.stages.push(e)
+        emit(job, { type: 'stage', e })
+        const status = STAGE_TO_STATUS[e.stage]
+        if (status) void patchLessonStatus(topicId, lessonId, status)
+      })
+      job.status = 'done'
+      emit(job, { type: 'result' })
+    } catch (err) {
+      job.status = 'failed'
+      job.error = err instanceof Error ? err.message : String(err)
+      // 优化失败保留原课程内容
+      await patchLessonStatus(topicId, lessonId, 'generated').catch(() => {})
+      emit(job, { type: 'error', message: job.error })
+    } finally {
+      runningByTopic.delete(topicId)
+      setTimeout(() => jobsByLesson.delete(lessonId), 10 * 60_000)
+    }
+  })()
+
+  return { lessonId, reused: false }
+}
+
 // 挂接任务：返回内存任务（可回放）或落盘课程（已结束/僵尸）
 export async function attachLesson(lessonId: string): Promise<AttachResult> {
   const job = jobsByLesson.get(lessonId)
@@ -123,4 +168,8 @@ export async function attachLesson(lessonId: string): Promise<AttachResult> {
 export function subscribeJob(job: Job, listener: JobListener): () => void {
   job.listeners.add(listener)
   return () => job.listeners.delete(listener)
+}
+
+export function jobsRunningFor(lessonId: string): boolean {
+  return jobsByLesson.get(lessonId)?.status === 'running'
 }

@@ -40,6 +40,7 @@ export const lessonStatusSchema = z.enum([
   'outlining',
   'writing',
   'self-checking',
+  'revising',
   'generated',
   'failed',
 ])
@@ -64,6 +65,7 @@ export const lessonSchema = z.object({
   contentMd: z.string(),
   status: lessonStatusSchema,
   createdAt: z.string(),
+  revisedAt: z.string().optional(),
 })
 export type Lesson = z.infer<typeof lessonSchema>
 

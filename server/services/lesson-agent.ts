@@ -12,10 +12,11 @@ import {
   llmOutlineSchema,
   outlineUserPrompt,
 } from '../llm/prompts/outline'
-import { WRITE_SYSTEM_PROMPT, writeLessonPrompt } from '../llm/prompts/write'
+import { WRITE_SYSTEM_PROMPT, REVISE_SYSTEM_PROMPT, writeLessonPrompt, reviseLessonPrompt } from '../llm/prompts/write'
 import { SELFCHECK_SYSTEM_PROMPT, llmSelfCheckSchema, selfCheckPrompt } from '../llm/prompts/selfcheck'
 import { scheduleNext } from './scheduler'
 import { getGraph, getTopic } from './graph-service'
+import { findLesson } from './lesson-service'
 import { MASTERY_UNLOCK_THRESHOLD } from '../../shared/types'
 import type {
   Attempt,
@@ -311,4 +312,67 @@ export async function prepareLesson(
 
   onStage({ stage: 'done', detail: { lessonId, nodeId: node.id, wordCount: contentMd.length } })
   return { lesson, questions }
+}
+
+// AI 优化课件：基于研究笔记 + 用户意见重写正文，重跑自查出题，原地覆盖
+export async function reviseLesson(
+  lessonId: string,
+  instruction: string,
+  onStage: StageFn = () => {},
+): Promise<Lesson> {
+  const detail = await findLesson(lessonId)
+  if (!detail) throw new Error('课程不存在')
+  const { topic, lesson } = detail
+  if (lesson.status !== 'generated') throw new Error('仅生成完成的课程可以优化')
+
+  const graph = await getGraph(topic.id)
+  const node = graph?.nodes.find((n) => n.id === lesson.nodeIds[0])
+  const note = node ? await readResearchNote(topic.id, node.id) : null
+
+  onStage({ stage: 'revise', detail: { instruction } })
+  const revised = await streamWriteLesson(
+    REVISE_SYSTEM_PROMPT,
+    reviseLessonPrompt({
+      contentMd: lesson.contentMd,
+      instruction,
+      noteJson: note ? JSON.stringify(note, null, 2) : '（无研究笔记）',
+      sources: lesson.sources.map((s) => `[${s.idx}] ${s.title} ${s.url}`).join('\n') || '（无来源）',
+    }),
+    onStage,
+  )
+
+  onStage({ stage: 'self-check' })
+  let contentMd = revised
+  let questions: QuestionSet | null = null
+  if (node && note) {
+    const check = await completeJson({
+      system: SELFCHECK_SYSTEM_PROMPT,
+      prompt: selfCheckPrompt(node, note, revised),
+      schema: llmSelfCheckSchema,
+      temperature: 0.2,
+    })
+    contentMd = check.correctedContent?.trim() ? check.correctedContent : revised
+    questions = {
+      questions: check.questions.map<Question>((q, i) => ({
+        id: `q_${i + 1}`,
+        nodeId: node.id,
+        type: q.type,
+        prompt: q.prompt,
+        options: q.options,
+        answer: q.answer,
+        referenceAnswer: q.referenceAnswer,
+        explanation: q.explanation,
+      })),
+    }
+  }
+
+  lesson.contentMd = contentMd
+  lesson.status = 'generated'
+  lesson.revisedAt = nowIso()
+  await writeJson(dataPath('topics', topic.id, 'lessons', `${lessonId}.json`), lesson)
+  if (questions) {
+    await writeJson(dataPath('topics', topic.id, 'lessons', `${lessonId}.questions.json`), questions)
+  }
+  onStage({ stage: 'done', detail: { lessonId, wordCount: contentMd.length } })
+  return lesson
 }
