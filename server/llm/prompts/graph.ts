@@ -14,9 +14,13 @@ export const llmGraphSchema = z.object({
 export const GRAPH_SYSTEM_PROMPT = `你是一位资深的课程架构师，擅长把技术领域拆解为循序渐进的知识点学习路径。
 你只输出合法 JSON，不输出任何解释、前后缀或 markdown 围栏之外的内容。`
 
-export function graphUserPrompt(topicName: string, retryHints?: string): string {
+export function graphUserPrompt(topicName: string, research?: string, retryHints?: string): string {
+  const researchBlock = research
+    ? `\n\n联网调研结论（生成图谱的主要依据，内容板块尽量覆盖）：\n${research}`
+    : ''
   const hints = retryHints ? `\n\n上一次生成存在以下问题，务必修正：\n${retryHints}` : ''
   return `为课题「${topicName}」生成知识点学习图谱。
+${researchBlock}
 
 要求：
 1. 知识点数量 15~40 个，覆盖该课题从入门到进阶的主干内容

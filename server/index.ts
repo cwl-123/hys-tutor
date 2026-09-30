@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { healthRoute } from './routes/health'
-import { handleTopics } from './routes/topics'
+import { handleGraphChat, handleTopics } from './routes/topics'
 import {
   handleCreateLesson,
   handleFindLesson,
@@ -51,6 +51,13 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, next:
     const submitMatch = url.match(/^\/lessons\/([^/]+)\/submit$/)
     if (submitMatch && req.method === 'POST') {
       await handleSubmitLesson(req, res, submitMatch[1])
+      return
+    }
+
+    // POST /api/topics/:id/graph/chat — 图谱 AI 对话式调整
+    const graphChatMatch = url.match(/^\/topics\/([^/]+)\/graph\/chat$/)
+    if (graphChatMatch && req.method === 'POST') {
+      await handleGraphChat(req, res, graphChatMatch[1])
       return
     }
 

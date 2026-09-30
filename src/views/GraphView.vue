@@ -9,6 +9,7 @@ import { useTopicStore } from '@/stores/topic'
 import { layoutGraph } from '@/utils/layout'
 import GraphNode from '@/components/GraphNode.vue'
 import NodePanel from '@/components/NodePanel.vue'
+import GraphChatPanel from '@/components/GraphChatPanel.vue'
 import type { KnowledgeNode } from '@shared/types'
 
 const route = useRoute()
@@ -21,6 +22,7 @@ const editNodes = ref<KnowledgeNode[]>([])
 const dirty = ref(false)
 const selectedId = ref<string | null>(null)
 const saveError = ref<string | null>(null)
+const chatVisible = ref(false)
 
 onMounted(async () => {
   await store.loadTopic(topicId.value)
@@ -112,6 +114,17 @@ async function save() {
     saveError.value = err instanceof Error ? err.message : String(err)
   }
 }
+
+// AI 建议的图谱直接保存（面板在有未保存修改时禁用，服务端图谱与本地一致）
+async function applyAiProposal(nodes: KnowledgeNode[]) {
+  saveError.value = null
+  try {
+    await store.saveGraph(nodes.map((n) => ({ ...n, deps: [...n.deps] })))
+    syncFromStore()
+  } catch (err) {
+    saveError.value = err instanceof Error ? err.message : String(err)
+  }
+}
 </script>
 
 <template>
@@ -162,6 +175,13 @@ async function save() {
           </RouterLink>
           <button
             class="btn"
+            :class="{ 'btn--on': chatVisible }"
+            @click="chatVisible = !chatVisible"
+          >
+            🤖 AI 调整
+          </button>
+          <button
+            class="btn"
             @click="addNode"
           >
             + 新增知识点
@@ -204,6 +224,14 @@ async function save() {
           @save="applyPatch"
           @remove="removeNode"
           @close="selectedId = null"
+        />
+
+        <GraphChatPanel
+          v-if="chatVisible"
+          :topic-id="topicId"
+          :disabled="dirty"
+          @apply="applyAiProposal"
+          @close="chatVisible = false"
         />
       </div>
     </template>
@@ -312,5 +340,10 @@ async function save() {
   text-decoration: none;
   display: inline-flex;
   align-items: center;
+}
+.btn--on {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  color: #1d4ed8;
 }
 </style>

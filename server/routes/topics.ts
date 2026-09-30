@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { sendJson } from '../index'
 import { startSse } from '../sse'
 import { createTopic, getGraph, getTopic, listTopics, saveGraph } from '../services/graph-service'
+import { chatGraphEdit } from '../services/graph-chat-service'
 import { knowledgeNodeSchema } from '../../shared/types'
 
 export async function readBody<T>(req: IncomingMessage): Promise<T> {
@@ -81,4 +82,32 @@ export async function handleTopics(
   }
 
   sendJson(res, 404, { error: 'Not found' })
+}
+
+const graphChatBodySchema = z.object({
+  message: z.string().min(1).max(2000),
+  history: z
+    .array(z.object({ role: z.enum(['user', 'assistant']), content: z.string() }))
+    .max(20)
+    .default([]),
+})
+
+// POST /api/topics/:id/graph/chat — 图谱 AI 对话式调整（返回修改建议，前端确认后应用）
+export async function handleGraphChat(
+  req: IncomingMessage,
+  res: ServerResponse,
+  topicId: string,
+): Promise<void> {
+  const body = graphChatBodySchema.safeParse(await readBody(req))
+  if (!body.success) {
+    sendJson(res, 400, { error: body.error.issues.map((i) => i.message).join('；') })
+    return
+  }
+  try {
+    const result = await chatGraphEdit(topicId, body.data.message, body.data.history)
+    sendJson(res, 200, result)
+  } catch (err) {
+    const status = (err as { status?: number }).status ?? 500
+    sendJson(res, status, { error: err instanceof Error ? err.message : String(err) })
+  }
 }

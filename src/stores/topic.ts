@@ -59,9 +59,20 @@ export const useTopicStore = defineStore('topic', () => {
           {
             onEvent(event, data) {
               if (event === 'stage') {
-                const d = data as { stage: string }
-                stageText.value =
-                  d.stage === 'retrying' ? '生成结果不合格，正在重试…' : 'AI 正在调研并生成知识图谱…'
+                const d = data as { stage: string; detail?: unknown }
+                if (d.stage === 'researching') {
+                  stageText.value = 'AI 正在联网调研该方向的知识体系…'
+                } else if (d.stage === 'research-tool') {
+                  const dd = d.detail as { tool: string; args?: Record<string, unknown> }
+                  if (dd.tool === 'web_search') stageText.value = `调研搜索：${String(dd.args?.query ?? '')}`
+                  else if (dd.tool === 'web_fetch') stageText.value = `调研精读：${String(dd.args?.url ?? '').slice(0, 60)}…`
+                } else if (d.stage === 'research-failed') {
+                  stageText.value = '调研失败，降级为直接生成图谱…'
+                } else if (d.stage === 'retrying') {
+                  stageText.value = '生成结果不合格，正在重试…'
+                } else {
+                  stageText.value = '调研完成，正在生成知识点图谱…'
+                }
               } else if (event === 'result') {
                 const r = data as { topic: Topic; graph: Graph }
                 created = r.topic
