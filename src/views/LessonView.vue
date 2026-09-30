@@ -33,44 +33,55 @@ watch(
   },
 )
 
+async function startGeneration() {
+  lessonStore.reset()
+  // 优先用路由 query 指定的学习方向；直接刷新页面时回退到唯一课题
+  let topicId = typeof route.query.topic === 'string' ? route.query.topic : ''
+  if (!topicId && topicStore.topic) topicId = topicStore.topic.id
+  if (!topicId) {
+    await topicStore.fetchTopics()
+    if (topicStore.topics.length === 1) topicId = topicStore.topics[0].id
+  }
+  if (!topicId) {
+    lessonStore.error = '无法确定学习方向，请从图谱页点「开始下一课」'
+    return
+  }
+  if (topicStore.topic?.id !== topicId || !topicStore.graph) await topicStore.loadTopic(topicId)
+  const nodeId = typeof route.query.node === 'string' ? route.query.node : undefined
+  const lessonId = await lessonStore.generate(topicId, nodeId)
+  if (lessonId) await router.replace(`/lesson/${lessonId}`)
+}
+
 onMounted(async () => {
-  if (isNew.value) {
-    lessonStore.reset()
-    // 优先用路由 query 指定的学习方向；直接刷新页面时回退到唯一课题
-    let topicId = typeof route.query.topic === 'string' ? route.query.topic : ''
-    if (!topicId && topicStore.topic) topicId = topicStore.topic.id
-    if (!topicId) {
-      await topicStore.fetchTopics()
-      if (topicStore.topics.length === 1) topicId = topicStore.topics[0].id
-    }
-    if (!topicId) {
-      lessonStore.error = '无法确定学习方向，请从图谱页点「开始下一课」'
-      return
-    }
-    if (topicStore.topic?.id !== topicId || !topicStore.graph) await topicStore.loadTopic(topicId)
-    const nodeId = typeof route.query.node === 'string' ? route.query.node : undefined
-    const lessonId = await lessonStore.generate(topicId, nodeId)
-    if (lessonId) await router.replace(`/lesson/${lessonId}`)
-  } else {
-    await lessonStore.load(String(route.params.id))
-    const lessonTopicId = lessonStore.lesson?.topicId
-    if (lessonTopicId && topicStore.topic?.id !== lessonTopicId) {
-      await topicStore.loadTopic(lessonTopicId)
-    }
-    // 在途/中断的备课：重新挂接进度流
-    const status = lessonStore.lesson?.status
-    if (status && status !== 'generated' && status !== 'failed') {
-      await lessonStore.attach(String(route.params.id))
+  try {
+    if (isNew.value) {
+      await startGeneration()
+    } else {
       await lessonStore.load(String(route.params.id))
+      const lessonTopicId = lessonStore.lesson?.topicId
+      if (lessonTopicId && topicStore.topic?.id !== lessonTopicId) {
+        await topicStore.loadTopic(lessonTopicId)
+      }
+      // 在途/中断的备课：重新挂接进度流
+      const status = lessonStore.lesson?.status
+      if (status && status !== 'generated' && status !== 'failed') {
+        await lessonStore.attach(String(route.params.id))
+        await lessonStore.load(String(route.params.id))
+      }
     }
+  } catch (err) {
+    lessonStore.error = err instanceof Error ? err.message : String(err)
   }
 })
 
 async function retry() {
   const lesson = lessonStore.lesson
-  if (!lesson) return
-  const lessonId = await lessonStore.generate(lesson.topicId, lesson.nodeIds[0])
-  if (lessonId && lessonId !== lesson.id) await router.replace(`/lesson/${lessonId}`)
+  if (lesson) {
+    const lessonId = await lessonStore.generate(lesson.topicId, lesson.nodeIds[0])
+    if (lessonId && lessonId !== lesson.id) await router.replace(`/lesson/${lessonId}`)
+    return
+  }
+  await startGeneration()
 }
 </script>
 
@@ -115,7 +126,6 @@ async function retry() {
       </p>
       <div class="state__actions">
         <button
-          v-if="lessonStore.lesson"
           class="btn btn--primary"
           @click="retry"
         >

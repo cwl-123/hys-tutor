@@ -76,24 +76,37 @@ export const useLessonStore = defineStore('lesson', () => {
   // 发起后台备课任务并挂接进度；离开页面再回来可重新 attach 回放
   async function generate(topicId: string, nodeId?: string): Promise<string | null> {
     reset()
-    const res = await fetch(`/api/topics/${topicId}/lessons`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(nodeId ? { nodeId } : {}),
-    })
-    const data = (await res.json()) as { lessonId?: string; reused?: boolean; error?: string }
-    if (!res.ok || !data.lessonId) {
-      error.value = data.error ?? `发起备课失败：${res.status}`
+    // 立即进入进度视图，避免任何窗口期只显示"加载中"
+    generating.value = true
+    stages.value = [{ key: 'init', label: '正在发起备课任务…', ts: Date.now() }]
+    try {
+      const res = await fetch(`/api/topics/${topicId}/lessons`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nodeId ? { nodeId } : {}),
+      })
+      const data = (await res.json()) as { lessonId?: string; reused?: boolean; error?: string }
+      if (!res.ok || !data.lessonId) {
+        throw new Error(data.error ?? `发起备课失败：${res.status}`)
+      }
+      if (data.reused) {
+        stages.value = [
+          ...stages.value,
+          { key: 'reused', label: '检测到该方向已有在途备课任务，直接挂接其进度', ts: Date.now() },
+        ]
+      }
+      await attach(data.lessonId)
+      return data.lessonId
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : String(err)
+      generating.value = false
       return null
     }
-    await attach(data.lessonId)
-    return data.lessonId
   }
 
   // 挂接在途/已完成任务的进度流（服务端回放已缓存阶段）
   async function attach(lessonId: string) {
     generating.value = true
-    error.value = null
     let pendingLoad: Promise<void> | null = null
     try {
       await getSse(`/api/lessons/${lessonId}/progress`, {
