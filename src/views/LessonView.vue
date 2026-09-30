@@ -48,7 +48,8 @@ onMounted(async () => {
       return
     }
     if (topicStore.topic?.id !== topicId || !topicStore.graph) await topicStore.loadTopic(topicId)
-    await lessonStore.generate(topicId)
+    const nodeId = typeof route.query.node === 'string' ? route.query.node : undefined
+    await lessonStore.generate(topicId, nodeId)
     if (lessonStore.lesson) {
       await router.replace(`/lesson/${lessonStore.lesson.id}`)
     }

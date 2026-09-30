@@ -12,14 +12,16 @@ import type { AnswerRecord, Attempt, Question } from '../../shared/types'
 import { readBody } from './topics'
 
 // POST /api/topics/:id/lessons — 备课 Agent 全流程（SSE 分阶段推进度 + 流式正文）
+// body.nodeId 可选：用户指定知识点（面板「学这个知识点」）；缺省走排课引擎
 export async function handleCreateLesson(
-  _req: IncomingMessage,
+  req: IncomingMessage,
   res: ServerResponse,
   topicId: string,
 ): Promise<void> {
+  const body = (await readBody<{ nodeId?: string }>(req)) as { nodeId?: string }
   const send = startSse(res)
   try {
-    const result = await prepareLesson(topicId, (e) => send('stage', e))
+    const result = await prepareLesson(topicId, (e) => send('stage', e), body.nodeId || undefined)
     send('result', { lessonId: result.lesson.id, nodeId: result.lesson.nodeIds[0] })
   } catch (err) {
     send('error', { message: err instanceof Error ? err.message : String(err) })

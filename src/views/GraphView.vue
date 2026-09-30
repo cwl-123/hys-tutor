@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { VueFlow, type Node, type Edge, type NodeMouseEvent } from '@vue-flow/core'
 import { Controls } from '@vue-flow/controls'
 import { Background } from '@vue-flow/background'
@@ -15,6 +15,7 @@ import GraphChatPanel from '@/components/GraphChatPanel.vue'
 import type { KnowledgeNode } from '@shared/types'
 
 const route = useRoute()
+const router = useRouter()
 const store = useTopicStore()
 
 const topicId = computed(() => String(route.params.id))
@@ -79,6 +80,11 @@ async function applyAiProposal(nodes: KnowledgeNode[]) {
     applyError.value = err instanceof Error ? err.message : String(err)
   }
 }
+
+// 面板「学这个知识点」：指定节点备课
+function learnNode(nodeId: string) {
+  void router.push(`/lesson/new?topic=${topicId.value}&node=${nodeId}`)
+}
 </script>
 
 <template>
@@ -124,6 +130,7 @@ async function applyAiProposal(nodes: KnowledgeNode[]) {
           <RouterLink
             :to="`/lesson/new?topic=${topicId}`"
             class="btn btn--go"
+            title="由排课引擎自动选择：已解锁且掌握分最低的知识点"
           >
             开始下一课 →
           </RouterLink>
@@ -165,6 +172,7 @@ async function applyAiProposal(nodes: KnowledgeNode[]) {
           :all-nodes="store.nodes"
           :lessons="selectedNodeLessons"
           @close="selectedId = null"
+          @learn="learnNode"
         />
 
         <GraphChatPanel

@@ -73,13 +73,13 @@ export const useLessonStore = defineStore('lesson', () => {
     questions.value = []
   }
 
-  async function generate(topicId: string) {
+  async function generate(topicId: string, nodeId?: string) {
     reset()
     generating.value = true
     try {
       await postSse(
         `/api/topics/${topicId}/lessons`,
-        {},
+        nodeId ? { nodeId } : {},
         {
           onEvent(event, data) {
             if (event === 'stage') {

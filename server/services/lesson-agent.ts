@@ -16,6 +16,7 @@ import { WRITE_SYSTEM_PROMPT, writeLessonPrompt } from '../llm/prompts/write'
 import { SELFCHECK_SYSTEM_PROMPT, llmSelfCheckSchema, selfCheckPrompt } from '../llm/prompts/selfcheck'
 import { scheduleNext } from './scheduler'
 import { getGraph, getTopic } from './graph-service'
+import { MASTERY_UNLOCK_THRESHOLD } from '../../shared/types'
 import type {
   Attempt,
   ErrorReport,
@@ -200,20 +201,39 @@ async function streamWriteLesson(system: string, prompt: string, onStage: StageF
 }
 
 // 备课主流程：schedule → research → outline → write → self-check（Design.md §1.1）
+// forceNodeId：用户指定知识点（面板「学这个知识点」）；缺省走排课引擎
 export async function prepareLesson(
   topicId: string,
   onStage: StageFn = () => {},
+  forceNodeId?: string,
 ): Promise<{ lesson: Lesson; questions: QuestionSet }> {
   const topic = await getTopic(topicId)
   const graph = await getGraph(topicId)
   if (!topic || !graph) throw new Error(`课题不存在或图谱为空：${topicId}`)
 
-  // 1. 排课（纯规则）
-  onStage({ stage: 'schedule' })
-  const sched = scheduleNext(graph.nodes)
-  if (!sched.nodeId) throw new Error(sched.reason)
-  const node = graph.nodes.find((n) => n.id === sched.nodeId)!
-  onStage({ stage: 'scheduled', detail: { nodeId: node.id, nodeName: node.name, reason: sched.reason } })
+  // 1. 选题：用户指定 or 排课引擎
+  let node: KnowledgeNode
+  let reason: string
+  if (forceNodeId) {
+    const picked = graph.nodes.find((n) => n.id === forceNodeId)
+    if (!picked) throw new Error(`知识点不存在：${forceNodeId}`)
+    const byId = new Map(graph.nodes.map((n) => [n.id, n]))
+    const locked = picked.deps.filter((d) => (byId.get(d)?.mastery ?? 0) < MASTERY_UNLOCK_THRESHOLD)
+    if (locked.length) {
+      throw new Error(
+        `「${picked.name}」的前置未达标：${locked.map((d) => `${byId.get(d)?.name ?? d}=${byId.get(d)?.mastery ?? 0}`).join('、')}（需 ≥${MASTERY_UNLOCK_THRESHOLD}）`,
+      )
+    }
+    node = picked
+    reason = `你指定学习：${picked.name}${picked.deps.length ? `（前置 ${picked.deps.map((d) => byId.get(d)?.name ?? d).join('、')} 均已达标）` : ''}`
+  } else {
+    onStage({ stage: 'schedule' })
+    const sched = scheduleNext(graph.nodes)
+    if (!sched.nodeId) throw new Error(sched.reason)
+    node = graph.nodes.find((n) => n.id === sched.nodeId)!
+    reason = sched.reason
+  }
+  onStage({ stage: 'scheduled', detail: { nodeId: node.id, nodeName: node.name, reason } })
 
   const ctx = await buildLearnerContext(topicId, graph.nodes)
   ctx.profileText = profileTextOf(topic.profile)
@@ -265,7 +285,7 @@ export async function prepareLesson(
     id: lessonId,
     topicId,
     nodeIds: [node.id],
-    scheduleReason: sched.reason,
+    scheduleReason: reason,
     masterySnapshot: ctx.masterySnapshot,
     injectedReports: ctx.reports.filter((r) => r.nodeId === node.id).map((r) => r.id),
     researchNoteIds: [note.id],

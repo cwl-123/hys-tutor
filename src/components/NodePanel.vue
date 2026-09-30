@@ -11,6 +11,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
+  learn: [id: string]
 }>()
 
 const level = computed(() => masteryLevel(props.node.mastery))
@@ -23,6 +24,9 @@ const deps = computed(() =>
     .map((id) => props.allNodes.find((n) => n.id === id))
     .filter((n): n is KnowledgeNode => n !== undefined),
 )
+
+// 前置未全部 ≥80 则锁定，不能指定学习
+const lockedDeps = computed(() => deps.value.filter((d) => d.mastery < 80))
 
 function fmtDate(iso: string): string {
   return new Date(iso).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -114,7 +118,20 @@ function fmtDate(iso: string): string {
     </section>
 
     <footer class="panel__footer">
-      增删知识点、调整依赖：点右上角「AI 调整」用自然语言描述即可
+      <button
+        class="learn-btn"
+        :disabled="lockedDeps.length > 0"
+        :title="lockedDeps.length ? `前置未达标：${lockedDeps.map((d) => `${d.name}=${d.mastery}`).join('、')}` : ''"
+        @click="emit('learn', node.id)"
+      >
+        {{ node.mastery >= 80 ? '再学一遍这个知识点 →' : '学这个知识点 →' }}
+      </button>
+      <p
+        v-if="lockedDeps.length"
+        class="panel__muted"
+      >
+        前置未达标：{{ lockedDeps.map((d) => `${d.name} ${d.mastery} 分`).join('、') }}（需 80 分）
+      </p>
     </footer>
   </aside>
 </template>
@@ -271,8 +288,26 @@ function fmtDate(iso: string): string {
 .panel__footer {
   margin-top: auto;
   padding: 14px 20px 18px;
-  font-size: 12px;
-  color: var(--text-dim);
-  line-height: 1.7;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.learn-btn {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 10px;
+  background: #16a34a;
+  color: #fff;
+  cursor: pointer;
+}
+.learn-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+.learn-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 </style>
