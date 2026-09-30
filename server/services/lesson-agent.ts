@@ -348,24 +348,32 @@ export async function reviseLesson(
   let contentMd = revised
   let questions: QuestionSet | null = null
   if (node && note) {
-    const check = await completeJson({
-      system: SELFCHECK_SYSTEM_PROMPT,
-      prompt: selfCheckPrompt(node, note, revised),
-      schema: llmSelfCheckSchema,
-      temperature: 0.2,
-    })
-    contentMd = check.correctedContent?.trim() ? check.correctedContent : revised
-    questions = {
-      questions: check.questions.map<Question>((q, i) => ({
-        id: `q_${i + 1}`,
-        nodeId: node.id,
-        type: q.type,
-        prompt: q.prompt,
-        options: q.options,
-        answer: q.answer,
-        referenceAnswer: q.referenceAnswer,
-        explanation: q.explanation,
-      })),
+    try {
+      const check = await completeJson({
+        system: SELFCHECK_SYSTEM_PROMPT,
+        prompt: selfCheckPrompt(node, note, revised),
+        schema: llmSelfCheckSchema,
+        temperature: 0.2,
+      })
+      contentMd = check.correctedContent?.trim() ? check.correctedContent : revised
+      questions = {
+        questions: check.questions.map<Question>((q, i) => ({
+          id: `q_${i + 1}`,
+          nodeId: node.id,
+          type: q.type,
+          prompt: q.prompt,
+          options: q.options,
+          answer: q.answer,
+          referenceAnswer: q.referenceAnswer,
+          explanation: q.explanation,
+        })),
+      }
+    } catch (err) {
+      // 自查尽力而为：失败则保留重写正文与原有题目，不中断优化
+      onStage({
+        stage: 'self-check-skipped',
+        detail: { message: err instanceof Error ? err.message : String(err) },
+      })
     }
   }
 

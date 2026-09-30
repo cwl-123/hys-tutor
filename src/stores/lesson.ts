@@ -44,6 +44,8 @@ function stageLabel(stage: string, detail?: unknown): string | null {
       return 'AI 正在按你的意见重写课程…'
     case 'self-check':
       return '对照研究笔记自查 + 出课末题…'
+    case 'self-check-skipped':
+      return '自查输出异常，已跳过（保留重写正文与原题目）'
     case 'self-check-done': {
       const d = detail as { issues: string[]; corrected: boolean }
       return d.issues.length > 0
