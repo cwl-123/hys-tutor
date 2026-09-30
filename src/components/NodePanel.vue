@@ -105,7 +105,13 @@ function fmtDate(iso: string): string {
           :to="`/lesson/${l.id}`"
           class="lesson-item"
         >
-          <span class="lesson-item__title">{{ l.title }}</span>
+          <span class="lesson-item__title">
+            {{ l.title }}
+            <em
+              v-if="l.status !== 'generated'"
+              class="lesson-item__live"
+            >{{ l.status === 'failed' ? '失败' : '备课中' }}</em>
+          </span>
           <span class="lesson-item__meta">{{ fmtDate(l.createdAt) }} · {{ l.wordCount }} 字</span>
         </RouterLink>
         <p
@@ -280,6 +286,15 @@ function fmtDate(iso: string): string {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.lesson-item__live {
+  font-style: normal;
+  font-size: 11px;
+  color: #b45309;
+  background: #fffbeb;
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-left: 6px;
 }
 .lesson-item__meta {
   font-size: 11px;

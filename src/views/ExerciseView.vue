@@ -18,6 +18,9 @@ const error = ref<string | null>(null)
 
 const questions = computed(() => lessonStore.questions)
 const graded = computed(() => result.value !== null)
+const notReady = computed(
+  () => !!lessonStore.lesson && lessonStore.lesson.status !== 'generated',
+)
 
 const allAnswered = computed(
   () => questions.value.length > 0 && questions.value.every((q) => (answers.value[q.id] ?? '').trim() !== ''),
@@ -107,142 +110,155 @@ async function submit() {
       </RouterLink>
     </div>
     <h1>随堂练习</h1>
+
+    <div
+      v-if="notReady"
+      class="not-ready"
+    >
+      课程尚未生成完成（{{ lessonStore.lesson?.status === 'failed' ? '上次备课失败' : '正在备课中' }}），
+      <RouterLink :to="`/lesson/${lessonId}`">
+        返回课程页查看
+      </RouterLink>
+    </div>
+
     <p
-      v-if="!graded"
+      v-else-if="!graded"
       class="hint"
     >
       共 {{ questions.length }} 题：客观题提交即判，简答题由 AI 批改（约 20 秒）。全部作答后交卷。
     </p>
 
-    <div
-      v-for="(q, qi) in questions"
-      :key="q.id"
-      class="question"
-    >
-      <div class="question__head">
-        <span class="question__no">第 {{ qi + 1 }} 题</span>
-        <span class="question__type">{{ typeLabel(q) }}</span>
-        <span
-          v-if="graded"
-          class="question__verdict"
-          :class="
-            resultOf(q.id)?.correct === true || (resultOf(q.id)?.score ?? 0) >= 0.6
-              ? 'question__verdict--ok'
-              : 'question__verdict--bad'
-          "
-        >
-          <template v-if="q.type === 'short'">得分 {{ ((resultOf(q.id)?.score ?? 0) * 10).toFixed(0) }}/10</template>
-          <template v-else>{{ resultOf(q.id)?.correct ? '✓ 答对' : '✗ 答错' }}</template>
-        </span>
-        <button
-          class="question__report"
-          @click="toggleReport(q.id)"
-        >
-          ⚠ 这里有错
-        </button>
-      </div>
-
+    <template v-if="!notReady">
       <div
-        v-if="reportingQid === q.id"
-        class="report-inline"
+        v-for="(q, qi) in questions"
+        :key="q.id"
+        class="question"
       >
+        <div class="question__head">
+          <span class="question__no">第 {{ qi + 1 }} 题</span>
+          <span class="question__type">{{ typeLabel(q) }}</span>
+          <span
+            v-if="graded"
+            class="question__verdict"
+            :class="
+              resultOf(q.id)?.correct === true || (resultOf(q.id)?.score ?? 0) >= 0.6
+                ? 'question__verdict--ok'
+                : 'question__verdict--bad'
+            "
+          >
+            <template v-if="q.type === 'short'">得分 {{ ((resultOf(q.id)?.score ?? 0) * 10).toFixed(0) }}/10</template>
+            <template v-else>{{ resultOf(q.id)?.correct ? '✓ 答对' : '✗ 答错' }}</template>
+          </span>
+          <button
+            class="question__report"
+            @click="toggleReport(q.id)"
+          >
+            ⚠ 这里有错
+          </button>
+        </div>
+
+        <div
+          v-if="reportingQid === q.id"
+          class="report-inline"
+        >
+          <textarea
+            v-model="reportNote"
+            rows="2"
+            placeholder="备注（可选）：题目哪里有问题？"
+          />
+          <button
+            class="btn btn--small"
+            @click="submitQuestionReport(q)"
+          >
+            提交报错
+          </button>
+        </div>
+
+        <MarkdownRenderer :content="q.prompt" />
+
+        <!-- 单选 -->
+        <div
+          v-if="q.type === 'single' && q.options"
+          class="options"
+        >
+          <label
+            v-for="(opt, oi) in q.options"
+            :key="oi"
+            class="option"
+            :class="{ 'option--on': answers[q.id] === 'ABCD'[oi] }"
+          >
+            <input
+              type="radio"
+              :name="q.id"
+              :value="'ABCD'[oi]"
+              :checked="answers[q.id] === 'ABCD'[oi]"
+              :disabled="graded"
+              @change="pick(q, 'ABCD'[oi])"
+            >
+            <span class="option__letter">{{ 'ABCD'[oi] }}</span>
+            <MarkdownRenderer :content="opt" />
+          </label>
+        </div>
+
+        <!-- 判断 -->
+        <div
+          v-else-if="q.type === 'judge'"
+          class="options"
+        >
+          <label
+            v-for="v in ['对', '错']"
+            :key="v"
+            class="option"
+            :class="{ 'option--on': answers[q.id] === v }"
+          >
+            <input
+              type="radio"
+              :name="q.id"
+              :value="v"
+              :checked="answers[q.id] === v"
+              :disabled="graded"
+              @change="pick(q, v)"
+            >
+            {{ v }}
+          </label>
+        </div>
+
+        <!-- 简答 -->
         <textarea
-          v-model="reportNote"
-          rows="2"
-          placeholder="备注（可选）：题目哪里有问题？"
+          v-else
+          class="short-input"
+          rows="5"
+          placeholder="写出你的推导/思路…"
+          :value="answers[q.id] ?? ''"
+          :disabled="graded"
+          @input="onShortInput(q, $event)"
         />
-        <button
-          class="btn btn--small"
-          @click="submitQuestionReport(q)"
-        >
-          提交报错
-        </button>
-      </div>
 
-      <MarkdownRenderer :content="q.prompt" />
-
-      <!-- 单选 -->
-      <div
-        v-if="q.type === 'single' && q.options"
-        class="options"
-      >
-        <label
-          v-for="(opt, oi) in q.options"
-          :key="oi"
-          class="option"
-          :class="{ 'option--on': answers[q.id] === 'ABCD'[oi] }"
+        <!-- 批改反馈 -->
+        <div
+          v-if="graded && result"
+          class="feedback"
         >
-          <input
-            type="radio"
-            :name="q.id"
-            :value="'ABCD'[oi]"
-            :checked="answers[q.id] === 'ABCD'[oi]"
-            :disabled="graded"
-            @change="pick(q, 'ABCD'[oi])"
+          <p
+            v-if="resultOf(q.id)?.feedback"
+            class="feedback__comment"
           >
-          <span class="option__letter">{{ 'ABCD'[oi] }}</span>
-          <MarkdownRenderer :content="opt" />
-        </label>
-      </div>
-
-      <!-- 判断 -->
-      <div
-        v-else-if="q.type === 'judge'"
-        class="options"
-      >
-        <label
-          v-for="v in ['对', '错']"
-          :key="v"
-          class="option"
-          :class="{ 'option--on': answers[q.id] === v }"
-        >
-          <input
-            type="radio"
-            :name="q.id"
-            :value="v"
-            :checked="answers[q.id] === v"
-            :disabled="graded"
-            @change="pick(q, v)"
-          >
-          {{ v }}
-        </label>
-      </div>
-
-      <!-- 简答 -->
-      <textarea
-        v-else
-        class="short-input"
-        rows="5"
-        placeholder="写出你的推导/思路…"
-        :value="answers[q.id] ?? ''"
-        :disabled="graded"
-        @input="onShortInput(q, $event)"
-      />
-
-      <!-- 批改反馈 -->
-      <div
-        v-if="graded && result"
-        class="feedback"
-      >
-        <p
-          v-if="resultOf(q.id)?.feedback"
-          class="feedback__comment"
-        >
-          <strong>批改评语：</strong>{{ resultOf(q.id)?.feedback }}
-        </p>
-        <p v-if="result.revealed[q.id]?.answer">
-          <strong>正确答案：</strong>{{ result.revealed[q.id]?.answer }}
-        </p>
-        <div v-if="result.revealed[q.id]?.referenceAnswer">
-          <strong>参考答案：</strong>
-          <MarkdownRenderer :content="result.revealed[q.id].referenceAnswer!" />
-        </div>
-        <div v-if="result.revealed[q.id]?.explanation">
-          <strong>讲解：</strong>
-          <MarkdownRenderer :content="result.revealed[q.id].explanation!" />
+            <strong>批改评语：</strong>{{ resultOf(q.id)?.feedback }}
+          </p>
+          <p v-if="result.revealed[q.id]?.answer">
+            <strong>正确答案：</strong>{{ result.revealed[q.id]?.answer }}
+          </p>
+          <div v-if="result.revealed[q.id]?.referenceAnswer">
+            <strong>参考答案：</strong>
+            <MarkdownRenderer :content="result.revealed[q.id].referenceAnswer!" />
+          </div>
+          <div v-if="result.revealed[q.id]?.explanation">
+            <strong>讲解：</strong>
+            <MarkdownRenderer :content="result.revealed[q.id].explanation!" />
+          </div>
         </div>
       </div>
-    </div>
+    </template>
 
     <!-- 掌握分变化 -->
     <section
@@ -283,7 +299,7 @@ async function submit() {
     </section>
 
     <footer
-      v-if="!graded"
+      v-if="!graded && !notReady"
       class="submit-bar"
     >
       <p
@@ -331,6 +347,17 @@ async function submit() {
 .hint {
   color: var(--text-dim);
   font-size: 13px;
+}
+.not-ready {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fffbeb;
+  color: #b45309;
+  font-size: 14px;
+}
+.not-ready a {
+  color: #1d4ed8;
 }
 .question {
   border: 1px solid var(--border);

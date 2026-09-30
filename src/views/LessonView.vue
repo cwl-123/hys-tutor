@@ -49,18 +49,29 @@ onMounted(async () => {
     }
     if (topicStore.topic?.id !== topicId || !topicStore.graph) await topicStore.loadTopic(topicId)
     const nodeId = typeof route.query.node === 'string' ? route.query.node : undefined
-    await lessonStore.generate(topicId, nodeId)
-    if (lessonStore.lesson) {
-      await router.replace(`/lesson/${lessonStore.lesson.id}`)
-    }
+    const lessonId = await lessonStore.generate(topicId, nodeId)
+    if (lessonId) await router.replace(`/lesson/${lessonId}`)
   } else {
     await lessonStore.load(String(route.params.id))
     const lessonTopicId = lessonStore.lesson?.topicId
     if (lessonTopicId && topicStore.topic?.id !== lessonTopicId) {
       await topicStore.loadTopic(lessonTopicId)
     }
+    // 在途/中断的备课：重新挂接进度流
+    const status = lessonStore.lesson?.status
+    if (status && status !== 'generated' && status !== 'failed') {
+      await lessonStore.attach(String(route.params.id))
+      await lessonStore.load(String(route.params.id))
+    }
   }
 })
+
+async function retry() {
+  const lesson = lessonStore.lesson
+  if (!lesson) return
+  const lessonId = await lessonStore.generate(lesson.topicId, lesson.nodeIds[0])
+  if (lessonId && lessonId !== lesson.id) await router.replace(`/lesson/${lessonId}`)
+}
 </script>
 
 <template>
@@ -93,21 +104,30 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- 出错 -->
+    <!-- 出错 / 历史失败 -->
     <div
-      v-else-if="lessonStore.error"
+      v-else-if="lessonStore.error || lessonStore.lesson?.status === 'failed'"
       class="state"
     >
       <h1>备课失败</h1>
       <p class="state__error">
-        {{ lessonStore.error }}
+        {{ lessonStore.error || '上次备课未成功完成' }}
       </p>
-      <RouterLink
-        to="/"
-        class="btn"
-      >
-        返回图谱
-      </RouterLink>
+      <div class="state__actions">
+        <button
+          v-if="lessonStore.lesson"
+          class="btn btn--primary"
+          @click="retry"
+        >
+          重新备课
+        </button>
+        <RouterLink
+          :to="topicHome"
+          class="btn"
+        >
+          返回图谱
+        </RouterLink>
+      </div>
     </div>
 
     <!-- 课程正文 -->
@@ -260,5 +280,11 @@ onMounted(async () => {
 }
 .state__error {
   color: var(--mastery-red);
+}
+.state__actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
 }
 </style>

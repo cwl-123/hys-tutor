@@ -2,6 +2,17 @@
 
 版本记录：每次改动提交 git 并在此追加「版本 + 日期 + 功能点」。
 
+## v0.13.0 - 2026-09-30
+
+- 模型设置窗口：顶栏「⚙ 设置」可配置 LLM 模型名 / API Base URL / API Key（key 脱敏展示、留空保持不变），存 data/settings.json，优先级高于 .env，保存后调研/备课/批改立即生效；模型名带常用预设下拉
+
+## v0.12.0 - 2026-09-30
+
+- 备课后台任务化：POST /api/topics/:id/lessons 立即返回 lessonId，备课在服务端后台跑；新增 GET /api/lessons/:id/progress（SSE 回放+直播），离开页面再回来自动重连进度，服务重启后僵尸任务标记 failed 可重试
+- 课程列表/面板对「备课中/失败」状态可见；练习页对未生成课程给出引导
+- SSE 写安全化 + 15s 心跳 + 进程级异常兜底：客户端断开不再炸进程，在途备课继续跑完落盘
+- 模型配置服务端化：settings-service（data/settings.json 覆盖 .env），/api/settings GET/PATCH
+
 ## v0.11.0 - 2026-09-30
 
 - 指定节点开课：POST /api/topics/:id/lessons 支持 body.nodeId；节点面板「学这个知识点 / 再学一遍」按钮（前置未达标锁定并提示原因）

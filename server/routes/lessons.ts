@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { sendJson } from '../index'
 import { startSse } from '../sse'
 import { dataPath, nowIso, readJson, writeJson } from '../repo/json-store'
-import { prepareLesson } from '../services/lesson-agent'
+import { startLessonJob, attachLesson, subscribeJob } from '../services/lesson-jobs'
 import { findLesson, getLessonDetail, listLessons, stripQuestions } from '../services/lesson-service'
 import { gradeObjective, gradeShort } from '../services/grading-service'
 import { applyMasteryChanges, type ApplyEntry } from '../services/mastery-service'
@@ -11,7 +11,7 @@ import type { SubmitResult } from '../../shared/api'
 import type { AnswerRecord, Attempt, Question } from '../../shared/types'
 import { readBody } from './topics'
 
-// POST /api/topics/:id/lessons — 备课 Agent 全流程（SSE 分阶段推进度 + 流式正文）
+// POST /api/topics/:id/lessons — 发起后台备课任务，立即返回 lessonId
 // body.nodeId 可选：用户指定知识点（面板「学这个知识点」）；缺省走排课引擎
 export async function handleCreateLesson(
   req: IncomingMessage,
@@ -19,15 +19,60 @@ export async function handleCreateLesson(
   topicId: string,
 ): Promise<void> {
   const body = (await readBody<{ nodeId?: string }>(req)) as { nodeId?: string }
-  const send = startSse(res)
   try {
-    const result = await prepareLesson(topicId, (e) => send('stage', e), body.nodeId || undefined)
-    send('result', { lessonId: result.lesson.id, nodeId: result.lesson.nodeIds[0] })
+    const { lessonId, reused } = startLessonJob(topicId, { nodeId: body.nodeId || undefined })
+    sendJson(res, 200, { lessonId, reused })
   } catch (err) {
-    send('error', { message: err instanceof Error ? err.message : String(err) })
-  } finally {
-    res.end()
+    sendJson(res, 500, { error: err instanceof Error ? err.message : String(err) })
   }
+}
+
+// GET /api/lessons/:id/progress — SSE 挂接备课进度（回放已缓存阶段 + 直播后续）
+export async function handleLessonProgress(
+  _req: IncomingMessage,
+  res: ServerResponse,
+  lessonId: string,
+): Promise<void> {
+  const send = startSse(res)
+  const { job, lesson } = await attachLesson(lessonId)
+
+  if (job) {
+    for (const e of job.stages) send('stage', e)
+    if (job.status === 'running') {
+      const finish = () => res.end()
+      const unsub = subscribeJob(job, (ev) => {
+        if (ev.type === 'stage') send('stage', ev.e)
+        else if (ev.type === 'result') {
+          send('result', { lessonId })
+          finish()
+        } else {
+          send('error', { message: ev.message })
+          finish()
+        }
+      })
+      res.on('close', () => {
+        unsub()
+        finish()
+      })
+      return
+    }
+    if (job.status === 'done') send('result', { lessonId })
+    else send('error', { message: job.error ?? '备课失败' })
+    res.end()
+    return
+  }
+
+  if (!lesson) {
+    send('error', { message: '课程不存在' })
+    res.end()
+    return
+  }
+  if (lesson.status === 'generated') {
+    send('result', { lessonId })
+  } else {
+    send('error', { message: lesson.status === 'failed' ? '上次备课失败，可重新发起' : '备课已中断，可重新发起' })
+  }
+  res.end()
 }
 
 // GET /api/topics/:tid/lessons/:lid — 读取课程（题目已脱敏）

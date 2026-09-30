@@ -53,6 +53,14 @@ async function serveStatic(req: IncomingMessage, res: ServerResponse): Promise<v
   }
 }
 
+// 常驻服务兜底：任何漏网异常只记日志，不让进程退出（launchd 重启会中断在途备课）
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err)
+})
+process.on('unhandledRejection', (err) => {
+  console.error('[unhandledRejection]', err)
+})
+
 const server = createServer((req, res) => {
   const url = req.url ?? '/'
   if (url === '/api' || url.startsWith('/api/')) {

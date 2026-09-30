@@ -1,20 +1,38 @@
 import OpenAI from 'openai'
 import { z } from 'zod'
+import { getSettings } from '../services/settings-service'
 
-let client: OpenAI | null = null
+// 配置优先级：页面设置（data/settings.json）> .env
+export interface ResolvedLlmConfig {
+  apiKey: string
+  baseUrl?: string
+  model: string
+}
+
+export function resolveLlmConfig(): ResolvedLlmConfig {
+  const s = getSettings()
+  return {
+    apiKey: s.apiKey || process.env.LLM_API_KEY || '',
+    baseUrl: s.baseUrl || process.env.LLM_BASE_URL || undefined,
+    model: s.model || process.env.LLM_MODEL || '',
+  }
+}
+
+let cached: { sig: string; client: OpenAI } | null = null
 
 export function getLLM(): OpenAI {
-  const apiKey = process.env.LLM_API_KEY
-  if (!apiKey) throw new Error('缺少 LLM_API_KEY：请在 .env 中配置')
-  if (!client) {
-    client = new OpenAI({ apiKey, baseURL: process.env.LLM_BASE_URL || undefined })
+  const cfg = resolveLlmConfig()
+  if (!cfg.apiKey) throw new Error('缺少 LLM API Key：请在页面设置或 .env 中配置')
+  const sig = `${cfg.baseUrl ?? ''}|${cfg.apiKey}`
+  if (!cached || cached.sig !== sig) {
+    cached = { sig, client: new OpenAI({ apiKey: cfg.apiKey, baseURL: cfg.baseUrl }) }
   }
-  return client
+  return cached.client
 }
 
 export function getLLMModel(): string {
-  const model = process.env.LLM_MODEL
-  if (!model) throw new Error('缺少 LLM_MODEL：请在 .env 中配置')
+  const model = resolveLlmConfig().model
+  if (!model) throw new Error('缺少 LLM 模型：请在页面设置或 .env 中配置')
   return model
 }
 

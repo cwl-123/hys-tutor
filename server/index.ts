@@ -5,10 +5,12 @@ import {
   handleCreateLesson,
   handleFindLesson,
   handleGetLesson,
+  handleLessonProgress,
   handleListLessons,
   handleSubmitLesson,
 } from './routes/lessons'
 import { handleCreateReport, handleListReports } from './routes/reports'
+import { handleGetSettings, handleUpdateSettings } from './routes/settings'
 
 type Next = (err?: unknown) => void
 
@@ -40,6 +42,13 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, next:
       return
     }
 
+    // GET /api/lessons/:lid/progress — SSE 挂接备课进度
+    const progressMatch = url.match(/^\/lessons\/([^/]+)\/progress$/)
+    if (progressMatch && req.method === 'GET') {
+      await handleLessonProgress(req, res, progressMatch[1])
+      return
+    }
+
     // GET /api/lessons/:lid — 按 lessonId 反查
     const findLessonMatch = url.match(/^\/lessons\/([^/]+)$/)
     if (findLessonMatch && req.method === 'GET') {
@@ -58,6 +67,13 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, next:
     const graphChatMatch = url.match(/^\/topics\/([^/]+)\/graph\/chat$/)
     if (graphChatMatch && req.method === 'POST') {
       await handleGraphChat(req, res, graphChatMatch[1])
+      return
+    }
+
+    // GET/PATCH /api/settings — LLM 配置
+    if (url === '/settings' && (req.method === 'GET' || req.method === 'PATCH')) {
+      if (req.method === 'GET') await handleGetSettings(req, res)
+      else await handleUpdateSettings(req, res)
       return
     }
 

@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { Lesson, Question, Topic } from '@shared/types'
-import { postSse } from '@/utils/sse'
+import { getSse } from '@/utils/sse'
 
 export interface StageEntry {
   key: string
@@ -73,36 +73,52 @@ export const useLessonStore = defineStore('lesson', () => {
     questions.value = []
   }
 
-  async function generate(topicId: string, nodeId?: string) {
+  // 发起后台备课任务并挂接进度；离开页面再回来可重新 attach 回放
+  async function generate(topicId: string, nodeId?: string): Promise<string | null> {
     reset()
+    const res = await fetch(`/api/topics/${topicId}/lessons`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(nodeId ? { nodeId } : {}),
+    })
+    const data = (await res.json()) as { lessonId?: string; reused?: boolean; error?: string }
+    if (!res.ok || !data.lessonId) {
+      error.value = data.error ?? `发起备课失败：${res.status}`
+      return null
+    }
+    await attach(data.lessonId)
+    return data.lessonId
+  }
+
+  // 挂接在途/已完成任务的进度流（服务端回放已缓存阶段）
+  async function attach(lessonId: string) {
     generating.value = true
+    error.value = null
+    let pendingLoad: Promise<void> | null = null
     try {
-      await postSse(
-        `/api/topics/${topicId}/lessons`,
-        nodeId ? { nodeId } : {},
-        {
-          onEvent(event, data) {
-            if (event === 'stage') {
-              const e = data as { stage: string; detail?: unknown }
-              if (e.stage === 'write-delta') {
-                streamingContent.value += (e.detail as { text: string }).text
-                return
-              }
-              const label = stageLabel(e.stage, e.detail)
-              if (label) stages.value = [...stages.value, { key: `${Date.now()}-${stages.value.length}`, label, ts: Date.now() }]
-            } else if (event === 'result') {
-              const r = data as { lessonId: string }
-              void load(r.lessonId)
-            } else if (event === 'error') {
-              error.value = (data as { message: string }).message
+      await getSse(`/api/lessons/${lessonId}/progress`, {
+        onEvent(event, data) {
+          if (event === 'stage') {
+            const e = data as { stage: string; detail?: unknown }
+            if (e.stage === 'write-delta') {
+              streamingContent.value += (e.detail as { text: string }).text
+              return
             }
-          },
+            const label = stageLabel(e.stage, e.detail)
+            if (label) {
+              stages.value = [
+                ...stages.value,
+                { key: `${Date.now()}-${stages.value.length}`, label, ts: Date.now() },
+              ]
+            }
+          } else if (event === 'result') {
+            pendingLoad = load(lessonId)
+          } else if (event === 'error') {
+            error.value = (data as { message: string }).message
+          }
         },
-      )
-      // SSE 结束后 load 可能仍在进行，等待 lesson 就位
-      for (let i = 0; i < 50 && !lesson.value && !error.value; i++) {
-        await new Promise((r) => setTimeout(r, 100))
-      }
+      })
+      if (pendingLoad) await pendingLoad
     } catch (err) {
       error.value = err instanceof Error ? err.message : String(err)
     } finally {
@@ -127,5 +143,5 @@ export const useLessonStore = defineStore('lesson', () => {
     questions.value = data.questions?.questions ?? []
   }
 
-  return { stages, streamingContent, generating, error, topic, lesson, questions, generate, load, reset }
+  return { stages, streamingContent, generating, error, topic, lesson, questions, generate, attach, load, reset }
 })

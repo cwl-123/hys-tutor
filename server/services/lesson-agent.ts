@@ -201,11 +201,11 @@ async function streamWriteLesson(system: string, prompt: string, onStage: StageF
 }
 
 // 备课主流程：schedule → research → outline → write → self-check（Design.md §1.1）
-// forceNodeId：用户指定知识点（面板「学这个知识点」）；缺省走排课引擎
+// opts.nodeId：用户指定知识点；opts.lessonId：后台任务预分配的课程 id
 export async function prepareLesson(
   topicId: string,
   onStage: StageFn = () => {},
-  forceNodeId?: string,
+  opts: { nodeId?: string; lessonId?: string } = {},
 ): Promise<{ lesson: Lesson; questions: QuestionSet }> {
   const topic = await getTopic(topicId)
   const graph = await getGraph(topicId)
@@ -214,9 +214,9 @@ export async function prepareLesson(
   // 1. 选题：用户指定 or 排课引擎
   let node: KnowledgeNode
   let reason: string
-  if (forceNodeId) {
-    const picked = graph.nodes.find((n) => n.id === forceNodeId)
-    if (!picked) throw new Error(`知识点不存在：${forceNodeId}`)
+  if (opts.nodeId) {
+    const picked = graph.nodes.find((n) => n.id === opts.nodeId)
+    if (!picked) throw new Error(`知识点不存在：${opts.nodeId}`)
     const byId = new Map(graph.nodes.map((n) => [n.id, n]))
     const locked = picked.deps.filter((d) => (byId.get(d)?.mastery ?? 0) < MASTERY_UNLOCK_THRESHOLD)
     if (locked.length) {
@@ -280,7 +280,7 @@ export async function prepareLesson(
   })
 
   // 落盘
-  const lessonId = newId('l')
+  const lessonId = opts.lessonId ?? newId('l')
   const lesson: Lesson = {
     id: lessonId,
     topicId,
