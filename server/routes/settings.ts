@@ -1,36 +1,68 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { z } from 'zod'
 import { sendJson } from '../index'
-import { getSettings, maskKey, updateSettings } from '../services/settings-service'
+import {
+  getSettings,
+  maskKey,
+  resolveLlm,
+  updateSettings,
+} from '../services/settings-service'
 import { readBody } from './topics'
 
-function view(s: { baseUrl?: string; model?: string; apiKey?: string }) {
+// 当前生效配置 + 模型源列表（key 脱敏）
+function view() {
+  const s = getSettings()
+  const eff = resolveLlm()
   return {
-    baseUrl: s.baseUrl ?? '',
-    model: s.model ?? '',
-    apiKeyMasked: maskKey(s.apiKey || process.env.LLM_API_KEY),
-    apiKeySource: s.apiKey ? '页面设置' : process.env.LLM_API_KEY ? '.env' : '未配置',
+    providers: s.providers.map((p) => ({
+      id: p.id,
+      name: p.name,
+      baseUrl: p.baseUrl ?? '',
+      model: p.model,
+      apiKeyMasked: maskKey(p.apiKey),
+      hasKey: !!p.apiKey,
+    })),
+    activeProviderId: s.activeProviderId ?? '',
+    effective: {
+      model: eff.model,
+      baseUrl: eff.baseUrl ?? '',
+      providerName: eff.providerName,
+      source: eff.source,
+    },
+    envFallback: {
+      model: process.env.LLM_MODEL ?? '',
+      hasKey: !!process.env.LLM_API_KEY,
+    },
   }
 }
 
-// GET /api/settings — 当前 LLM 配置（key 脱敏）
+// GET /api/settings
 export async function handleGetSettings(_req: IncomingMessage, res: ServerResponse): Promise<void> {
-  sendJson(res, 200, view(getSettings()))
+  sendJson(res, 200, view())
 }
 
 const updateSettingsSchema = z.object({
-  baseUrl: z.string().max(500).optional(),
-  model: z.string().max(200).optional(),
-  apiKey: z.string().max(500).optional(),
+  providers: z
+    .array(
+      z.object({
+        id: z.string().optional(),
+        name: z.string().min(1).max(50),
+        baseUrl: z.string().max(500).optional(),
+        model: z.string().min(1).max(200),
+        apiKey: z.string().max(500).optional(),
+      }),
+    )
+    .optional(),
+  activeProviderId: z.string().nullable().optional(),
 })
 
-// PATCH /api/settings — 更新 LLM 配置（apiKey 留空 = 保持不变）
+// PATCH /api/settings — 整体保存模型源列表 + 激活源（apiKey 留空 = 保持原 key）
 export async function handleUpdateSettings(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const body = updateSettingsSchema.safeParse(await readBody(req))
   if (!body.success) {
     sendJson(res, 400, { error: body.error.issues.map((i) => i.message).join('；') })
     return
   }
-  const updated = await updateSettings(body.data)
-  sendJson(res, 200, view(updated))
+  await updateSettings(body.data)
+  sendJson(res, 200, view())
 }

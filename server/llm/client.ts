@@ -1,8 +1,8 @@
 import OpenAI from 'openai'
 import { z } from 'zod'
-import { getSettings } from '../services/settings-service'
+import { resolveLlm } from '../services/settings-service'
 
-// 配置优先级：页面设置（data/settings.json）> .env
+// 配置优先级：页面设置的激活模型源 > .env
 export interface ResolvedLlmConfig {
   apiKey: string
   baseUrl?: string
@@ -10,12 +10,8 @@ export interface ResolvedLlmConfig {
 }
 
 export function resolveLlmConfig(): ResolvedLlmConfig {
-  const s = getSettings()
-  return {
-    apiKey: s.apiKey || process.env.LLM_API_KEY || '',
-    baseUrl: s.baseUrl || process.env.LLM_BASE_URL || undefined,
-    model: s.model || process.env.LLM_MODEL || '',
-  }
+  const r = resolveLlm()
+  return { apiKey: r.apiKey, baseUrl: r.baseUrl, model: r.model }
 }
 
 let cached: { sig: string; client: OpenAI } | null = null
