@@ -16,9 +16,11 @@
 ┌──────────────▼──────────────── Vite Dev Middleware (Node) ─────────────────┐
 │  routes/         api 路由层（薄，只做参数校验和编排）                        │
 │  services/                                                                  │
-│    ├─ graph-service     LLM 生成 DAG + 校验（无环/数量）+ 手动编辑落盘       │
+│    ├─ graph-service     开课 Agent（联网调研方向→生成 DAG）+ 校验 + 手动编辑   │
+│    ├─ graph-chat        图谱 AI 对话调整（修改建议+diff，确认后应用）          │
 │    ├─ scheduler         纯函数排课引擎：已解锁(依赖≥80)且分最低              │
 │    ├─ lesson-agent      备课 Agent（多轮工具循环，见 §1.1）                  │
+│    ├─ lesson-service    课程查询/列表/题目脱敏                               │
 │    ├─ grading-service   客观题本地秒判；简答交卷后 LLM 批改                  │
 │    ├─ mastery-service   掌握分增减（唯一写入口，记录 MasteryLog）            │
 │    └─ report-service    "这里有错"记录，供备课 Agent 注入上下文              │
@@ -98,6 +100,17 @@ self-check  对照研究笔记自查一遍：无来源支撑的断言标记/修�
   "name": "CTR/CVR 预估模型",
   "createdAt": "2026-09-30T10:00:00Z",
   "llmModel": "xxx"            // 生成图谱所用模型，便于追溯
+}
+```
+
+### 3.1b topic-research.json — 开课调研结论（Agent 产出，图谱生成依据）
+```jsonc
+{
+  "overview": "该学习方向总览",
+  "contentAreas": [{ "name": "板块名", "description": "一句话说明" }],  // 8~20 个，按学习顺序
+  "keySkills": ["关键能力"],
+  "sources": [{ "title": "...", "url": "..." }],
+  "researchedAt": "..."
 }
 ```
 
@@ -220,33 +233,42 @@ self-check  对照研究笔记自查一遍：无来源支撑的断言标记/修�
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | /api/topics | 输入课题名 → LLM 生成 DAG（SSE 推进度）→ 返回 graph |
+| GET | /api/topics | 学习方向列表 |
+| POST | /api/topics | 输入方向名 → Agent 联网调研（researching/research-tool 阶段）→ 生成 DAG（SSE 推进度）→ 返回 topic+graph |
 | GET | /api/topics/:id/graph | 读取图谱 |
-| PATCH | /api/topics/:id/graph | 手动增删改节点/依赖（服务端校验无环） |
+| PATCH | /api/topics/:id/graph | 手动编辑保存，全量替换节点（服务端校验无环） |
+| POST | /api/topics/:id/graph/chat | 图谱 AI 对话调整：返回 reply + 修改建议 proposal + diff，前端确认后走 PATCH 应用 |
+| GET | /api/topics/:id/lessons | 课程列表（挂到知识点节点，不含正文） |
 | POST | /api/topics/:id/lessons | 排课 + 备课 Agent，SSE：`stage(schedule/research/outline/write/self-check/done)` + 阶段详情（搜索 query、命中来源）+ 课程流式内容 |
-| GET | /api/lessons/:id | 课程 + 题目（题目不含 answer 字段，防前端偷看） |
-| POST | /api/lessons/:id/submit | 交卷：客观题同步返回判定；含简答则后台 LLM 批改，SSE 推结果 |
+| GET | /api/lessons/:id | 课程 + 题目（题目不含 answer/explanation，防前端偷看） |
+| POST | /api/lessons/:id/submit | 交卷：客观题本地秒判 + 简答 LLM 批改，同步返回判分/评语/掌握分变化/MasteryLog/答案揭示 |
 | GET | /api/topics/:id/mastery-log | 掌握分变更历史 |
-| POST | /api/reports | 报错标记 |
+| POST | /api/reports | 报错标记（课程划词 / 题目） |
+| GET | /api/topics/:id/reports | 报错记录列表 |
 
-## 5. 目录结构（ planned ）
+前端路由：`/` 学习方向列表（HomeView）、`/topic/:id` 图谱、`/lesson/new?topic=:id` 备课、`/lesson/:id` 课程、`/lesson/:id/exercise` 练习。
+
+## 5. 目录结构
 
 ```
 hys-tutor/
 ├─ src/                     # 前端
-│  ├─ views/                # GraphView / LessonView / ExerciseView
-│  ├─ components/           # GraphCanvas, MarkdownRenderer, ReportButton...
-│  ├─ stores/               # graph.ts, lesson.ts
+│  ├─ views/                # HomeView / GraphView / LessonView / ExerciseView
+│  ├─ components/           # GraphNode, NodePanel, GraphChatPanel, MarkdownRenderer, SelectionReporter
+│  ├─ stores/               # topic.ts, lesson.ts
+│  ├─ utils/                # sse.ts, layout.ts(dagre), report.ts
 │  └─ styles/
 ├─ server/
-│  ├─ routes/               # topics.ts, lessons.ts, reports.ts
-│  ├─ services/             # graph / scheduler / lesson-agent / grading / mastery / report
+│  ├─ routes/               # topics.ts, lessons.ts, reports.ts, health.ts
+│  ├─ services/             # graph / graph-chat / scheduler / lesson-agent / lesson / grading / mastery / report
 │  ├─ agent/                # loop.ts（工具循环）, tools/（web-search / web-fetch / notes）
-│  ├─ llm/                  # client.ts, prompts/（图谱/大纲/写作/自查/批改模板）
+│  ├─ llm/                  # client.ts, prompts/（topic-research/图谱/graph-chat/研究/大纲/写作/自查/批改）
 │  └─ repo/                 # json 读写 + 原子写
-├─ shared/types.ts          # 前后端共用领域模型类型
-├─ data/                    # 运行时生成，git 忽略（含 research/ 研究笔记缓存）
-├─ vite.config.ts           # 挂载 server middleware
+├─ shared/                  # types.ts（领域模型 zod）, api.ts（接口 DTO）, dag.ts, mastery.ts
+├─ scripts/                 # try-lesson-agent.ts（备课 CLI 冒烟）
+├─ tests/                   # vitest 单测
+├─ data/                    # 运行时生成，git 忽略：topics.json + topics/<id>/{topic,graph,topic-research,mastery-log,reports}.json + lessons/ attempts/ research/
+├─ vite.config.ts           # 挂载 server middleware（ssrLoadModule 热载后端）
 └─ .env                     # LLM_API_KEY / LLM_BASE_URL / LLM_MODEL / TAVILY_API_KEY / BOCHA_API_KEY
 ```
 
