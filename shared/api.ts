@@ -1,5 +1,16 @@
 import type { GradeResult, MasteryLogEntry, Question } from './types'
 
+// 课程列表项（不含正文，供图谱页挂载展示）
+export interface LessonMeta {
+  id: string
+  title: string
+  nodeIds: string[]
+  scheduleReason: string
+  status: 'researching' | 'outlining' | 'writing' | 'self-checking' | 'generated' | 'failed'
+  createdAt: string
+  wordCount: number
+}
+
 // 交卷接口（POST /api/lessons/:id/submit）前后端共用类型
 
 export interface SubmitAnswerInput {

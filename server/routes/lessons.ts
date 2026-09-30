@@ -4,7 +4,7 @@ import { sendJson } from '../index'
 import { startSse } from '../sse'
 import { dataPath, nowIso, readJson, writeJson } from '../repo/json-store'
 import { prepareLesson } from '../services/lesson-agent'
-import { findLesson, getLessonDetail, stripQuestions } from '../services/lesson-service'
+import { findLesson, getLessonDetail, listLessons, stripQuestions } from '../services/lesson-service'
 import { gradeObjective, gradeShort } from '../services/grading-service'
 import { applyMasteryChanges, type ApplyEntry } from '../services/mastery-service'
 import type { SubmitResult } from '../../shared/api'
@@ -149,4 +149,13 @@ export async function handleSubmitLesson(
     masteryLogs: logs,
     revealed,
   } satisfies SubmitResult)
+}
+
+// GET /api/topics/:id/lessons — 课题下全部课程列表（挂到知识点节点用）
+export async function handleListLessons(
+  _req: IncomingMessage,
+  res: ServerResponse,
+  topicId: string,
+): Promise<void> {
+  sendJson(res, 200, { lessons: await listLessons(topicId) })
 }

@@ -35,12 +35,20 @@ function syncFromStore() {
 
 const positions = computed(() => layoutGraph(editNodes.value))
 
+const lessonCountByNode = computed(() => {
+  const counts = new Map<string, number>()
+  for (const l of store.lessons) {
+    for (const nid of l.nodeIds) counts.set(nid, (counts.get(nid) ?? 0) + 1)
+  }
+  return counts
+})
+
 const flowNodes = computed<Node[]>(() =>
   editNodes.value.map((n) => ({
     id: n.id,
     type: 'knode',
     position: positions.value.get(n.id) ?? { x: 0, y: 0 },
-    data: { node: n, selected: n.id === selectedId.value },
+    data: { node: n, selected: n.id === selectedId.value, lessonCount: lessonCountByNode.value.get(n.id) ?? 0 },
     draggable: false,
   })),
 )
@@ -60,6 +68,10 @@ const flowEdges = computed<Edge[]>(() => {
 })
 
 const selectedNode = computed(() => editNodes.value.find((n) => n.id === selectedId.value) ?? null)
+
+const selectedNodeLessons = computed(() =>
+  selectedNode.value ? store.lessons.filter((l) => l.nodeIds.includes(selectedNode.value!.id)) : [],
+)
 
 function onNodeClick(event: NodeMouseEvent) {
   selectedId.value = event.node.id
@@ -224,6 +236,7 @@ async function createTopic() {
           v-if="selectedNode"
           :node="selectedNode"
           :all-nodes="editNodes"
+          :lessons="selectedNodeLessons"
           @save="applyPatch"
           @remove="removeNode"
           @close="selectedId = null"

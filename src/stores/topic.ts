@@ -1,12 +1,14 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import type { Graph, KnowledgeNode, Topic } from '@shared/types'
+import type { LessonMeta } from '@shared/api'
 import { postSse } from '@/utils/sse'
 
 export const useTopicStore = defineStore('topic', () => {
   const topics = ref<Topic[]>([])
   const topic = ref<Topic | null>(null)
   const graph = ref<Graph | null>(null)
+  const lessons = ref<LessonMeta[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -40,6 +42,12 @@ export const useTopicStore = defineStore('topic', () => {
     const data = (await res.json()) as { topic: Topic; graph: Graph | null }
     topic.value = data.topic
     graph.value = data.graph
+    await fetchLessons(id)
+  }
+
+  async function fetchLessons(topicId: string) {
+    const res = await fetch(`/api/topics/${topicId}/lessons`)
+    lessons.value = res.ok ? ((await res.json()) as { lessons: LessonMeta[] }).lessons : []
   }
 
   async function createTopic(name: string) {
@@ -62,6 +70,7 @@ export const useTopicStore = defineStore('topic', () => {
                 topic.value = r.topic
                 graph.value = r.graph
                 topics.value = [...topics.value, r.topic]
+                lessons.value = []
                 resolve()
               } else if (event === 'error') {
                 reject(new Error((data as { message: string }).message))
@@ -96,11 +105,13 @@ export const useTopicStore = defineStore('topic', () => {
     topic,
     graph,
     nodes,
+    lessons,
     loading,
     error,
     stageText,
     loadFirstTopic,
     loadTopic,
+    fetchLessons,
     createTopic,
     saveGraph,
   }

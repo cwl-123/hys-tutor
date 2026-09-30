@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import type { LessonMeta } from '@shared/api'
 import type { KnowledgeNode } from '@shared/types'
 
 const props = defineProps<{
   node: KnowledgeNode
   allNodes: KnowledgeNode[]
+  lessons: LessonMeta[]
 }>()
 
 const emit = defineEmits<{
@@ -27,6 +29,10 @@ watch(
 )
 
 const depCandidates = computed(() => props.allNodes.filter((n) => n.id !== props.node.id))
+
+function fmtDate(iso: string): string {
+  return new Date(iso).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
 
 function toggleDep(id: string) {
   deps.value = deps.value.includes(id) ? deps.value.filter((d) => d !== id) : [...deps.value, id]
@@ -93,6 +99,27 @@ function onSave() {
 
     <div class="panel__meta">
       掌握分：{{ node.mastery }}（由练习批改更新，不可手改）
+    </div>
+
+    <div class="panel__field">
+      <span>历史课程（{{ lessons.length }}）</span>
+      <div class="panel__lessons">
+        <RouterLink
+          v-for="l in lessons"
+          :key="l.id"
+          :to="`/lesson/${l.id}`"
+          class="lesson-item"
+        >
+          <span class="lesson-item__title">{{ l.title }}</span>
+          <span class="lesson-item__meta">{{ fmtDate(l.createdAt) }} · {{ l.wordCount }} 字</span>
+        </RouterLink>
+        <p
+          v-if="lessons.length === 0"
+          class="panel__empty"
+        >
+          还没有该知识点的课程
+        </p>
+      </div>
     </div>
 
     <footer class="panel__actions">
@@ -175,6 +202,35 @@ function onSave() {
 }
 .panel__meta {
   font-size: 12px;
+  color: var(--text-dim);
+}
+.panel__lessons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lesson-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-decoration: none;
+}
+.lesson-item:hover {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+.lesson-item__title {
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lesson-item__meta {
+  font-size: 11px;
   color: var(--text-dim);
 }
 .panel__actions {

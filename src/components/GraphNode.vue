@@ -3,7 +3,7 @@ import { Handle, Position } from '@vue-flow/core'
 import { computed } from 'vue'
 import { masteryLevel, type KnowledgeNode } from '@shared/types'
 
-const props = defineProps<{ data: { node: KnowledgeNode; selected: boolean } }>()
+const props = defineProps<{ data: { node: KnowledgeNode; selected: boolean; lessonCount: number } }>()
 
 const level = computed(() => masteryLevel(props.data.node.mastery))
 </script>
@@ -20,8 +20,13 @@ const level = computed(() => masteryLevel(props.data.node.mastery))
     <div class="knode__name">
       {{ data.node.name }}
     </div>
-    <div class="knode__mastery">
-      {{ data.node.mastery }} 分
+    <div class="knode__row">
+      <span class="knode__mastery">{{ data.node.mastery }} 分</span>
+      <span
+        v-if="data.lessonCount > 0"
+        class="knode__lessons"
+        :title="`${data.lessonCount} 节历史课程`"
+      >📖 {{ data.lessonCount }}</span>
     </div>
     <Handle
       type="source"
@@ -62,9 +67,18 @@ const level = computed(() => masteryLevel(props.data.node.mastery))
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.knode__mastery {
+.knode__row {
   margin-top: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.knode__mastery {
   font-size: 12px;
   color: var(--text-dim);
+}
+.knode__lessons {
+  font-size: 11px;
+  color: #2563eb;
 }
 </style>

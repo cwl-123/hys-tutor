@@ -1,7 +1,13 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { healthRoute } from './routes/health'
 import { handleTopics } from './routes/topics'
-import { handleCreateLesson, handleFindLesson, handleGetLesson, handleSubmitLesson } from './routes/lessons'
+import {
+  handleCreateLesson,
+  handleFindLesson,
+  handleGetLesson,
+  handleListLessons,
+  handleSubmitLesson,
+} from './routes/lessons'
 import { handleCreateReport, handleListReports } from './routes/reports'
 
 type Next = (err?: unknown) => void
@@ -16,10 +22,14 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, next:
       return
     }
 
-    // POST /api/topics/:id/lessons — 备课（SSE）
+    // POST /api/topics/:id/lessons — 备课（SSE）；GET — 课程列表
     const createLessonMatch = url.match(/^\/topics\/([^/]+)\/lessons$/)
     if (createLessonMatch && req.method === 'POST') {
       await handleCreateLesson(req, res, createLessonMatch[1])
+      return
+    }
+    if (createLessonMatch && req.method === 'GET') {
+      await handleListLessons(req, res, createLessonMatch[1])
       return
     }
 
