@@ -41,6 +41,11 @@ function statusLabel(status: string): string {
 }
 
 const confirmDeleteId = ref<string | null>(null)
+
+function confirmDelete(id: string) {
+  emit('deleteLesson', id)
+  confirmDeleteId.value = null
+}
 </script>
 
 <template>
@@ -144,10 +149,7 @@ const confirmDeleteId = ref<string | null>(null)
           >
             <button
               class="lesson-item__yes"
-              @click="
-                emit('deleteLesson', l.id)
-                confirmDeleteId = null
-              "
+              @click="confirmDelete(l.id)"
             >
               删除
             </button>

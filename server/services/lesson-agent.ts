@@ -323,7 +323,10 @@ export async function reviseLesson(
   const detail = await findLesson(lessonId)
   if (!detail) throw new Error('课程不存在')
   const { topic, lesson } = detail
-  if (lesson.status !== 'generated') throw new Error('仅生成完成的课程可以优化')
+  // 后台任务会先把状态置为 revising，两种状态都允许
+  if (lesson.status !== 'generated' && lesson.status !== 'revising') {
+    throw new Error('仅生成完成的课程可以优化')
+  }
 
   const graph = await getGraph(topic.id)
   const node = graph?.nodes.find((n) => n.id === lesson.nodeIds[0])
