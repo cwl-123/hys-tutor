@@ -20,6 +20,9 @@ const nodeName = computed(() => {
   const node = topicStore.graph.nodes.find((n) => n.id === lesson.nodeIds[0])
   return node?.name ?? lesson.nodeIds[0]
 })
+const topicHome = computed(
+  () => `/topic/${lessonStore.lesson?.topicId ?? topicStore.topic?.id ?? ''}`,
+)
 
 // 备课进行中自动滚动进度列表
 watch(
@@ -33,18 +36,28 @@ watch(
 onMounted(async () => {
   if (isNew.value) {
     lessonStore.reset()
-    if (!topicStore.topic) await topicStore.loadFirstTopic()
-    if (!topicStore.topic) {
-      lessonStore.error = '还没有课题，请先在图谱页创建'
+    // 优先用路由 query 指定的学习方向；直接刷新页面时回退到唯一课题
+    let topicId = typeof route.query.topic === 'string' ? route.query.topic : ''
+    if (!topicId && topicStore.topic) topicId = topicStore.topic.id
+    if (!topicId) {
+      await topicStore.fetchTopics()
+      if (topicStore.topics.length === 1) topicId = topicStore.topics[0].id
+    }
+    if (!topicId) {
+      lessonStore.error = '无法确定学习方向，请从图谱页点「开始下一课」'
       return
     }
-    await lessonStore.generate(topicStore.topic.id)
+    if (topicStore.topic?.id !== topicId || !topicStore.graph) await topicStore.loadTopic(topicId)
+    await lessonStore.generate(topicId)
     if (lessonStore.lesson) {
       await router.replace(`/lesson/${lessonStore.lesson.id}`)
     }
   } else {
     await lessonStore.load(String(route.params.id))
-    if (!topicStore.graph) await topicStore.loadFirstTopic()
+    const lessonTopicId = lessonStore.lesson?.topicId
+    if (lessonTopicId && topicStore.topic?.id !== lessonTopicId) {
+      await topicStore.loadTopic(lessonTopicId)
+    }
   }
 })
 </script>
@@ -103,7 +116,7 @@ onMounted(async () => {
     >
       <header class="lesson__header">
         <div class="lesson__crumb">
-          <RouterLink to="/">
+          <RouterLink :to="topicHome">
             ← 知识图谱
           </RouterLink>
           <span>{{ lessonStore.topic?.name }}</span>

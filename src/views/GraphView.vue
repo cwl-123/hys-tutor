@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { VueFlow, type Node, type Edge, type NodeMouseEvent } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import '@vue-flow/core/dist/style.css'
@@ -10,7 +11,10 @@ import GraphNode from '@/components/GraphNode.vue'
 import NodePanel from '@/components/NodePanel.vue'
 import type { KnowledgeNode } from '@shared/types'
 
+const route = useRoute()
 const store = useTopicStore()
+
+const topicId = computed(() => String(route.params.id))
 
 // 本地可编辑副本，保存后才写回 store
 const editNodes = ref<KnowledgeNode[]>([])
@@ -18,12 +22,8 @@ const dirty = ref(false)
 const selectedId = ref<string | null>(null)
 const saveError = ref<string | null>(null)
 
-// 开课表单
-const topicName = ref('')
-const creating = ref(false)
-
 onMounted(async () => {
-  await store.loadFirstTopic()
+  await store.loadTopic(topicId.value)
   syncFromStore()
 })
 
@@ -112,77 +112,41 @@ async function save() {
     saveError.value = err instanceof Error ? err.message : String(err)
   }
 }
-
-async function createTopic() {
-  const name = topicName.value.trim()
-  if (!name || creating.value) return
-  creating.value = true
-  saveError.value = null
-  try {
-    await store.createTopic(name)
-    syncFromStore()
-  } catch {
-    // 错误已记录在 store.error
-  } finally {
-    creating.value = false
-  }
-}
 </script>
 
 <template>
   <div class="graph-view">
-    <!-- 未开课：创建课题 -->
     <div
-      v-if="!store.loading && !store.topic"
-      class="create"
-    >
-      <h1>开始一个新课题</h1>
-      <p class="create__hint">
-        输入课题名，AI 将生成知识点学习图谱（15~40 个知识点，含依赖关系）
-      </p>
-      <form
-        class="create__form"
-        @submit.prevent="createTopic"
-      >
-        <input
-          v-model="topicName"
-          type="text"
-          placeholder="例如：CTR/CVR 预估模型"
-          :disabled="creating"
-        >
-        <button
-          class="btn btn--primary"
-          type="submit"
-          :disabled="creating || !topicName.trim()"
-        >
-          {{ creating ? '生成中…' : '生成图谱' }}
-        </button>
-      </form>
-      <p
-        v-if="store.stageText"
-        class="create__stage"
-      >
-        {{ store.stageText }}
-      </p>
-      <p
-        v-if="store.error"
-        class="create__error"
-      >
-        {{ store.error }}
-      </p>
-    </div>
-
-    <div
-      v-else-if="store.loading"
-      class="create"
+      v-if="store.loading"
+      class="state"
     >
       <p>加载中…</p>
     </div>
 
-    <!-- 已有课题：图谱画布 -->
+    <div
+      v-else-if="store.error || !store.topic"
+      class="state"
+    >
+      <p class="state__error">
+        {{ store.error ?? '课题不存在' }}
+      </p>
+      <RouterLink
+        to="/"
+        class="btn"
+      >
+        ← 返回学习方向
+      </RouterLink>
+    </div>
+
     <template v-else>
       <div class="toolbar">
-        <strong>{{ store.topic?.name }}</strong>
+        <RouterLink
+          to="/"
+          class="toolbar__home"
+        >
+          ←
+        </RouterLink>
+        <strong>{{ store.topic.name }}</strong>
         <span class="toolbar__count">{{ editNodes.length }} 个知识点</span>
         <div class="toolbar__legend">
           <span class="legend legend--red">&lt;40</span>
@@ -191,7 +155,7 @@ async function createTopic() {
         </div>
         <div class="toolbar__actions">
           <RouterLink
-            to="/lesson/new"
+            :to="`/lesson/new?topic=${topicId}`"
             class="btn btn--go"
           >
             开始下一课 →
@@ -252,44 +216,28 @@ async function createTopic() {
   flex-direction: column;
   height: calc(100vh - 53px);
 }
-.create {
+.state {
   margin: auto;
   text-align: center;
-  max-width: 480px;
   padding: 24px;
 }
-.create__hint {
-  color: var(--text-dim);
-  font-size: 14px;
-}
-.create__form {
-  display: flex;
-  gap: 8px;
-  margin-top: 16px;
-}
-.create__form input {
-  flex: 1;
-  font: inherit;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-.create__stage {
-  margin-top: 12px;
-  color: #3b82f6;
-  font-size: 14px;
-}
-.create__error {
-  margin-top: 12px;
+.state__error {
   color: var(--mastery-red);
-  font-size: 14px;
 }
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   padding: 10px 16px;
   border-bottom: 1px solid var(--border);
+}
+.toolbar__home {
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 16px;
+}
+.toolbar__home:hover {
+  color: #2563eb;
 }
 .toolbar__count {
   font-size: 13px;
@@ -345,6 +293,8 @@ async function createTopic() {
   border: 1px solid var(--border);
   background: #fff;
   cursor: pointer;
+  text-decoration: none;
+  color: var(--text);
 }
 .btn--primary {
   background: #3b82f6;

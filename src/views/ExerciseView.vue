@@ -90,7 +90,7 @@ async function submit() {
 <template>
   <div class="exercise-view">
     <div class="crumb">
-      <RouterLink to="/">
+      <RouterLink :to="lessonStore.lesson?.topicId ? `/topic/${lessonStore.lesson.topicId}` : '/'">
         ← 知识图谱
       </RouterLink>
       <RouterLink :to="`/lesson/${lessonId}`">

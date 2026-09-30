@@ -23,12 +23,16 @@ export const useTopicStore = defineStore('topic', () => {
     topics.value = data.topics
   }
 
-  async function loadFirstTopic() {
+  async function loadTopic(id: string) {
     loading.value = true
     error.value = null
     try {
-      await fetchTopics()
-      if (topics.value.length > 0) await loadTopic(topics.value[0].id)
+      const res = await fetch(`/api/topics/${id}/graph`)
+      if (!res.ok) throw new Error(`加载课题失败：${res.status}`)
+      const data = (await res.json()) as { topic: Topic; graph: Graph | null }
+      topic.value = data.topic
+      graph.value = data.graph
+      await fetchLessons(id)
     } catch (err) {
       error.value = err instanceof Error ? err.message : String(err)
     } finally {
@@ -36,24 +40,17 @@ export const useTopicStore = defineStore('topic', () => {
     }
   }
 
-  async function loadTopic(id: string) {
-    const res = await fetch(`/api/topics/${id}/graph`)
-    if (!res.ok) throw new Error(`加载课题失败：${res.status}`)
-    const data = (await res.json()) as { topic: Topic; graph: Graph | null }
-    topic.value = data.topic
-    graph.value = data.graph
-    await fetchLessons(id)
-  }
-
   async function fetchLessons(topicId: string) {
     const res = await fetch(`/api/topics/${topicId}/lessons`)
     lessons.value = res.ok ? ((await res.json()) as { lessons: LessonMeta[] }).lessons : []
   }
 
-  async function createTopic(name: string) {
+  // 返回新课题供路由跳转；失败返回 null（错误在 error 中）
+  async function createTopic(name: string): Promise<Topic | null> {
     loading.value = true
     error.value = null
-    stageText.value = '正在生成知识图谱…'
+    stageText.value = 'AI 正在调研并生成知识图谱…'
+    let created: Topic | null = null
     try {
       await new Promise<void>((resolve, reject) => {
         postSse(
@@ -64,9 +61,10 @@ export const useTopicStore = defineStore('topic', () => {
               if (event === 'stage') {
                 const d = data as { stage: string }
                 stageText.value =
-                  d.stage === 'retrying' ? '生成结果不合格，正在重试…' : '正在生成知识图谱…'
+                  d.stage === 'retrying' ? '生成结果不合格，正在重试…' : 'AI 正在调研并生成知识图谱…'
               } else if (event === 'result') {
                 const r = data as { topic: Topic; graph: Graph }
+                created = r.topic
                 topic.value = r.topic
                 graph.value = r.graph
                 topics.value = [...topics.value, r.topic]
@@ -81,11 +79,11 @@ export const useTopicStore = defineStore('topic', () => {
       })
     } catch (err) {
       error.value = err instanceof Error ? err.message : String(err)
-      throw err
     } finally {
       stageText.value = null
       loading.value = false
     }
+    return created
   }
 
   async function saveGraph(nextNodes: KnowledgeNode[]) {
@@ -109,7 +107,7 @@ export const useTopicStore = defineStore('topic', () => {
     loading,
     error,
     stageText,
-    loadFirstTopic,
+    fetchTopics,
     loadTopic,
     fetchLessons,
     createTopic,
