@@ -30,12 +30,53 @@ watch(
 
 const depCandidates = computed(() => props.allNodes.filter((n) => n.id !== props.node.id))
 
-function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+// 当前节点的下游（直接/间接依赖它的节点）：选作前置会成环，从候选中排除
+const descendants = computed(() => {
+  const result = new Set<string>()
+  const queue = [props.node.id]
+  while (queue.length) {
+    const cur = queue.shift()!
+    for (const n of props.allNodes) {
+      if (n.deps.includes(cur) && !result.has(n.id)) {
+        result.add(n.id)
+        queue.push(n.id)
+      }
+    }
+  }
+  return result
+})
+
+const selectedDeps = computed(() =>
+  deps.value
+    .map((id) => props.allNodes.find((n) => n.id === id))
+    .filter((n): n is KnowledgeNode => n !== undefined),
+)
+
+const depSearch = ref('')
+const depDropdown = ref(false)
+
+const addCandidates = computed(() => {
+  const kw = depSearch.value.trim().toLowerCase()
+  return depCandidates.value.filter(
+    (n) =>
+      !deps.value.includes(n.id) &&
+      !descendants.value.has(n.id) &&
+      (!kw || n.name.toLowerCase().includes(kw) || n.description.toLowerCase().includes(kw)),
+  )
+})
+
+function removeDep(id: string) {
+  deps.value = deps.value.filter((d) => d !== id)
 }
 
-function toggleDep(id: string) {
-  deps.value = deps.value.includes(id) ? deps.value.filter((d) => d !== id) : [...deps.value, id]
+function addDep(id: string) {
+  if (!deps.value.includes(id)) deps.value = [...deps.value, id]
+  depSearch.value = ''
+  depDropdown.value = false
+}
+
+function fmtDate(iso: string): string {
+  return new Date(iso).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 function onSave() {
@@ -77,23 +118,57 @@ function onSave() {
     </label>
 
     <div class="panel__field">
-      <span>前置依赖（点击切换）</span>
+      <span>前置依赖</span>
       <div class="panel__deps">
-        <button
-          v-for="cand in depCandidates"
-          :key="cand.id"
-          class="dep-chip"
-          :class="{ 'dep-chip--on': deps.includes(cand.id) }"
-          @click="toggleDep(cand.id)"
+        <span
+          v-for="d in selectedDeps"
+          :key="d.id"
+          class="dep-chip dep-chip--on"
         >
-          {{ cand.name }}
-        </button>
-        <p
-          v-if="depCandidates.length === 0"
+          {{ d.name }}
+          <button
+            class="dep-chip__x"
+            title="移除该依赖"
+            @click="removeDep(d.id)"
+          >
+            ×
+          </button>
+        </span>
+        <span
+          v-if="selectedDeps.length === 0"
           class="panel__empty"
         >
-          暂无其他节点
-        </p>
+          无前置依赖（入门节点）
+        </span>
+      </div>
+      <div class="dep-add">
+        <input
+          v-model="depSearch"
+          type="text"
+          placeholder="搜索并添加依赖…"
+          @focus="depDropdown = true"
+          @blur="depDropdown = false"
+        >
+        <div
+          v-if="depDropdown && depSearch.trim()"
+          class="dep-add__dropdown"
+        >
+          <button
+            v-for="cand in addCandidates.slice(0, 8)"
+            :key="cand.id"
+            class="dep-add__item"
+            @mousedown.prevent="addDep(cand.id)"
+          >
+            {{ cand.name }}
+            <span class="dep-add__desc">{{ cand.description }}</span>
+          </button>
+          <p
+            v-if="addCandidates.length === 0"
+            class="panel__empty dep-add__none"
+          >
+            无匹配节点（下游节点不可作为前置，避免成环）
+          </p>
+        </div>
       </div>
     </div>
 
@@ -189,12 +264,77 @@ function onSave() {
   border-radius: 999px;
   border: 1px solid var(--border);
   background: #fff;
-  cursor: pointer;
 }
 .dep-chip--on {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border-color: #3b82f6;
   background: #eff6ff;
   color: #1d4ed8;
+}
+.dep-chip__x {
+  border: none;
+  background: none;
+  color: #1d4ed8;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.dep-add {
+  position: relative;
+}
+.dep-add input {
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+}
+.dep-add input:focus {
+  border-color: #3b82f6;
+  outline: none;
+}
+.dep-add__dropdown {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 12%);
+  max-height: 240px;
+  overflow-y: auto;
+}
+.dep-add__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 10px;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.dep-add__item:hover {
+  background: #eff6ff;
+}
+.dep-add__desc {
+  display: block;
+  font-size: 11px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dep-add__none {
+  padding: 8px 10px;
+  margin: 0;
 }
 .panel__empty {
   font-size: 12px;
