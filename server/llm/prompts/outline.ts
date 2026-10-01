@@ -17,7 +17,7 @@ export const llmOutlineSchema = z.object({
 export type LlmOutline = z.infer<typeof llmOutlineSchema>
 
 export const OUTLINE_SYSTEM_PROMPT = `你是一位自适应课程设计师。基于研究笔记和学习者当前状态，为一节 15 分钟微课设计大纲。
-你只输出合法 JSON，不输出任何解释。`
+你只输出合法 JSON，不输出任何解释。字符串值内部如需引用词句，一律用中文引号「」，严禁出现未转义的英文双引号。`
 
 export function learnerContextText(ctx: {
   masterySnapshot: Record<string, number>

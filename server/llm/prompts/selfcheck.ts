@@ -17,7 +17,7 @@ export const llmSelfCheckSchema = z.object({
 })
 export type LlmSelfCheck = z.infer<typeof llmSelfCheckSchema>
 
-export const SELFCHECK_SYSTEM_PROMPT = `你是一位严格的内容质检员和出题老师。你只输出合法 JSON，不输出任何解释。`
+export const SELFCHECK_SYSTEM_PROMPT = `你是一位严格的内容质检员和出题老师。你只输出合法 JSON，不输出任何解释。字符串值内部如需引用词句，一律用中文引号「」，严禁出现未转义的英文双引号。`
 
 export function selfCheckPrompt(
   node: KnowledgeNode,

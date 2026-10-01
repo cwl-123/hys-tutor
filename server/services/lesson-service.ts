@@ -40,6 +40,7 @@ export async function listLessons(topicId: string): Promise<LessonMeta[]> {
       nodeIds: lesson.nodeIds,
       scheduleReason: lesson.scheduleReason,
       status: lesson.status,
+      error: lesson.error,
       createdAt: lesson.createdAt,
       wordCount: lesson.contentMd.length,
     })

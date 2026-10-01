@@ -32,7 +32,41 @@ export function getLLMModel(): string {
   return model
 }
 
-// 从 LLM 文本中抠出 JSON（容忍代码围栏和前后废话）
+// 修复字符串值内未转义的英文双引号（LLM 高频毛病，语言类课题尤甚）：
+// 字符串内遇到的 " 若其后（跳过空白）不是结构符 , } ] : 也不是结尾，则视为内容并转义
+export function repairJson(raw: string): string {
+  let out = ''
+  let inStr = false
+  for (let i = 0; i < raw.length; i++) {
+    const c = raw[i]
+    if (!inStr) {
+      if (c === '"') inStr = true
+      out += c
+      continue
+    }
+    if (c === '\\') {
+      out += c + (raw[i + 1] ?? '')
+      i++
+      continue
+    }
+    if (c !== '"') {
+      out += c
+      continue
+    }
+    let j = i + 1
+    while (j < raw.length && (raw[j] === ' ' || raw[j] === '\t' || raw[j] === '\n' || raw[j] === '\r')) j++
+    const next = raw[j]
+    if (next === undefined || next === ',' || next === '}' || next === ']' || next === ':') {
+      inStr = false
+      out += c
+    } else {
+      out += '\\"'
+    }
+  }
+  return out
+}
+
+// 从 LLM 文本中抠出 JSON（容忍代码围栏和前后废话；二次尝试修复未转义引号）
 export function extractJson(text: string): unknown {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/)
   const raw = fenced ? fenced[1] : text
@@ -40,7 +74,16 @@ export function extractJson(text: string): unknown {
   if (start < 0) throw new Error('LLM 输出中未找到 JSON')
   const end = Math.max(raw.lastIndexOf('}'), raw.lastIndexOf(']'))
   if (end <= start) throw new Error('LLM 输出的 JSON 不完整')
-  return JSON.parse(raw.slice(start, end + 1))
+  const slice = raw.slice(start, end + 1)
+  try {
+    return JSON.parse(slice)
+  } catch (err) {
+    try {
+      return JSON.parse(repairJson(slice))
+    } catch {
+      throw err
+    }
+  }
 }
 
 // 单轮 JSON 完成：输出经 zod 校验，失败带错误信息重试一次
@@ -67,10 +110,18 @@ export async function completeJson<T>(opts: {
       return opts.schema.parse(extractJson(text))
     } catch (err) {
       lastErr = err
+      // 排障关键：记录模型实际返回（截断），否则线上只剩"未找到 JSON"无从排查
+      console.error('[completeJson] 输出校验失败', {
+        attempt: attempt + 1,
+        finishReason: res.choices[0]?.finish_reason,
+        contentLen: text.length,
+        contentPreview: text.slice(0, 500),
+        error: err instanceof Error ? err.message : String(err),
+      })
       messages.push({ role: 'assistant', content: text })
       messages.push({
         role: 'user',
-        content: `输出校验失败：${err instanceof Error ? err.message : String(err)}。请重新输出，只输出合法 JSON，不要任何解释。`,
+        content: `输出校验失败：${err instanceof Error ? err.message : String(err)}。请重新输出，只输出合法 JSON，不要任何解释；字符串值内部严禁出现未转义的英文双引号（引用词句用「」）。`,
       })
     }
   }

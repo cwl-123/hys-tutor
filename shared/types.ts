@@ -66,6 +66,7 @@ export const lessonSchema = z.object({
   status: lessonStatusSchema,
   createdAt: z.string(),
   revisedAt: z.string().optional(),
+  error: z.string().optional(), // status=failed 时的失败原因
 })
 export type Lesson = z.infer<typeof lessonSchema>
 

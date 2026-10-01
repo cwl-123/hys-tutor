@@ -22,6 +22,7 @@ export interface LessonMeta {
     | 'revising'
     | 'generated'
     | 'failed'
+  error?: string // status=failed 时的失败原因
   createdAt: string
   wordCount: number
 }

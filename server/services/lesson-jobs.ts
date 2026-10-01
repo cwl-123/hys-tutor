@@ -32,10 +32,16 @@ function lessonFile(topicId: string, lessonId: string): string {
   return dataPath('topics', topicId, 'lessons', `${lessonId}.json`)
 }
 
-async function patchLessonStatus(topicId: string, lessonId: string, status: LessonStatus): Promise<void> {
+async function patchLessonStatus(
+  topicId: string,
+  lessonId: string,
+  status: LessonStatus,
+  error?: string,
+): Promise<void> {
   const lesson = await readJson<Lesson | null>(lessonFile(topicId, lessonId), null)
   if (!lesson) return
   lesson.status = status
+  lesson.error = error
   await writeJson(lessonFile(topicId, lessonId), lesson)
 }
 
@@ -85,7 +91,8 @@ export function startLessonJob(
     } catch (err) {
       job.status = 'failed'
       job.error = err instanceof Error ? err.message : String(err)
-      await patchLessonStatus(topicId, lessonId, 'failed').catch(() => {})
+      console.error(`[lesson-job] 备课失败 ${lessonId}:`, err)
+      await patchLessonStatus(topicId, lessonId, 'failed', job.error).catch(() => {})
       emit(job, { type: 'error', message: job.error })
     } finally {
       runningByTopic.delete(topicId)
@@ -134,8 +141,9 @@ export async function startReviseJob(
     } catch (err) {
       job.status = 'failed'
       job.error = err instanceof Error ? err.message : String(err)
+      console.error(`[lesson-job] 优化失败 ${lessonId}:`, err)
       // 优化失败保留原课程内容
-      await patchLessonStatus(topicId, lessonId, 'generated').catch(() => {})
+      await patchLessonStatus(topicId, lessonId, 'generated', job.error).catch(() => {})
       emit(job, { type: 'error', message: job.error })
     } finally {
       runningByTopic.delete(topicId)

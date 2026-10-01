@@ -129,6 +129,7 @@ function confirmDelete(id: string) {
                 v-if="l.status !== 'generated'"
                 class="lesson-item__live"
                 :class="{ 'lesson-item__live--bad': l.status === 'failed' }"
+                :title="l.error"
               >{{ statusLabel(l.status) }}</em>
             </span>
             <span class="lesson-item__meta">

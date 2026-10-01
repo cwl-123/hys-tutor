@@ -2,6 +2,11 @@
 
 版本记录：每次改动提交 git 并在此追加「版本 + 日期 + 功能点」。
 
+## v0.18.2 - 2026-10-01
+
+- 修复：LLM JSON 输出含未转义英文双引号导致备课末尾自查出题 3 次重试全败、整课失败（英语口语等语言类课题高发）——extractJson 增加未转义引号修复兜底（repairJson 状态机），大纲/自查/批改 prompt 明确禁用未转义引号
+- 排障加固：completeJson 校验失败时服务端记录 finishReason + 内容预览；备课/优化失败原因写入 lesson.error 落盘并 console.error 进 serve.err.log；节点面板失败标签 hover 显示原因
+
 ## v0.18.1 - 2026-10-01
 
 - 开源准备：补充 MIT LICENSE（署名 haiyeshu）、重写 README（功能/快速开始/配置/部署/安全隐私）；package.json 去 private、补 license/author/keywords
