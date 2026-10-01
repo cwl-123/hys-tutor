@@ -5,12 +5,15 @@ const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 
 const PRESET_MODELS = [
-  'deepseek-v4.1-flash',
   'deepseek-v4-pro',
+  'deepseek-v4.1-flash',
   'qwen3.8-max',
   'qwen3.8-flash',
   'glm-5.3',
   'grok-4.6',
+  'kimi-k3',
+  'claude-fable-5-1',
+  'gpt-6-astra',
 ]
 
 interface UiProvider {
@@ -30,6 +33,16 @@ interface SettingsView {
   envFallback: { model: string; hasKey: boolean }
 }
 
+interface ImportCandidate {
+  id: string
+  source: string
+  name: string
+  baseUrl?: string
+  model: string
+  models: string[]
+  apiKeyMasked: string
+}
+
 const providers = ref<UiProvider[]>([])
 const activeId = ref('') // '' = 使用 .env 默认
 const effective = ref<SettingsView['effective'] | null>(null)
@@ -43,12 +56,18 @@ const saving = ref(false)
 const message = ref<string | null>(null)
 const messageError = ref(false)
 
+// 本机 AI 工具配置导入
+const candidates = ref<ImportCandidate[] | null>(null)
+const candidatesLoading = ref(false)
+const importingId = ref<string | null>(null)
+
 watch(
   () => props.open,
   async (open) => {
     if (!open) return
     message.value = null
     editing.value = null
+    candidates.value = null
     await reload()
   },
 )
@@ -95,6 +114,48 @@ function removeProvider(index: number) {
   providers.value = providers.value.filter((_, i) => i !== index)
   if (removed.id && activeId.value === removed.id) activeId.value = ''
   if (editingIndex.value === index) editing.value = null
+}
+
+async function loadCandidates() {
+  if (candidates.value !== null) {
+    candidates.value = null
+    return
+  }
+  candidatesLoading.value = true
+  try {
+    const res = await fetch('/api/settings/import-candidates')
+    if (!res.ok) throw new Error(`扫描失败：${res.status}`)
+    const data = (await res.json()) as { candidates: ImportCandidate[] }
+    candidates.value = data.candidates
+  } catch (err) {
+    messageError.value = true
+    message.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    candidatesLoading.value = false
+  }
+}
+
+async function doImport(c: ImportCandidate) {
+  importingId.value = c.id
+  message.value = null
+  messageError.value = false
+  try {
+    const res = await fetch('/api/settings/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: c.id }),
+    })
+    const data = (await res.json()) as SettingsView & { error?: string }
+    if (!res.ok) throw new Error(data.error ?? `导入失败：${res.status}`)
+    candidates.value = null
+    await reload()
+    message.value = `已导入并保存「${c.name}」，选中单选框即可设为激活源`
+  } catch (err) {
+    messageError.value = true
+    message.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    importingId.value = null
+  }
 }
 
 async function save() {
@@ -195,7 +256,7 @@ async function save() {
                   class="provider__warn"
                 >缺 Key</em>
               </span>
-              <span class="provider__model">{{ p.model }} · {{ p.baseUrl || 'OpenAI 默认地址' }} · {{ p.apiKeyMasked || '未设 Key' }}</span>
+              <span class="provider__model">{{ p.model }}</span>
             </span>
             <span class="provider__ops">
               <button
@@ -222,6 +283,48 @@ async function save() {
           >
             ＋ 添加模型源
           </button>
+
+          <button
+            type="button"
+            class="provider provider--add"
+            :disabled="candidatesLoading"
+            @click="loadCandidates"
+          >
+            {{ candidatesLoading ? '扫描中…' : candidates !== null ? '收起导入列表' : '⇩ 从本机 AI 工具导入（OpenCode / Codex / Claude Code）' }}
+          </button>
+
+          <div
+            v-if="candidates !== null"
+            class="candidates"
+          >
+            <p
+              v-if="candidates.length === 0"
+              class="candidates__empty"
+            >
+              未发现可导入的配置（需要本机 OpenCode / Codex / Claude Code 中已配置 API Key）
+            </p>
+            <div
+              v-for="c in candidates"
+              :key="c.id"
+              class="candidate"
+            >
+              <span class="candidate__main">
+                <span class="candidate__name">
+                  <em class="candidate__src">{{ c.source }}</em>
+                  {{ c.name }}
+                </span>
+                <span class="candidate__model">{{ c.model || '（未指定模型）' }} · {{ c.apiKeyMasked }}</span>
+              </span>
+              <button
+                type="button"
+                class="btn btn--primary candidate__import"
+                :disabled="importingId !== null"
+                @click="doImport(c)"
+              >
+                {{ importingId === c.id ? '导入中…' : '导入' }}
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- 编辑表单 -->
@@ -401,6 +504,62 @@ async function save() {
 .provider--add:hover {
   color: #1d4ed8;
   border-color: #93c5fd;
+}
+.candidates {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  background: #fafbfc;
+}
+.candidates__empty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.candidate {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid var(--border);
+}
+.candidate__main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.candidate__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.candidate__src {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 500;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-right: 6px;
+}
+.candidate__model {
+  font-size: 12px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.candidate__import {
+  flex-shrink: 0;
+  padding: 5px 12px;
 }
 .provider__main {
   display: flex;

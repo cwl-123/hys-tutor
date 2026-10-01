@@ -2,6 +2,14 @@
 
 版本记录：每次改动提交 git 并在此追加「版本 + 日期 + 功能点」。
 
+## v0.16.0 - 2026-10-01
+
+- 模型源一键导入：扫描本机 OpenCode / Codex / Claude Code 配置（GET /api/settings/import-candidates 脱敏预览，POST /api/settings/import 服务端直读 key 写入，不经过前端），AiHubMix 来源过滤不导入，Claude Code 仅自定义网关可导入
+- 设置窗口 UI 精简：模型源列表只显示名称 + 模型 + 缺 Key 警告，去掉 BaseURL/脱敏 Key 细节
+- 模型预设补充 kimi-k3 / claude-fable-5-1 / gpt-6-astra
+- 新增 import-service 单测 5 个（共 40 个）
+- PRD 同步至 v1.10.0
+
 ## v0.15.2 - 2026-09-30
 
 - 修复：AI 优化的自查出题改为尽力而为——模型 JSON 输出异常时保留重写正文与原有题目，不再整单失败

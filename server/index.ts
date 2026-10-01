@@ -12,7 +12,12 @@ import {
   handleSubmitLesson,
 } from './routes/lessons'
 import { handleCreateReport, handleListReports } from './routes/reports'
-import { handleGetSettings, handleUpdateSettings } from './routes/settings'
+import {
+  handleGetSettings,
+  handleImportCandidate,
+  handleListImportCandidates,
+  handleUpdateSettings,
+} from './routes/settings'
 
 type Next = (err?: unknown) => void
 
@@ -88,6 +93,16 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, next:
     if (url === '/settings' && (req.method === 'GET' || req.method === 'PATCH')) {
       if (req.method === 'GET') await handleGetSettings(req, res)
       else await handleUpdateSettings(req, res)
+      return
+    }
+
+    // GET /api/settings/import-candidates — 扫描本机 AI 工具配置；POST /api/settings/import — 确认导入
+    if (url === '/settings/import-candidates' && req.method === 'GET') {
+      await handleListImportCandidates(req, res)
+      return
+    }
+    if (url === '/settings/import' && req.method === 'POST') {
+      await handleImportCandidate(req, res)
       return
     }
 
