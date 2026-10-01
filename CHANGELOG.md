@@ -2,6 +2,13 @@
 
 版本记录：每次改动提交 git 并在此追加「版本 + 日期 + 功能点」。
 
+## v0.18.1 - 2026-10-01
+
+- 开源准备：补充 MIT LICENSE（署名 haiyeshu）、重写 README（功能/快速开始/配置/部署/安全隐私）；package.json 去 private、补 license/author/keywords
+- 安全：常驻服务绑定 127.0.0.1（原绑 0.0.0.0，局域网可读到设置接口返回的真实 key）
+- plist 脱敏：scripts/com.hys-tutor.plist 移出仓库改为 .template 模板，deploy.sh 部署时自动替换项目路径与 node 路径生成；.gitignore 增补 .DS_Store / .env.local 等
+- 全库明文密钥扫描（含 git 历史）：无泄漏
+
 ## v0.18.0 - 2026-10-01
 
 - Key 编辑所见即所得：模型源 API Key 与搜索 Key 输入框直接回填真实值（本机单用户场景，/api/settings 直返真实 key），眼睛图标切换明文/掩码；废弃「留空保持不变」语义，清空即清除 key（PATCH apiKey undefined=保持、空串=清除）

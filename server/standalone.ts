@@ -86,6 +86,7 @@ const server = createServer((req, res) => {
   })
 })
 
-server.listen(PORT, () => {
-  console.log(`hys-tutor serving on http://localhost:${PORT}`)
+// 仅监听本机回环：/api/settings 会返回真实 API key，严禁暴露到局域网
+server.listen(PORT, '127.0.0.1', () => {
+  console.log(`hys-tutor serving on http://127.0.0.1:${PORT}`)
 })

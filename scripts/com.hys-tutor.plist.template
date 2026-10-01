@@ -6,19 +6,19 @@
   <string>com.hys-tutor</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/opt/homebrew/bin/node</string>
+    <string>__NODE_PATH__</string>
     <string>--env-file=.env</string>
     <string>dist-server/standalone.js</string>
   </array>
   <key>WorkingDirectory</key>
-  <string>/Users/chenweilong/hys-tutor</string>
+  <string>__PROJECT_DIR__</string>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
   <true/>
   <key>StandardOutPath</key>
-  <string>/Users/chenweilong/hys-tutor/logs/serve.log</string>
+  <string>__PROJECT_DIR__/logs/serve.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/chenweilong/hys-tutor/logs/serve.err.log</string>
+  <string>__PROJECT_DIR__/logs/serve.err.log</string>
 </dict>
 </plist>
