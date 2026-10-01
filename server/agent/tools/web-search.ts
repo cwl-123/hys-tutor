@@ -1,3 +1,5 @@
+import { getSettings, resolveSearchKeys } from '../../services/settings-service'
+
 export interface SearchResult {
   title: string
   url: string
@@ -36,8 +38,7 @@ export function mergeSearchResults(...lists: SearchResult[][]): SearchResult[] {
   return out
 }
 
-async function tavilySearch(query: string, maxResults: number): Promise<SearchResult[]> {
-  const apiKey = process.env.TAVILY_API_KEY
+async function tavilySearch(query: string, maxResults: number, apiKey: string): Promise<SearchResult[]> {
   if (!apiKey) return []
   const res = await fetch('https://api.tavily.com/search', {
     method: 'POST',
@@ -55,8 +56,7 @@ async function tavilySearch(query: string, maxResults: number): Promise<SearchRe
   }))
 }
 
-async function bochaSearch(query: string, count: number): Promise<SearchResult[]> {
-  const apiKey = process.env.BOCHA_API_KEY
+async function bochaSearch(query: string, count: number, apiKey: string): Promise<SearchResult[]> {
   if (!apiKey) return []
   const res = await fetch('https://api.bochaai.com/v1/web-search', {
     method: 'POST',
@@ -78,9 +78,13 @@ async function bochaSearch(query: string, count: number): Promise<SearchResult[]
 
 // 双路并行搜索 + 去重合并；两家都失败/无结果才抛错（互为降级）
 export async function searchWeb(query: string, maxPerProvider = 5): Promise<SearchResult[]> {
+  const keys = resolveSearchKeys(getSettings())
+  if (!keys.tavilyKey && !keys.bochaKey) {
+    throw new Error('未配置搜索 API Key：请在「设置」中填写 Tavily / 博查 Key（或用 .env）')
+  }
   const [tavily, bocha] = await Promise.allSettled([
-    tavilySearch(query, maxPerProvider),
-    bochaSearch(query, maxPerProvider),
+    tavilySearch(query, maxPerProvider, keys.tavilyKey),
+    bochaSearch(query, maxPerProvider, keys.bochaKey),
   ])
   const merged = mergeSearchResults(
     tavily.status === 'fulfilled' ? tavily.value : [],

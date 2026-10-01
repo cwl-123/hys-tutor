@@ -34,6 +34,18 @@ function view() {
       model: process.env.LLM_MODEL ?? '',
       hasKey: !!process.env.LLM_API_KEY,
     },
+    search: {
+      tavily: {
+        apiKeyMasked: maskKey(s.search?.tavilyKey),
+        hasKey: !!s.search?.tavilyKey,
+        envHasKey: !!process.env.TAVILY_API_KEY,
+      },
+      bocha: {
+        apiKeyMasked: maskKey(s.search?.bochaKey),
+        hasKey: !!s.search?.bochaKey,
+        envHasKey: !!process.env.BOCHA_API_KEY,
+      },
+    },
   }
 }
 
@@ -55,6 +67,12 @@ const updateSettingsSchema = z.object({
     )
     .optional(),
   activeProviderId: z.string().nullable().optional(),
+  search: z
+    .object({
+      tavilyKey: z.string().max(500).optional(),
+      bochaKey: z.string().max(500).optional(),
+    })
+    .optional(),
 })
 
 // PATCH /api/settings — 整体保存模型源列表 + 激活源（apiKey 留空 = 保持原 key）

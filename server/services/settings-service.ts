@@ -14,6 +14,13 @@ export interface ProviderConfig {
 export interface Settings {
   providers: ProviderConfig[]
   activeProviderId?: string
+  search?: SearchKeys
+}
+
+// 搜索 API key（Tavily / 博查）：页面设置 > .env
+export interface SearchKeys {
+  tavilyKey?: string
+  bochaKey?: string
 }
 
 export interface ResolvedLlm {
@@ -40,9 +47,11 @@ function loadRaw(): unknown {
 function migrate(raw: unknown): Settings {
   const r = raw as Record<string, unknown> | null
   if (r && Array.isArray(r.providers)) {
+    const search = r.search as SearchKeys | undefined
     return {
       providers: (r.providers as ProviderConfig[]).map((p) => ({ ...p })),
       activeProviderId: typeof r.activeProviderId === 'string' ? r.activeProviderId : undefined,
+      search: search ? { tavilyKey: search.tavilyKey, bochaKey: search.bochaKey } : undefined,
     }
   }
   if (r && (r.model || r.baseUrl || r.apiKey)) {
@@ -65,7 +74,22 @@ function migrate(raw: unknown): Settings {
 const cache: Settings = migrate(loadRaw())
 
 export function getSettings(): Settings {
-  return { providers: cache.providers.map((p) => ({ ...p })), activeProviderId: cache.activeProviderId }
+  return {
+    providers: cache.providers.map((p) => ({ ...p })),
+    activeProviderId: cache.activeProviderId,
+    search: cache.search ? { ...cache.search } : undefined,
+  }
+}
+
+// 生效搜索 key：页面设置 > .env（纯函数便于测试）
+export function resolveSearchKeys(
+  s: Settings,
+  env: NodeJS.ProcessEnv = process.env,
+): { tavilyKey: string; bochaKey: string } {
+  return {
+    tavilyKey: s.search?.tavilyKey?.trim() || env.TAVILY_API_KEY || '',
+    bochaKey: s.search?.bochaKey?.trim() || env.BOCHA_API_KEY || '',
+  }
 }
 
 function isValid(p: ProviderConfig | undefined): p is ProviderConfig {
@@ -105,6 +129,7 @@ export interface ProviderInput {
 export async function updateSettings(patch: {
   providers?: ProviderInput[]
   activeProviderId?: string | null
+  search?: { tavilyKey?: string; bochaKey?: string } // 留空 = 保持原 key
 }): Promise<Settings> {
   if (patch.providers) {
     const oldById = new Map(cache.providers.map((p) => [p.id, p]))
@@ -123,6 +148,14 @@ export async function updateSettings(patch: {
     const wanted = patch.activeProviderId || undefined
     cache.activeProviderId =
       wanted && cache.providers.some((p) => p.id === wanted) ? wanted : undefined
+  }
+  if (patch.search) {
+    const tavilyKey = patch.search.tavilyKey?.trim()
+    const bochaKey = patch.search.bochaKey?.trim()
+    cache.search = {
+      tavilyKey: tavilyKey || cache.search?.tavilyKey,
+      bochaKey: bochaKey || cache.search?.bochaKey,
+    }
   }
   await writeJson(settingsFile(), cache)
   return getSettings()

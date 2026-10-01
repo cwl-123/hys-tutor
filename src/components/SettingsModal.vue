@@ -31,6 +31,10 @@ interface SettingsView {
   activeProviderId: string
   effective: { model: string; baseUrl: string; providerName: string; source: string }
   envFallback: { model: string; hasKey: boolean }
+  search: {
+    tavily: { apiKeyMasked: string; hasKey: boolean; envHasKey: boolean }
+    bocha: { apiKeyMasked: string; hasKey: boolean; envHasKey: boolean }
+  }
 }
 
 interface ImportCandidate {
@@ -61,6 +65,18 @@ const candidates = ref<ImportCandidate[] | null>(null)
 const candidatesLoading = ref(false)
 const importingId = ref<string | null>(null)
 
+// 搜索 API Key（输入框内容；空 = 保持原 key）
+const searchInfo = ref<SettingsView['search'] | null>(null)
+const tavilyKeyInput = ref('')
+const bochaKeyInput = ref('')
+
+function searchPlaceholder(k: { apiKeyMasked: string; hasKey: boolean; envHasKey: boolean } | undefined): string {
+  if (!k) return ''
+  if (k.hasKey) return `当前 ${k.apiKeyMasked}（留空保持不变）`
+  if (k.envHasKey) return '留空使用 .env 中的配置'
+  return '未配置'
+}
+
 watch(
   () => props.open,
   async (open) => {
@@ -88,6 +104,9 @@ async function reload() {
   activeId.value = data.activeProviderId
   effective.value = data.effective
   envFallback.value = data.envFallback
+  searchInfo.value = data.search
+  tavilyKeyInput.value = ''
+  bochaKeyInput.value = ''
 }
 
 function startAdd() {
@@ -175,6 +194,10 @@ async function save() {
           apiKey: p.apiKey || undefined,
         })),
         activeProviderId: activeId.value || null,
+        search: {
+          tavilyKey: tavilyKeyInput.value || undefined,
+          bochaKey: bochaKeyInput.value || undefined,
+        },
       }),
     })
     const data = (await res.json()) as SettingsView & { error?: string }
@@ -324,6 +347,47 @@ async function save() {
                 {{ importingId === c.id ? '导入中…' : '导入' }}
               </button>
             </div>
+          </div>
+        </div>
+
+        <!-- 搜索 API Key -->
+        <div class="search-keys">
+          <p class="search-keys__title">
+            搜索 API（备课联网研究用，双路互为备份）
+          </p>
+          <div class="edit__row">
+            <label class="field">
+              <span class="field__label">
+                Tavily Key
+                <a
+                  class="field__link"
+                  href="https://tavily.com"
+                  target="_blank"
+                  rel="noopener"
+                >申请 →</a>
+              </span>
+              <input
+                v-model="tavilyKeyInput"
+                type="password"
+                :placeholder="searchPlaceholder(searchInfo?.tavily)"
+              >
+            </label>
+            <label class="field">
+              <span class="field__label">
+                博查 Key
+                <a
+                  class="field__link"
+                  href="https://open.bochaai.com"
+                  target="_blank"
+                  rel="noopener"
+                >申请 →</a>
+              </span>
+              <input
+                v-model="bochaKeyInput"
+                type="password"
+                :placeholder="searchPlaceholder(searchInfo?.bocha)"
+              >
+            </label>
           </div>
         </div>
 
@@ -560,6 +624,24 @@ async function save() {
 .candidate__import {
   flex-shrink: 0;
   padding: 5px 12px;
+}
+.search-keys {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.search-keys__title {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.field__link {
+  margin-left: 6px;
+  color: #3b82f6;
+  text-decoration: none;
+}
+.field__link:hover {
+  text-decoration: underline;
 }
 .provider__main {
   display: flex;

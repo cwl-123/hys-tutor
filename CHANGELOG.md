@@ -2,6 +2,13 @@
 
 版本记录：每次改动提交 git 并在此追加「版本 + 日期 + 功能点」。
 
+## v0.17.0 - 2026-10-01
+
+- 搜索 API Key 页面可配置：设置窗口新增 Tavily / 博查 Key（留空保持原 key，附官方申请链接），resolveSearchKeys 统一解析（页面设置 > .env），web-search 改走该入口
+- 两家搜索 key 全缺时报错改为明确提示去设置页配置
+- 新增 resolveSearchKeys 单测 3 个（共 43 个）
+- PRD 同步至 v1.11.0
+
 ## v0.16.0 - 2026-10-01
 
 - 模型源一键导入：扫描本机 OpenCode / Codex / Claude Code 配置（GET /api/settings/import-candidates 脱敏预览，POST /api/settings/import 服务端直读 key 写入，不经过前端），AiHubMix 来源过滤不导入，Claude Code 仅自定义网关可导入
