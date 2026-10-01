@@ -21,18 +21,17 @@ interface UiProvider {
   name: string
   baseUrl: string
   model: string
-  apiKey: string // 输入框内容；空 = 保持原 key
-  apiKeyMasked: string
+  apiKey: string
   hasKey: boolean
 }
 
 interface SettingsView {
-  providers: { id: string; name: string; baseUrl: string; model: string; apiKeyMasked: string; hasKey: boolean }[]
+  providers: { id: string; name: string; baseUrl: string; model: string; apiKey: string; hasKey: boolean }[]
   activeProviderId: string
   effective: { model: string; baseUrl: string; providerName: string; source: string }
   search: {
-    tavily: { apiKeyMasked: string; hasKey: boolean }
-    bocha: { apiKeyMasked: string; hasKey: boolean }
+    tavily: { apiKey: string; hasKey: boolean }
+    bocha: { apiKey: string; hasKey: boolean }
   }
 }
 
@@ -63,15 +62,14 @@ const candidates = ref<ImportCandidate[] | null>(null)
 const candidatesLoading = ref(false)
 const importingId = ref<string | null>(null)
 
-// 搜索 API Key（输入框内容；空 = 保持原 key）
-const searchInfo = ref<SettingsView['search'] | null>(null)
+// 搜索 API Key（回填真实值，眼睛图标切换明文/掩码）
 const tavilyKeyInput = ref('')
 const bochaKeyInput = ref('')
 
-function searchPlaceholder(k: { apiKeyMasked: string; hasKey: boolean } | undefined): string {
-  if (!k || !k.hasKey) return ''
-  return `当前 ${k.apiKeyMasked}（留空保持不变）`
-}
+// Key 明文显示开关
+const showEditKey = ref(false)
+const showTavilyKey = ref(false)
+const showBochaKey = ref(false)
 
 watch(
   () => props.open,
@@ -80,6 +78,9 @@ watch(
     message.value = null
     editing.value = null
     candidates.value = null
+    showEditKey.value = false
+    showTavilyKey.value = false
+    showBochaKey.value = false
     await reload()
   },
 )
@@ -93,20 +94,18 @@ async function reload() {
     name: p.name,
     baseUrl: p.baseUrl,
     model: p.model,
-    apiKey: '',
-    apiKeyMasked: p.apiKeyMasked,
+    apiKey: p.apiKey,
     hasKey: p.hasKey,
   }))
   activeId.value = data.activeProviderId
   effective.value = data.effective
-  searchInfo.value = data.search
-  tavilyKeyInput.value = ''
-  bochaKeyInput.value = ''
+  tavilyKeyInput.value = data.search.tavily.apiKey
+  bochaKeyInput.value = data.search.bocha.apiKey
 }
 
 function startAdd() {
   editingIndex.value = -1
-  editing.value = { name: '', baseUrl: '', model: '', apiKey: '', apiKeyMasked: '', hasKey: false }
+  editing.value = { name: '', baseUrl: '', model: '', apiKey: '', hasKey: false }
 }
 
 function startEdit(index: number) {
@@ -186,12 +185,12 @@ async function save() {
           name: p.name,
           baseUrl: p.baseUrl || undefined,
           model: p.model,
-          apiKey: p.apiKey || undefined,
+          apiKey: p.apiKey,
         })),
         activeProviderId: activeId.value || null,
         search: {
-          tavilyKey: tavilyKeyInput.value || undefined,
-          bochaKey: bochaKeyInput.value || undefined,
+          tavilyKey: tavilyKeyInput.value,
+          bochaKey: bochaKeyInput.value,
         },
       }),
     })
@@ -347,11 +346,46 @@ async function save() {
                   rel="noopener"
                 >申请 →</a>
               </span>
-              <input
-                v-model="tavilyKeyInput"
-                type="password"
-                :placeholder="searchPlaceholder(searchInfo?.tavily)"
-              >
+              <span class="key-field">
+                <input
+                  v-model="tavilyKeyInput"
+                  :type="showTavilyKey ? 'text' : 'password'"
+                >
+                <button
+                  type="button"
+                  class="key-field__eye"
+                  :title="showTavilyKey ? '隐藏' : '显示'"
+                  @click="showTavilyKey = !showTavilyKey"
+                >
+                  <svg
+                    v-if="showTavilyKey"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  ><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle
+                    cx="12"
+                    cy="12"
+                    r="3"
+                  /></svg>
+                  <svg
+                    v-else
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  ><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line
+                    x1="1"
+                    y1="1"
+                    x2="23"
+                    y2="23"
+                  /></svg>
+                </button>
+              </span>
             </label>
             <label class="field">
               <span class="field__label">
@@ -363,11 +397,46 @@ async function save() {
                   rel="noopener"
                 >申请 →</a>
               </span>
-              <input
-                v-model="bochaKeyInput"
-                type="password"
-                :placeholder="searchPlaceholder(searchInfo?.bocha)"
-              >
+              <span class="key-field">
+                <input
+                  v-model="bochaKeyInput"
+                  :type="showBochaKey ? 'text' : 'password'"
+                >
+                <button
+                  type="button"
+                  class="key-field__eye"
+                  :title="showBochaKey ? '隐藏' : '显示'"
+                  @click="showBochaKey = !showBochaKey"
+                >
+                  <svg
+                    v-if="showBochaKey"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  ><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle
+                    cx="12"
+                    cy="12"
+                    r="3"
+                  /></svg>
+                  <svg
+                    v-else
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  ><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line
+                    x1="1"
+                    y1="1"
+                    x2="23"
+                    y2="23"
+                  /></svg>
+                </button>
+              </span>
             </label>
           </div>
         </div>
@@ -406,11 +475,47 @@ async function save() {
           </label>
           <label class="field">
             <span class="field__label">API Key</span>
-            <input
-              v-model="editing.apiKey"
-              type="password"
-              :placeholder="editing.hasKey ? `当前 ${editing.apiKeyMasked}（留空保持不变）` : 'sk-...'"
-            >
+            <span class="key-field">
+              <input
+                v-model="editing.apiKey"
+                :type="showEditKey ? 'text' : 'password'"
+                placeholder="sk-..."
+              >
+              <button
+                type="button"
+                class="key-field__eye"
+                :title="showEditKey ? '隐藏' : '显示'"
+                @click="showEditKey = !showEditKey"
+              >
+                <svg
+                  v-if="showEditKey"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                ><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle
+                  cx="12"
+                  cy="12"
+                  r="3"
+                /></svg>
+                <svg
+                  v-else
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                ><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line
+                  x1="1"
+                  y1="1"
+                  x2="23"
+                  y2="23"
+                /></svg>
+              </button>
+            </span>
           </label>
           <datalist id="preset-models">
             <option
@@ -699,6 +804,34 @@ async function save() {
 .field input:focus {
   outline: none;
   border-color: #3b82f6;
+}
+.key-field {
+  position: relative;
+  display: flex;
+}
+.key-field input {
+  flex: 1;
+  padding-right: 32px;
+}
+.key-field__eye {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-dim);
+  padding: 2px;
+  display: flex;
+  align-items: center;
+}
+.key-field__eye svg {
+  width: 15px;
+  height: 15px;
+}
+.key-field__eye:hover {
+  color: var(--text);
 }
 .edit__actions {
   display: flex;

@@ -123,13 +123,13 @@ export interface ProviderInput {
   name: string
   baseUrl?: string
   model: string
-  apiKey?: string // 留空 = 保持原 key
+  apiKey?: string // undefined = 保持原 key；空串 = 清除
 }
 
 export async function updateSettings(patch: {
   providers?: ProviderInput[]
   activeProviderId?: string | null
-  search?: { tavilyKey?: string; bochaKey?: string } // 留空 = 保持原 key
+  search?: { tavilyKey?: string; bochaKey?: string } // undefined = 保持原 key；空串 = 清除
 }): Promise<Settings> {
   if (patch.providers) {
     const oldById = new Map(cache.providers.map((p) => [p.id, p]))
@@ -140,7 +140,8 @@ export async function updateSettings(patch: {
         name: inp.name.trim() || '未命名',
         baseUrl: inp.baseUrl?.trim() || undefined,
         model: inp.model.trim(),
-        apiKey: inp.apiKey?.trim() ? inp.apiKey.trim() : existing?.apiKey,
+        apiKey:
+          inp.apiKey === undefined ? existing?.apiKey : inp.apiKey.trim() || undefined,
       }
     })
   }
@@ -150,11 +151,11 @@ export async function updateSettings(patch: {
       wanted && cache.providers.some((p) => p.id === wanted) ? wanted : undefined
   }
   if (patch.search) {
-    const tavilyKey = patch.search.tavilyKey?.trim()
-    const bochaKey = patch.search.bochaKey?.trim()
+    const t = patch.search.tavilyKey
+    const b = patch.search.bochaKey
     cache.search = {
-      tavilyKey: tavilyKey || cache.search?.tavilyKey,
-      bochaKey: bochaKey || cache.search?.bochaKey,
+      tavilyKey: t === undefined ? cache.search?.tavilyKey : t.trim() || undefined,
+      bochaKey: b === undefined ? cache.search?.bochaKey : b.trim() || undefined,
     }
   }
   await writeJson(settingsFile(), cache)

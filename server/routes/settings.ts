@@ -3,14 +3,13 @@ import { z } from 'zod'
 import { sendJson } from '../index'
 import {
   getSettings,
-  maskKey,
   resolveLlm,
   updateSettings,
 } from '../services/settings-service'
 import { findCandidate, listImportCandidates } from '../services/import-service'
 import { readBody } from './topics'
 
-// 当前生效配置 + 模型源列表（key 脱敏）
+// 当前生效配置 + 模型源列表 + 搜索 key（本机单用户应用，key 直返前端用于回填编辑）
 function view() {
   const s = getSettings()
   const eff = resolveLlm()
@@ -20,7 +19,7 @@ function view() {
       name: p.name,
       baseUrl: p.baseUrl ?? '',
       model: p.model,
-      apiKeyMasked: maskKey(p.apiKey),
+      apiKey: p.apiKey ?? '',
       hasKey: !!p.apiKey,
     })),
     activeProviderId: s.activeProviderId ?? '',
@@ -32,11 +31,11 @@ function view() {
     },
     search: {
       tavily: {
-        apiKeyMasked: maskKey(s.search?.tavilyKey || process.env.TAVILY_API_KEY),
+        apiKey: s.search?.tavilyKey || process.env.TAVILY_API_KEY || '',
         hasKey: !!(s.search?.tavilyKey || process.env.TAVILY_API_KEY),
       },
       bocha: {
-        apiKeyMasked: maskKey(s.search?.bochaKey || process.env.BOCHA_API_KEY),
+        apiKey: s.search?.bochaKey || process.env.BOCHA_API_KEY || '',
         hasKey: !!(s.search?.bochaKey || process.env.BOCHA_API_KEY),
       },
     },
