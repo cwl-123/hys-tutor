@@ -30,20 +30,14 @@ function view() {
       providerName: eff.providerName,
       source: eff.source,
     },
-    envFallback: {
-      model: process.env.LLM_MODEL ?? '',
-      hasKey: !!process.env.LLM_API_KEY,
-    },
     search: {
       tavily: {
-        apiKeyMasked: maskKey(s.search?.tavilyKey),
-        hasKey: !!s.search?.tavilyKey,
-        envHasKey: !!process.env.TAVILY_API_KEY,
+        apiKeyMasked: maskKey(s.search?.tavilyKey || process.env.TAVILY_API_KEY),
+        hasKey: !!(s.search?.tavilyKey || process.env.TAVILY_API_KEY),
       },
       bocha: {
-        apiKeyMasked: maskKey(s.search?.bochaKey),
-        hasKey: !!s.search?.bochaKey,
-        envHasKey: !!process.env.BOCHA_API_KEY,
+        apiKeyMasked: maskKey(s.search?.bochaKey || process.env.BOCHA_API_KEY),
+        hasKey: !!(s.search?.bochaKey || process.env.BOCHA_API_KEY),
       },
     },
   }

@@ -30,10 +30,9 @@ interface SettingsView {
   providers: { id: string; name: string; baseUrl: string; model: string; apiKeyMasked: string; hasKey: boolean }[]
   activeProviderId: string
   effective: { model: string; baseUrl: string; providerName: string; source: string }
-  envFallback: { model: string; hasKey: boolean }
   search: {
-    tavily: { apiKeyMasked: string; hasKey: boolean; envHasKey: boolean }
-    bocha: { apiKeyMasked: string; hasKey: boolean; envHasKey: boolean }
+    tavily: { apiKeyMasked: string; hasKey: boolean }
+    bocha: { apiKeyMasked: string; hasKey: boolean }
   }
 }
 
@@ -48,9 +47,8 @@ interface ImportCandidate {
 }
 
 const providers = ref<UiProvider[]>([])
-const activeId = ref('') // '' = 使用 .env 默认
+const activeId = ref('') // '' = 未选激活源，使用默认配置
 const effective = ref<SettingsView['effective'] | null>(null)
-const envFallback = ref<SettingsView['envFallback']>({ model: '', hasKey: false })
 
 // 编辑表单：null = 关闭；editingIndex = -1 表示新增
 const editing = ref<UiProvider | null>(null)
@@ -70,11 +68,9 @@ const searchInfo = ref<SettingsView['search'] | null>(null)
 const tavilyKeyInput = ref('')
 const bochaKeyInput = ref('')
 
-function searchPlaceholder(k: { apiKeyMasked: string; hasKey: boolean; envHasKey: boolean } | undefined): string {
-  if (!k) return ''
-  if (k.hasKey) return `当前 ${k.apiKeyMasked}（留空保持不变）`
-  if (k.envHasKey) return '留空使用 .env 中的配置'
-  return '未配置'
+function searchPlaceholder(k: { apiKeyMasked: string; hasKey: boolean } | undefined): string {
+  if (!k || !k.hasKey) return ''
+  return `当前 ${k.apiKeyMasked}（留空保持不变）`
 }
 
 watch(
@@ -103,7 +99,6 @@ async function reload() {
   }))
   activeId.value = data.activeProviderId
   effective.value = data.effective
-  envFallback.value = data.envFallback
   searchInfo.value = data.search
   tavilyKeyInput.value = ''
   bochaKeyInput.value = ''
@@ -236,28 +231,14 @@ async function save() {
           class="modal__effective"
         >
           当前生效：<strong>{{ effective.model || '（未配置）' }}</strong>
-          <span class="modal__effective-src">来自 {{ effective.providerName }}（{{ effective.source }}）</span>
+          <span
+            v-if="effective.model"
+            class="modal__effective-src"
+          >{{ effective.providerName }}</span>
         </p>
 
         <!-- 模型源列表 -->
         <div class="providers">
-          <label
-            v-if="envFallback.hasKey || providers.length === 0"
-            class="provider"
-            :class="{ 'provider--active': activeId === '' }"
-          >
-            <input
-              v-model="activeId"
-              type="radio"
-              value=""
-              name="active-provider"
-            >
-            <span class="provider__main">
-              <span class="provider__name">.env 默认</span>
-              <span class="provider__model">{{ envFallback.model || '（.env 未配置模型）' }}</span>
-            </span>
-          </label>
-
           <label
             v-for="(p, i) in providers"
             :key="p.id ?? `new-${i}`"
@@ -464,7 +445,7 @@ async function save() {
         </p>
 
         <footer class="modal__footer">
-          <span class="modal__hint">配置仅存本地 data/settings.json</span>
+          <span class="modal__hint">配置仅保存在本机</span>
           <div class="modal__buttons">
             <button
               class="btn"

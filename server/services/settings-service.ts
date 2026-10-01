@@ -113,7 +113,7 @@ export function resolveLlm(): ResolvedLlm {
     apiKey: process.env.LLM_API_KEY ?? '',
     baseUrl: process.env.LLM_BASE_URL || undefined,
     model: process.env.LLM_MODEL ?? '',
-    providerName: '.env 默认',
+    providerName: '默认配置',
     source: '.env',
   }
 }
