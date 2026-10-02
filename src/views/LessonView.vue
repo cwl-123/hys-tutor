@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { useLessonStore } from '@/stores/lesson'
 import { useTopicStore } from '@/stores/topic'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
-import SelectionReporter from '@/components/SelectionReporter.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -213,11 +212,6 @@ async function startRevise() {
           去随堂练习（{{ lessonStore.questions.length }} 题）
         </RouterLink>
       </footer>
-
-      <SelectionReporter
-        :lesson-id="lessonStore.lesson.id"
-        :node-id="lessonStore.lesson.nodeIds[0]"
-      />
     </article>
 
     <div
