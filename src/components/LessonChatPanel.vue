@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { findSectionByHeading } from '@shared/lesson-md'
 import type { LessonChatMessage, LessonQuote, LessonVersion } from '@shared/lesson-chat'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
@@ -18,7 +18,7 @@ const pendingQuote = ref<LessonQuote | null>(null)
 const loading = ref(false)
 const applyingId = ref<string | null>(null)
 const error = ref<string | null>(null)
-const previewId = ref<string | null>(null)
+const previewMsgId = ref<string | null>(null)
 const listEl = ref<HTMLElement | null>(null)
 const inputEl = ref<HTMLTextAreaElement | null>(null)
 
@@ -78,6 +78,17 @@ watch(
 )
 
 const canUndo = computed(() => versions.value.length > 0)
+const previewMsg = computed(() => messages.value.find((m) => m.id === previewMsgId.value) ?? null)
+
+// 预览弹层：Esc 关闭
+function onEsc(e: KeyboardEvent) {
+  if (e.key === 'Escape') previewMsgId.value = null
+}
+watch(previewMsgId, (id) => {
+  if (id) window.addEventListener('keydown', onEsc)
+  else window.removeEventListener('keydown', onEsc)
+})
+onBeforeUnmount(() => window.removeEventListener('keydown', onEsc))
 
 async function send() {
   const message = input.value.trim()
@@ -125,7 +136,7 @@ async function applyProposal(msg: LessonChatMessage) {
     if (!res.ok) throw new Error(data.error ?? `应用失败：${res.status}`)
     messages.value = data.messages ?? messages.value
     versions.value = data.versions ?? versions.value
-    previewId.value = null
+    previewMsgId.value = null
     emit('updated')
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err)
@@ -251,19 +262,13 @@ function quoteLabel(q?: LessonQuote | null): string {
             <span class="msg__scope">{{ m.proposal.scope === 'section' ? `改本节 · ${m.proposal.targetHeading ?? ''}` : '整篇重写' }}</span>
             <span class="msg__summary">{{ m.proposal.summary }}</span>
           </div>
-          <div
-            v-if="previewId === m.id"
-            class="msg__preview"
-          >
-            <MarkdownRenderer :content="previewContent(m)" />
-          </div>
           <div class="msg__actions">
             <button
               class="chat__ghost"
               type="button"
-              @click="previewId = previewId === m.id ? null : m.id"
+              @click="previewMsgId = m.id"
             >
-              {{ previewId === m.id ? '收起预览' : '预览改动' }}
+              🔍 放大预览
             </button>
             <button
               class="chat__apply"
@@ -331,6 +336,57 @@ function quoteLabel(q?: LessonQuote | null): string {
       </p>
     </div>
   </aside>
+
+  <!-- 放大预览：大尺寸阅读改动 -->
+  <Teleport to="body">
+    <div
+      v-if="previewMsg?.proposal"
+      class="preview-mask"
+      @click.self="previewMsgId = null"
+    >
+      <div class="preview-modal">
+        <header class="preview-modal__head">
+          <div class="preview-modal__title">
+            <span class="msg__scope">{{ previewMsg.proposal.scope === 'section' ? `改本节 · ${previewMsg.proposal.targetHeading ?? ''}` : '整篇重写' }}</span>
+            <span class="preview-modal__summary">{{ previewMsg.proposal.summary }}</span>
+          </div>
+          <button
+            class="preview-modal__close"
+            type="button"
+            title="关闭（Esc）"
+            @click="previewMsgId = null"
+          >
+            ×
+          </button>
+        </header>
+        <div class="preview-modal__body">
+          <MarkdownRenderer :content="previewContent(previewMsg)" />
+        </div>
+        <footer class="preview-modal__foot">
+          <span class="preview-modal__hint">
+            {{ previewMsg.proposal.scope === 'section' ? '仅替换该章节，其余章节保持不变' : '将整篇替换为以上内容' }}
+          </span>
+          <div class="preview-modal__actions">
+            <button
+              class="chat__ghost"
+              type="button"
+              @click="previewMsgId = null"
+            >
+              关闭
+            </button>
+            <button
+              class="chat__apply"
+              type="button"
+              :disabled="previewMsg.applied || applyingId === previewMsg.id"
+              @click="applyProposal(previewMsg)"
+            >
+              {{ previewMsg.applied ? '✓ 已应用' : applyingId === previewMsg.id ? '应用中…' : '应用修改' }}
+            </button>
+          </div>
+        </footer>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -555,14 +611,6 @@ function quoteLabel(q?: LessonQuote | null): string {
   font-size: 12px;
   color: var(--text);
 }
-.msg__preview {
-  max-height: 320px;
-  overflow-y: auto;
-  border: 1px dashed var(--border);
-  border-radius: 8px;
-  padding: 8px 12px;
-  background: #fff;
-}
 .msg__actions {
   display: flex;
   gap: 8px;
@@ -679,5 +727,90 @@ function quoteLabel(q?: LessonQuote | null): string {
   margin: 6px 2px 0;
   font-size: 11px;
   color: var(--text-dim);
+}
+
+/* ---- 放大预览弹层 ---- */
+.preview-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  background: rgb(15 23 42 / 45%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+.preview-modal {
+  width: min(960px, 92vw);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 18px 50px rgb(15 23 42 / 28%);
+}
+.preview-modal__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  background: #f8fafc;
+}
+.preview-modal__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.preview-modal__summary {
+  font-size: 13px;
+  color: var(--text);
+}
+.preview-modal__close {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text-dim);
+}
+.preview-modal__close:hover {
+  background: #e2e8f0;
+  color: var(--text);
+}
+.preview-modal__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 28px 28px;
+}
+.preview-modal__body :deep(.md-body) {
+  max-width: 820px;
+  margin: 0 auto;
+}
+.preview-modal__foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+  background: #fff;
+}
+.preview-modal__hint {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.preview-modal__actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
 }
 </style>
