@@ -37,9 +37,9 @@ export async function postSse(url: string, body: unknown, handlers: SseHandlers)
   await readSseStream(res, handlers)
 }
 
-// GET + SSE（挂接进度流）
-export async function getSse(url: string, handlers: SseHandlers): Promise<void> {
-  const res = await fetch(url)
+// GET + SSE（挂接进度流）；signal 用于离开页面/重新挂接时中断旧连接
+export async function getSse(url: string, handlers: SseHandlers, signal?: AbortSignal): Promise<void> {
+  const res = await fetch(url, { signal })
   if (!res.ok) throw new Error(`SSE 请求失败：${res.status}`)
   await readSseStream(res, handlers)
 }

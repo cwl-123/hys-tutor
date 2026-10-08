@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { VueFlow, type Node, type Edge, type NodeMouseEvent } from '@vue-flow/core'
 import { Controls } from '@vue-flow/controls'
@@ -26,6 +26,31 @@ const applyError = ref<string | null>(null)
 onMounted(async () => {
   await store.loadTopic(topicId.value)
 })
+
+// 后台正在进行备课/优化的课程 → 工具栏提供「查看进度」入口（可随时离开再进来）
+const activeLesson = computed(
+  () => store.lessons.find((l) => l.status !== 'generated' && l.status !== 'failed') ?? null,
+)
+const activeLessonLabel = computed(() =>
+  activeLesson.value?.status === 'revising' ? '课件优化中' : '课件生成中',
+)
+
+let pollTimer: number | undefined
+function stopPolling() {
+  if (pollTimer !== undefined) {
+    clearInterval(pollTimer)
+    pollTimer = undefined
+  }
+}
+watch(
+  () => activeLesson.value?.id,
+  (id) => {
+    stopPolling()
+    if (id) pollTimer = window.setInterval(() => void store.fetchLessons(topicId.value), 8000)
+  },
+  { immediate: true },
+)
+onUnmounted(stopPolling)
 
 const positions = computed(() => layoutGraph(store.nodes))
 
@@ -142,6 +167,14 @@ async function deleteLesson(lessonId: string) {
           <span class="legend"><i class="legend__dot legend__dot--green" />已掌握 ≥80</span>
         </div>
         <div class="toolbar__actions">
+          <RouterLink
+            v-if="activeLesson"
+            :to="`/lesson/${activeLesson.id}`"
+            class="btn btn--progress"
+            title="后台备课尚未完成，点击查看实时进度"
+          >
+            ⏳ {{ activeLessonLabel }} · 查看进度
+          </RouterLink>
           <RouterLink
             :to="`/lesson/new?topic=${topicId}`"
             class="btn btn--go"
@@ -312,5 +345,13 @@ async function deleteLesson(lessonId: string) {
   border-color: #3b82f6;
   background: #eff6ff;
   color: #1d4ed8;
+}
+.btn--progress {
+  background: #fffbeb;
+  border-color: #f59e0b;
+  color: #b45309;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
 }
 </style>

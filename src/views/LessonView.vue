@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useLessonStore } from '@/stores/lesson'
 import { useTopicStore } from '@/stores/topic'
@@ -159,6 +159,9 @@ async function startRevise() {
   reviseInstruction.value = ''
   await lessonStore.load(lesson.id)
 }
+
+// 离开备课页时断开进度流；备课任务在后台继续，可从图谱页再次进入回放
+onUnmounted(() => lessonStore.detach())
 </script>
 
 <template>
@@ -171,9 +174,17 @@ async function startRevise() {
       v-if="lessonStore.generating"
       class="progress"
     >
-      <h1>正在备课…</h1>
+      <div class="progress__head">
+        <h1>正在备课…</h1>
+        <RouterLink
+          :to="topicHome"
+          class="btn"
+        >
+          ← 返回图谱
+        </RouterLink>
+      </div>
       <p class="progress__hint">
-        Agent 正在联网研究并撰写课程，全程约 2~5 分钟（缓存命中约 1 分钟）
+        Agent 正在联网研究并撰写课程，全程约 2~5 分钟（缓存命中约 1 分钟）。可先返回图谱，备课在后台继续，随时点「课件生成中」再进来查看进度。
       </p>
       <ol
         ref="stageList"
@@ -463,9 +474,19 @@ async function startRevise() {
   max-width: 1340px;
   padding-right: 452px;
 }
+.progress__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.progress__head h1 {
+  margin-bottom: 0;
+}
 .progress__hint {
   color: var(--text-dim);
   font-size: 13px;
+  line-height: 1.7;
 }
 .progress__stages {
   margin: 16px 0;

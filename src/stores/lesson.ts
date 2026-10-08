@@ -61,6 +61,9 @@ function stageLabel(stage: string, detail?: unknown): string | null {
   }
 }
 
+// 当前挂接中的进度流；重新挂接/离开页面时中断旧连接，避免重复阶段
+let attachAbort: AbortController | null = null
+
 export const useLessonStore = defineStore('lesson', () => {
   const stages = ref<StageEntry[]>([])
   const streamingContent = ref('')
@@ -99,13 +102,8 @@ export const useLessonStore = defineStore('lesson', () => {
       if (!res.ok || !data.lessonId) {
         throw new Error(data.error ?? `发起备课失败：${res.status}`)
       }
-      if (data.reused) {
-        stages.value = [
-          ...stages.value,
-          { key: 'reused', label: '检测到该方向已有在途备课任务，直接挂接其进度', ts: Date.now() },
-        ]
-      }
-      await attach(data.lessonId)
+      const preface = data.reused ? '检测到该方向已有在途备课任务，直接挂接其进度' : ''
+      await attach(data.lessonId, preface)
       return data.lessonId
     } catch (err) {
       error.value = err instanceof Error ? err.message : String(err)
@@ -115,38 +113,62 @@ export const useLessonStore = defineStore('lesson', () => {
   }
 
   // 挂接在途/已完成任务的进度流（服务端回放已缓存阶段）
-  async function attach(lessonId: string) {
+  // 重新挂接时会中断上一条流并清空进度，避免重复阶段
+  async function attach(lessonId: string, preface?: string) {
+    attachAbort?.abort()
+    const controller = new AbortController()
+    attachAbort = controller
+    stages.value = preface ? [{ key: 'init', label: preface, ts: Date.now() }] : []
+    streamingContent.value = ''
+    error.value = null
     generating.value = true
     let pendingLoad: Promise<void> | null = null
     try {
-      await getSse(`/api/lessons/${lessonId}/progress`, {
-        onEvent(event, data) {
-          if (event === 'stage') {
-            const e = data as { stage: string; detail?: unknown }
-            if (e.stage === 'write-delta') {
-              streamingContent.value += (e.detail as { text: string }).text
-              return
+      await getSse(
+        `/api/lessons/${lessonId}/progress`,
+        {
+          onEvent(event, data) {
+            if (event === 'stage') {
+              const e = data as { stage: string; detail?: unknown }
+              if (e.stage === 'write-delta') {
+                streamingContent.value += (e.detail as { text: string }).text
+                return
+              }
+              const label = stageLabel(e.stage, e.detail)
+              if (label) {
+                stages.value = [
+                  ...stages.value,
+                  { key: `${Date.now()}-${stages.value.length}`, label, ts: Date.now() },
+                ]
+              }
+            } else if (event === 'result') {
+              pendingLoad = load(lessonId)
+            } else if (event === 'error') {
+              error.value = (data as { message: string }).message
             }
-            const label = stageLabel(e.stage, e.detail)
-            if (label) {
-              stages.value = [
-                ...stages.value,
-                { key: `${Date.now()}-${stages.value.length}`, label, ts: Date.now() },
-              ]
-            }
-          } else if (event === 'result') {
-            pendingLoad = load(lessonId)
-          } else if (event === 'error') {
-            error.value = (data as { message: string }).message
-          }
+          },
         },
-      })
+        controller.signal,
+      )
       if (pendingLoad) await pendingLoad
     } catch (err) {
-      error.value = err instanceof Error ? err.message : String(err)
+      // 主动中断（重新挂接/离开页面）不算错误
+      if (!controller.signal.aborted) {
+        error.value = err instanceof Error ? err.message : String(err)
+      }
     } finally {
-      generating.value = false
+      if (attachAbort === controller) {
+        attachAbort = null
+        generating.value = false
+      }
     }
+  }
+
+  // 离开备课页时中断进度流；再次进入 attach 会重新回放，进度不丢
+  function detach() {
+    attachAbort?.abort()
+    attachAbort = null
+    generating.value = false
   }
 
   async function load(lessonId: string) {
@@ -240,6 +262,7 @@ export const useLessonStore = defineStore('lesson', () => {
     attempts,
     generate,
     attach,
+    detach,
     revise,
     load,
     loadAttempts,
