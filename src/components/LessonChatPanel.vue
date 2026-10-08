@@ -20,6 +20,19 @@ const applyingId = ref<string | null>(null)
 const error = ref<string | null>(null)
 const previewId = ref<string | null>(null)
 const listEl = ref<HTMLElement | null>(null)
+const inputEl = ref<HTMLTextAreaElement | null>(null)
+
+const suggestions = [
+  '第二段太抽象，讲通俗点',
+  '这个公式推导跳步太多，补全',
+  '我基础差，整篇用大白话重写',
+  '例子换成广告出价场景',
+]
+
+function useSuggestion(s: string) {
+  input.value = s
+  inputEl.value?.focus()
+}
 
 async function scrollToBottom() {
   await nextTick()
@@ -59,6 +72,7 @@ watch(
   () => {
     if (props.quoteRequest) {
       pendingQuote.value = { heading: props.quoteRequest.heading, text: props.quoteRequest.text }
+      inputEl.value?.focus()
     }
   },
 )
@@ -161,20 +175,24 @@ function quoteLabel(q?: LessonQuote | null): string {
 <template>
   <aside class="chat">
     <header class="chat__header">
-      <span>AI 对话优化课件</span>
+      <div class="chat__title">
+        <span class="chat__title-main">AI 对话优化</span>
+        <span class="chat__title-sub">说说哪里不满意，AI 给修改建议，确认后才写入</span>
+      </div>
       <div class="chat__header-actions">
         <button
-          class="chat__link"
+          class="chat__ghost"
           type="button"
           :disabled="!canUndo"
           title="撤销最近一次已应用的修改"
           @click="undo"
         >
-          撤销修改
+          ↩ 撤销
         </button>
         <button
           class="chat__close"
           type="button"
+          title="收起面板"
           @click="emit('close')"
         >
           ×
@@ -186,14 +204,28 @@ function quoteLabel(q?: LessonQuote | null): string {
       ref="listEl"
       class="chat__list"
     >
-      <p
+      <div
         v-if="messages.length === 0"
         class="chat__empty"
       >
-        看完课件哪里不满意，直接说。例如：「第二段太抽象，讲通俗点」「这个公式推导跳步太多，补全」「我基础差，整篇用大白话重写」。
-        <br><br>
-        想只改一处：把鼠标移到某个小节，点「改本节」；或选中一段话，点「引用这段让 AI 优化」。
-      </p>
+        <div class="chat__empty-title">
+          从哪里改起？
+        </div>
+        <p class="chat__empty-desc">
+          直接描述想怎么改；想只改一处，把鼠标移到某个小节点<b>「改本节」</b>，或选中一段话点<b>「引用这段让 AI 优化」</b>。
+        </p>
+        <div class="chat__chips">
+          <button
+            v-for="s in suggestions"
+            :key="s"
+            class="chat__chip"
+            type="button"
+            @click="useSuggestion(s)"
+          >
+            {{ s }}
+          </button>
+        </div>
+      </div>
 
       <div
         v-for="m in messages"
@@ -205,7 +237,7 @@ function quoteLabel(q?: LessonQuote | null): string {
           v-if="m.quote"
           class="msg__quote"
         >
-          引用：{{ quoteLabel(m.quote) }}
+          {{ quoteLabel(m.quote) }}
         </div>
         <div class="msg__content">
           {{ m.content }}
@@ -216,85 +248,88 @@ function quoteLabel(q?: LessonQuote | null): string {
           class="msg__proposal"
         >
           <div class="msg__proposal-head">
-            <span class="msg__scope">
-              {{ m.proposal.scope === 'section' ? `改本节：${m.proposal.targetHeading ?? ''}` : '整篇重写' }}
-            </span>
-            <span>{{ m.proposal.summary }}</span>
+            <span class="msg__scope">{{ m.proposal.scope === 'section' ? `改本节 · ${m.proposal.targetHeading ?? ''}` : '整篇重写' }}</span>
+            <span class="msg__summary">{{ m.proposal.summary }}</span>
           </div>
-          <button
-            class="chat__link"
-            type="button"
-            @click="previewId = previewId === m.id ? null : m.id"
-          >
-            {{ previewId === m.id ? '收起预览' : '预览改动' }}
-          </button>
           <div
             v-if="previewId === m.id"
             class="msg__preview"
           >
             <MarkdownRenderer :content="previewContent(m)" />
           </div>
-          <button
-            class="btn btn--primary msg__apply"
-            type="button"
-            :disabled="m.applied || applyingId === m.id"
-            @click="applyProposal(m)"
-          >
-            {{ m.applied ? '已应用到课件' : applyingId === m.id ? '应用中…' : '应用修改' }}
-          </button>
+          <div class="msg__actions">
+            <button
+              class="chat__ghost"
+              type="button"
+              @click="previewId = previewId === m.id ? null : m.id"
+            >
+              {{ previewId === m.id ? '收起预览' : '预览改动' }}
+            </button>
+            <button
+              class="chat__apply"
+              type="button"
+              :disabled="m.applied || applyingId === m.id"
+              @click="applyProposal(m)"
+            >
+              {{ m.applied ? '✓ 已应用' : applyingId === m.id ? '应用中…' : '应用修改' }}
+            </button>
+          </div>
         </div>
       </div>
 
       <div
         v-if="loading"
-        class="msg msg--assistant"
+        class="msg msg--assistant msg--typing"
       >
-        <div class="msg__content">
-          正在思考怎么改…
-        </div>
+        <span class="msg__dot" /><span class="msg__dot" /><span class="msg__dot" />
       </div>
     </div>
 
-    <p
-      v-if="error"
-      class="chat__error"
-    >
-      {{ error }}
-    </p>
-
-    <div
-      v-if="pendingQuote"
-      class="chat__quote"
-    >
-      <span>将引用：{{ quoteLabel(pendingQuote) }}</span>
-      <button
-        class="chat__quote-remove"
-        type="button"
-        @click="pendingQuote = null"
+    <div class="chat__composer">
+      <p
+        v-if="error"
+        class="chat__error"
       >
-        ×
-      </button>
+        {{ error }}
+      </p>
+      <div
+        v-if="pendingQuote"
+        class="chat__quote"
+      >
+        <span class="chat__quote-label">{{ quoteLabel(pendingQuote) }}</span>
+        <button
+          class="chat__quote-remove"
+          type="button"
+          title="取消引用"
+          @click="pendingQuote = null"
+        >
+          ×
+        </button>
+      </div>
+      <form
+        class="chat__inputbox"
+        @submit.prevent="send"
+      >
+        <textarea
+          ref="inputEl"
+          v-model="input"
+          rows="2"
+          placeholder="描述你想怎么改这节课…"
+          :disabled="loading"
+          @keydown.enter.exact.prevent="send"
+        />
+        <button
+          class="chat__send"
+          type="submit"
+          :disabled="loading || !input.trim()"
+        >
+          发送
+        </button>
+      </form>
+      <p class="chat__hint">
+        Enter 发送 · Shift+Enter 换行
+      </p>
     </div>
-
-    <form
-      class="chat__input"
-      @submit.prevent="send"
-    >
-      <textarea
-        v-model="input"
-        rows="2"
-        placeholder="描述你想怎么改这节课…（Enter 发送，Shift+Enter 换行）"
-        :disabled="loading"
-        @keydown.enter.exact.prevent="send"
-      />
-      <button
-        class="btn btn--primary"
-        type="submit"
-        :disabled="loading || !input.trim()"
-      >
-        发送
-      </button>
-    </form>
   </aside>
 </template>
 
@@ -310,170 +345,339 @@ function quoteLabel(q?: LessonQuote | null): string {
   flex-direction: column;
   background: #fff;
   border-left: 1px solid var(--border);
-  box-shadow: -4px 0 16px rgb(15 23 42 / 8%);
+  box-shadow: -8px 0 24px rgb(15 23 42 / 8%);
 }
+
+/* ---- 头部 ---- */
 .chat__header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 12px 14px;
-  font-weight: 600;
-  font-size: 14px;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px 12px;
   border-bottom: 1px solid var(--border);
+}
+.chat__title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.chat__title-main {
+  font-weight: 600;
+  font-size: 15px;
+}
+.chat__title-sub {
+  font-size: 11px;
+  color: var(--text-dim);
 }
 .chat__header-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  flex-shrink: 0;
 }
-.chat__link {
-  border: none;
-  background: none;
-  color: #2563eb;
+.chat__ghost {
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text-dim);
   font: inherit;
   font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 7px;
   cursor: pointer;
-  padding: 0;
 }
-.chat__link:disabled {
-  color: var(--text-dim);
+.chat__ghost:hover:not(:disabled) {
+  color: #2563eb;
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+.chat__ghost:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
 }
 .chat__close {
+  width: 28px;
+  height: 28px;
   border: none;
+  border-radius: 7px;
   background: none;
   font-size: 18px;
+  line-height: 1;
   cursor: pointer;
   color: var(--text-dim);
 }
+.chat__close:hover {
+  background: #f1f5f9;
+  color: var(--text);
+}
+
+/* ---- 消息区 ---- */
 .chat__list {
   flex: 1;
   overflow-y: auto;
-  padding: 12px;
+  padding: 16px 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+  background: #f7f8fa;
 }
 .chat__empty {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 8px;
+}
+.chat__empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.chat__empty-desc {
+  margin: 0 0 12px;
   font-size: 12px;
   color: var(--text-dim);
   line-height: 1.8;
 }
+.chat__empty-desc b {
+  color: var(--text);
+  font-weight: 500;
+}
+.chat__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chat__chip {
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  cursor: pointer;
+}
+.chat__chip:hover {
+  background: #dbeafe;
+}
+
 .msg {
   max-width: 100%;
   font-size: 13px;
-  line-height: 1.6;
-  padding: 8px 12px;
-  border-radius: 10px;
+  line-height: 1.7;
 }
 .msg--user {
   align-self: flex-end;
-  max-width: 92%;
+  max-width: 88%;
   background: #3b82f6;
   color: #fff;
+  padding: 9px 13px;
+  border-radius: 14px 14px 4px 14px;
 }
 .msg--assistant {
   align-self: flex-start;
   max-width: 96%;
-  background: #f3f4f6;
+  background: #fff;
+  border: 1px solid var(--border);
+  padding: 10px 13px;
+  border-radius: 14px 14px 14px 4px;
 }
 .msg__quote {
   font-size: 11px;
-  opacity: 0.85;
-  border-left: 2px solid currentcolor;
-  padding-left: 6px;
-  margin-bottom: 4px;
+  color: var(--text-dim);
+  background: #f1f5f9;
+  border-radius: 6px;
+  padding: 3px 8px;
+  margin-bottom: 6px;
 }
+.msg--user .msg__quote {
+  background: rgb(255 255 255 / 18%);
+  color: #fff;
+}
+.msg--typing {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  padding: 12px 16px;
+}
+.msg__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #94a3b8;
+  animation: chat-blink 1.2s infinite ease-in-out;
+}
+.msg__dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.msg__dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes chat-blink {
+  0%,
+  60%,
+  100% {
+    opacity: 0.25;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
+/* ---- 修改建议卡 ---- */
 .msg__proposal {
-  margin-top: 8px;
-  background: #fff;
+  margin-top: 10px;
+  background: #f8fafc;
   border: 1px solid #bfdbfe;
-  border-radius: 8px;
-  padding: 8px 10px;
+  border-radius: 10px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 .msg__proposal-head {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  font-size: 12px;
+  gap: 3px;
 }
 .msg__scope {
-  color: #1d4ed8;
+  align-self: flex-start;
+  font-size: 11px;
   font-weight: 600;
+  color: #1d4ed8;
+  background: #dbeafe;
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.msg__summary {
+  font-size: 12px;
+  color: var(--text);
 }
 .msg__preview {
   max-height: 320px;
   overflow-y: auto;
   border: 1px dashed var(--border);
-  border-radius: 6px;
-  padding: 6px 10px;
-  background: #fafafa;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #fff;
 }
-.msg__apply {
-  align-self: flex-start;
+.msg__actions {
+  display: flex;
+  gap: 8px;
+}
+.chat__apply {
+  font: inherit;
   font-size: 12px;
-  padding: 5px 14px;
+  padding: 5px 16px;
+  border-radius: 7px;
+  border: 1px solid #3b82f6;
+  background: #3b82f6;
+  color: #fff;
+  cursor: pointer;
+}
+.chat__apply:hover:not(:disabled) {
+  background: #2563eb;
+}
+.chat__apply:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ---- 输入区 ---- */
+.chat__composer {
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--border);
+  background: #fff;
 }
 .chat__error {
-  margin: 0;
-  padding: 6px 14px;
+  margin: 0 0 8px;
+  padding: 6px 10px;
   font-size: 12px;
   color: var(--mastery-red);
+  background: #fef2f2;
+  border-radius: 8px;
 }
 .chat__quote {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  padding: 6px 14px;
+  margin-bottom: 8px;
+  padding: 5px 6px 5px 12px;
   font-size: 12px;
   color: #1d4ed8;
   background: #eff6ff;
-  border-top: 1px solid #bfdbfe;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+}
+.chat__quote-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .chat__quote-remove {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
   border: none;
+  border-radius: 50%;
   background: none;
-  font-size: 16px;
+  font-size: 15px;
+  line-height: 1;
   cursor: pointer;
   color: #1d4ed8;
 }
-.chat__input {
+.chat__quote-remove:hover {
+  background: #dbeafe;
+}
+.chat__inputbox {
   display: flex;
-  gap: 6px;
-  padding: 10px 12px;
-  border-top: 1px solid var(--border);
   align-items: flex-end;
-}
-.chat__input textarea {
-  flex: 1;
-  font: inherit;
-  font-size: 13px;
-  padding: 7px 10px;
+  gap: 8px;
+  padding: 8px 8px 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  resize: vertical;
-  max-height: 120px;
-}
-.btn {
-  font: inherit;
-  font-size: 13px;
-  padding: 6px 14px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
+  border-radius: 12px;
   background: #fff;
+  transition: border-color 0.15s;
+}
+.chat__inputbox:focus-within {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgb(59 130 246 / 12%);
+}
+.chat__inputbox textarea {
+  flex: 1;
+  border: none;
+  outline: none;
+  resize: none;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  max-height: 120px;
+  background: transparent;
+}
+.chat__send {
+  flex-shrink: 0;
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 16px;
+  border: none;
+  border-radius: 8px;
+  background: #3b82f6;
+  color: #fff;
   cursor: pointer;
 }
-.btn--primary {
-  background: #3b82f6;
-  border-color: #3b82f6;
-  color: #fff;
+.chat__send:hover:not(:disabled) {
+  background: #2563eb;
 }
-.btn:disabled {
-  opacity: 0.5;
+.chat__send:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
+}
+.chat__hint {
+  margin: 6px 2px 0;
+  font-size: 11px;
+  color: var(--text-dim);
 }
 </style>

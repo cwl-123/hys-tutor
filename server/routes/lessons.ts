@@ -265,7 +265,7 @@ const updateContentBodySchema = z.object({
   summary: z.string().max(200).optional(),
 })
 
-// PATCH /api/lessons/:id/content — 手动编辑课件正文（插图/改图表/改文字，走版本快照可撤销）
+// PATCH /api/lessons/:id/content — 手动编辑课件正文（改图表/改文字，走版本快照可撤销）
 export async function handleUpdateLessonContent(
   req: IncomingMessage,
   res: ServerResponse,

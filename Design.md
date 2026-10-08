@@ -243,11 +243,11 @@ self-check  对照研究笔记自查一遍：无来源支撑的断言标记/修�
 ### 3.9 assets/ + assets.json — 课件配图素材库（按课题）
 ```
 data/topics/<topicId>/
-  assets/<sha256前16位>.<png|jpg|gif|webp>   // 内容哈希命名，天然去重（AI 下载 / 手动上传共用）
+  assets/<sha256前16位>.<png|jpg|gif|webp>   // 内容哈希命名，天然去重（AI 配图下载落地）
   assets.json                                 // { "<file>": { originUrl?, title?, pageUrl?, size, createdAt } }
 ```
 - 课件正文统一引用 `/api/topics/<tid>/assets/<file>`（hash 文件名可长期缓存）；原图 URL 记入清单与 lesson.images 供图注来源
-- 下载/上传均校验魔数（拒 SVG 防脚本，图示走 Mermaid），单图 ≤5MB；文件名白名单防路径穿越
+- 下载校验魔数（拒 SVG 防脚本，图示走 Mermaid），单图 ≤5MB；文件名白名单防路径穿越
 
 ### 掌握分算法规则（mastery-service，MVP 版）
 - 客观题：答对 +30，答错 -10（clamp 到 0~100）
@@ -272,8 +272,7 @@ data/topics/<topicId>/
 | GET | /api/lessons/:id/attempts | 该课全部测验记录（含题目快照/作答/批改/掌握分变化，升序） |
 | POST | /api/lessons/:id/questions/regenerate | 再次测验：LLM 围绕本课知识点重新出一套新题（避开历史题目），覆盖当前题集（写 generatedAt 供交卷乐观并发校验） |
 | GET | /api/topics/:tid/assets/:file | 课件配图静态资源（hash 文件名，immutable 缓存） |
-| POST | /api/topics/:tid/assets | 上传图片（raw image/* body，粘贴/拖拽截图走这里）→ {src, file} |
-| PATCH | /api/lessons/:id/content | 手动编辑课件正文（插图/改图表/编辑）：落图 + 版本快照（可撤销）+ 更新配图清单 |
+| PATCH | /api/lessons/:id/content | 手动编辑课件正文（改图表/编辑）：落图 + 版本快照（可撤销）+ 更新配图清单 |
 | GET | /api/topics/:id/mastery-log | 掌握分变更历史 |
 | POST | /api/reports | 报错标记（课程划词 / 题目） |
 | GET | /api/topics/:id/reports | 报错记录列表 |

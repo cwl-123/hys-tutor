@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { AssetUploadResult } from '@shared/api'
 import type { Attempt, Lesson, LessonImage, Question, Topic } from '@shared/types'
 import { getSse } from '@/utils/sse'
 
@@ -210,21 +209,7 @@ export const useLessonStore = defineStore('lesson', () => {
     await attach(data.lessonId)
   }
 
-  // 上传图片到课题素材库，返回课件引用路径
-  async function uploadImage(file: File): Promise<string> {
-    const topicId = lesson.value?.topicId
-    if (!topicId) throw new Error('课程未加载')
-    const res = await fetch(`/api/topics/${topicId}/assets`, {
-      method: 'POST',
-      headers: { 'Content-Type': file.type || 'application/octet-stream' },
-      body: file,
-    })
-    const data = (await res.json()) as AssetUploadResult & { error?: string }
-    if (!res.ok || !data.src) throw new Error(data.error ?? `上传失败：${res.status}`)
-    return data.src
-  }
-
-  // 手动写入课件正文（插图/改图表/编辑）：走版本快照可撤销；失败抛错由调用方提示
+  // 手动写入课件正文（改图表/编辑）：走版本快照可撤销；失败抛错由调用方提示
   async function saveContent(contentMd: string, summary?: string): Promise<void> {
     const id = lesson.value?.id
     if (!id) throw new Error('课程未加载')
@@ -260,7 +245,6 @@ export const useLessonStore = defineStore('lesson', () => {
     loadAttempts,
     regenerate,
     reset,
-    uploadImage,
     saveContent,
   }
 })

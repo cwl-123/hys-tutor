@@ -263,7 +263,7 @@ async function writeLessonContent(
   return { contentMd: lesson.contentMd, images: localized.images, versions: trimmedVersions }
 }
 
-// PATCH content：手动编辑课件正文（插图 / 改图表 / 改文字），与对话修改同享版本快照与撤销
+// PATCH content：手动编辑课件正文（改图表 / 改文字），与对话修改同享版本快照与撤销
 export async function updateLessonContent(
   lessonId: string,
   contentMd: string,

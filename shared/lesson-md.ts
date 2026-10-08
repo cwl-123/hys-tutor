@@ -76,19 +76,6 @@ export function replaceSection(md: string, heading: string, revisedMd: string): 
   return `${md.slice(0, section.start)}${revisedMd.trim()}${md.slice(section.end)}`
 }
 
-// 在指定章节末尾追加内容（heading=null 追加到前言；无对应章节时退回文末）
-export function appendToSection(md: string, heading: string | null, text: string): string {
-  const trimmed = text.trim()
-  if (!trimmed) return md
-  const sections = parseSections(md)
-  const target = heading == null ? sections.find((s) => s.heading === null) : findSectionByHeading(md, heading)
-  if (!target) {
-    if (heading == null) return `${trimmed}\n\n${md.replace(/^\s+/, '')}`
-    return `${md.replace(/\s+$/, '')}\n\n${trimmed}\n`
-  }
-  return `${md.slice(0, target.end).replace(/\s+$/, '')}\n\n${trimmed}\n${md.slice(target.end).replace(/^\n/, '')}`
-}
-
 // 定位并替换某个 mermaid 围栏块的代码（按代码文本匹配，围栏标记原样保留）；找不到返回 null
 export function replaceMermaidBlock(md: string, oldCode: string, newCode: string): string | null {
   const target = oldCode.trim()

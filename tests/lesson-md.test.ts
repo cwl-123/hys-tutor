@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-  appendToSection,
   findSectionByHeading,
   findSectionForQuote,
   listHeadings,
@@ -85,29 +84,6 @@ describe('findSectionForQuote', () => {
   it('引文不存在时返回 null 或最近章节标题', () => {
     const r = findSectionForQuote(md, '双塔把用户和物品分开编码')
     expect(r).toBe('为什么需要双塔')
-  })
-})
-
-describe('appendToSection', () => {
-  it('追加到指定章节末尾，其他章节原样保留', () => {
-    const next = appendToSection(md, '结构详解', '![架构图](/api/topics/t1/assets/a.png)')
-    expect(next).toContain('用户塔与物品塔各自过 MLP。')
-    expect(next).toContain('![架构图](/api/topics/t1/assets/a.png)')
-    expect(next).toContain('## 本课小结')
-    // 图插在「结构详解」内（本课小结之前）
-    expect(next.indexOf('![架构图]')).toBeLessThan(next.indexOf('## 本课小结'))
-    expect(next.indexOf('![架构图]')).toBeGreaterThan(next.indexOf('用户塔与物品塔'))
-  })
-
-  it('heading=null 追加到前言末尾（首个 ## 之前）', () => {
-    const next = appendToSection(md, null, '![封面](/p.png)')
-    expect(next.indexOf('![封面]')).toBeLessThan(next.indexOf('## 为什么需要双塔'))
-    expect(next).toContain('开头引入段落。')
-  })
-
-  it('章节不存在时退回文末', () => {
-    const next = appendToSection(md, '不存在', 'TAIL')
-    expect(next.trimEnd().endsWith('TAIL')).toBe(true)
   })
 })
 

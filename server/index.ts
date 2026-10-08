@@ -19,7 +19,7 @@ import {
   handleUpdateLessonContent,
 } from './routes/lessons'
 import { handleCreateReport, handleListReports } from './routes/reports'
-import { handleGetAsset, handleUploadAsset } from './routes/assets'
+import { handleGetAsset } from './routes/assets'
 import {
   handleGetSettings,
   handleImportCandidate,
@@ -85,7 +85,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, next:
       return
     }
 
-    // PATCH /api/lessons/:lid/content — 手动编辑课件正文（插图/改图表/改文字）
+    // PATCH /api/lessons/:lid/content — 手动编辑课件正文（改图表/改文字）
     const contentMatch = url.match(/^\/lessons\/([^/]+)\/content$/)
     if (contentMatch && req.method === 'PATCH') {
       await handleUpdateLessonContent(req, res, contentMatch[1])
@@ -170,15 +170,10 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, next:
       return
     }
 
-    // GET/HEAD /api/topics/:tid/assets/:file — 课件配图；POST /api/topics/:tid/assets — 上传图片
+    // GET/HEAD /api/topics/:tid/assets/:file — 课件配图（AI 配图下载落地后的静态资源）
     const assetFileMatch = url.match(/^\/topics\/([^/]+)\/assets\/([^/]+)$/)
     if (assetFileMatch && (req.method === 'GET' || req.method === 'HEAD')) {
       await handleGetAsset(req, res, assetFileMatch[1], assetFileMatch[2])
-      return
-    }
-    const assetUploadMatch = url.match(/^\/topics\/([^/]+)\/assets$/)
-    if (assetUploadMatch && req.method === 'POST') {
-      await handleUploadAsset(req, res, assetUploadMatch[1])
       return
     }
 
