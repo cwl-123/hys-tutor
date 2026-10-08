@@ -1,13 +1,21 @@
 import { dataPath, newId, readJson, writeJson } from '../repo/json-store'
-import type { Attempt, QuestionSet } from '../../shared/types'
+import type { Attempt, Question, QuestionSet } from '../../shared/types'
 
 function attemptsFile(topicId: string, lessonId: string): string {
   return dataPath('topics', topicId, 'attempts', `${lessonId}.json`)
 }
 
+// 作答与题型是否匹配（防回填到已换新的题集：旧答案 "B" 对上判断题就是错位）
+function answerFitsType(q: Question, userAnswer: string): boolean {
+  if (q.type === 'judge') return ['对', '错'].includes(userAnswer)
+  if (q.type === 'single') return /^[A-D]$/.test(userAnswer.trim())
+  return true
+}
+
 // 读取某课全部测验记录（按时间升序）
 // 兼容旧版单对象格式（无 id/questions/masteryChanges/createdAt）；
-// 旧记录缺题目快照时，若题目 id 与当前题集吻合则回填（含答案，用于回看）
+// 旧记录缺题目快照时回填当前题集（含答案，用于回看）——仅限题集从未被「再次测验」换新
+// （无 generatedAt）且每条作答与题目类型匹配，否则不回填，由前端降级为仅展示判分记录
 export async function listAttempts(topicId: string, lessonId: string): Promise<Attempt[]> {
   const raw = await readJson<Attempt[] | Attempt | null>(attemptsFile(topicId, lessonId), null)
   if (!raw) return []
@@ -23,11 +31,15 @@ export async function listAttempts(topicId: string, lessonId: string): Promise<A
       dataPath('topics', topicId, 'lessons', `${lessonId}.questions.json`),
       null,
     )
-    if (qs) {
+    if (qs && !qs.generatedAt) {
       for (const a of list) {
-        if (a.questions.length === 0 && a.records.every((r) => qs.questions.some((q) => q.id === r.questionId))) {
-          a.questions = qs.questions
-        }
+        const fits =
+          a.questions.length === 0 &&
+          a.records.every((r) => {
+            const q = qs.questions.find((x) => x.id === r.questionId)
+            return q ? answerFitsType(q, r.userAnswer) : false
+          })
+        if (fits) a.questions = qs.questions
       }
     }
   }
