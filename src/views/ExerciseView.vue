@@ -54,6 +54,11 @@ function typeLabel(q: Question): string {
   return q.type === 'single' ? '单选' : q.type === 'judge' ? '判断' : '简答'
 }
 
+// LLM 有时会在选项文本里自带「A. 」前缀，与字母标注重复，渲染时剥离
+function optText(opt: string, letter: string): string {
+  return opt.replace(new RegExp(`^${letter}[.、．:：]\\s*`), '')
+}
+
 function pick(q: Question, value: string) {
   answers.value = { ...answers.value, [q.id]: value }
 }
@@ -261,7 +266,7 @@ async function submitQuestionReport(q: Question) {
                 disabled
               >
               <span class="option__letter">{{ 'ABCD'[oi] }}</span>
-              <MarkdownRenderer :content="opt" />
+              <MarkdownRenderer :content="optText(opt, 'ABCD'[oi])" />
             </label>
           </div>
 
@@ -443,7 +448,7 @@ async function submitQuestionReport(q: Question) {
                 @change="pick(q, 'ABCD'[oi])"
               >
               <span class="option__letter">{{ 'ABCD'[oi] }}</span>
-              <MarkdownRenderer :content="opt" />
+              <MarkdownRenderer :content="optText(opt, 'ABCD'[oi])" />
             </label>
           </div>
 
