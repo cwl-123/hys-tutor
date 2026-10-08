@@ -1,6 +1,6 @@
 {
   "name": "hys-tutor",
-  "version": "0.24.0",
+  "version": "0.25.0",
   "description": "本地部署的 AI 自适应私教：多轮个性化微课 + 学习者模型持续迭代",
   "license": "MIT",
   "author": "haiyeshu",
