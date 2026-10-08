@@ -10,6 +10,7 @@ import {
   llmLessonPlanSchema,
 } from '../llm/prompts/lesson-chat'
 import { readResearchNote } from '../agent/tools/notes'
+import { localizeImages } from './asset-store'
 import { getGraph } from './graph-service'
 import { findLesson, type LessonDetail } from './lesson-service'
 import { findSectionByHeading, listHeadings, replaceSection } from '../../shared/lesson-md'
@@ -18,6 +19,7 @@ import type {
   LessonQuote,
   LessonVersion,
 } from '../../shared/lesson-chat'
+import type { LessonImage } from '../../shared/types'
 
 export interface LessonChatProposal {
   contentMd: string
@@ -218,30 +220,58 @@ export async function applyLessonChat(
   messageId: string,
 ): Promise<LessonChatState & { contentMd: string }> {
   const detail = await requireGenerated(lessonId)
-  const { topic, lesson } = detail
+  const { topic } = detail
   const messages = await loadMessages(topic.id, lessonId)
   const message = messages.find((m) => m.id === messageId)
   if (!message?.proposal) throw httpError('该消息没有可应用的修改', 400)
   if (message.applied) throw httpError('该修改已应用', 400)
 
-  const versions = await loadVersions(topic.id, lessonId)
+  const { contentMd, versions } = await writeLessonContent(
+    detail,
+    message.proposal.contentMd,
+    message.proposal.summary,
+  )
+  message.applied = true
+  await writeJson(chatFile(topic.id, lessonId), { messages })
+
+  return { contentMd, messages, versions }
+}
+
+// 写入课件正文（对话应用 / 手动编辑共用）：外链图落地 + 版本快照 + 配图清单
+async function writeLessonContent(
+  detail: LessonDetail,
+  contentMd: string,
+  summary: string,
+): Promise<{ contentMd: string; images: LessonImage[]; versions: LessonVersion[] }> {
+  const { topic, lesson } = detail
+  const versions = await loadVersions(topic.id, lesson.id)
   versions.push({
     id: newId('v'),
     contentMd: lesson.contentMd,
-    summary: `修改前：${message.proposal.summary}`,
+    summary: `修改前：${summary}`,
     createdAt: nowIso(),
   })
   const trimmedVersions = versions.slice(-MAX_VERSIONS)
 
-  lesson.contentMd = message.proposal.contentMd
+  const localized = await localizeImages(topic.id, contentMd, { dropFailed: false })
+  lesson.contentMd = localized.contentMd
+  lesson.images = localized.images
   lesson.revisedAt = nowIso()
-  message.applied = true
 
-  await writeJson(lessonFile(topic.id, lessonId), lesson)
-  await writeJson(chatFile(topic.id, lessonId), { messages })
-  await writeJson(versionsFile(topic.id, lessonId), trimmedVersions)
+  await writeJson(lessonFile(topic.id, lesson.id), lesson)
+  await writeJson(versionsFile(topic.id, lesson.id), trimmedVersions)
+  return { contentMd: lesson.contentMd, images: localized.images, versions: trimmedVersions }
+}
 
-  return { contentMd: lesson.contentMd, messages, versions: trimmedVersions }
+// PATCH content：手动编辑课件正文（插图 / 改图表 / 改文字），与对话修改同享版本快照与撤销
+export async function updateLessonContent(
+  lessonId: string,
+  contentMd: string,
+  summary: string,
+): Promise<{ contentMd: string; images: LessonImage[] }> {
+  const detail = await requireGenerated(lessonId)
+  const result = await writeLessonContent(detail, contentMd, summary || '手动编辑课件')
+  return { contentMd: result.contentMd, images: result.images }
 }
 
 // POST undo：撤销最近一次已应用的修改
@@ -254,7 +284,9 @@ export async function undoLessonChat(
   if (versions.length === 0) throw httpError('没有可撤销的修改', 400)
 
   const last = versions.pop()!
-  lesson.contentMd = last.contentMd
+  const localized = await localizeImages(topic.id, last.contentMd, { dropFailed: false })
+  lesson.contentMd = localized.contentMd
+  lesson.images = localized.images
   lesson.revisedAt = nowIso()
 
   await writeJson(lessonFile(topic.id, lessonId), lesson)

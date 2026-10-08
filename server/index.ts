@@ -16,6 +16,7 @@ import {
   handleReviseLesson,
   handleSubmitLesson,
   handleUndoLessonChat,
+  handleUpdateLessonContent,
 } from './routes/lessons'
 import { handleCreateReport, handleListReports } from './routes/reports'
 import { handleGetAsset, handleUploadAsset } from './routes/assets'
@@ -83,6 +84,14 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, next:
       await handlePostLessonChat(req, res, chatMatch[1])
       return
     }
+
+    // PATCH /api/lessons/:lid/content — 手动编辑课件正文（插图/改图表/改文字）
+    const contentMatch = url.match(/^\/lessons\/([^/]+)\/content$/)
+    if (contentMatch && req.method === 'PATCH') {
+      await handleUpdateLessonContent(req, res, contentMatch[1])
+      return
+    }
+
     const deleteMatch = url.match(/^\/lessons\/([^/]+)$/)
     if (deleteMatch && req.method === 'DELETE') {
       await handleDeleteLesson(req, res, deleteMatch[1])
@@ -161,9 +170,9 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, next:
       return
     }
 
-    // GET /api/topics/:tid/assets/:file — 课件配图；POST /api/topics/:tid/assets — 上传图片
+    // GET/HEAD /api/topics/:tid/assets/:file — 课件配图；POST /api/topics/:tid/assets — 上传图片
     const assetFileMatch = url.match(/^\/topics\/([^/]+)\/assets\/([^/]+)$/)
-    if (assetFileMatch && req.method === 'GET') {
+    if (assetFileMatch && (req.method === 'GET' || req.method === 'HEAD')) {
       await handleGetAsset(req, res, assetFileMatch[1], assetFileMatch[2])
       return
     }

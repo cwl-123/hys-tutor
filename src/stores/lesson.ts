@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { Attempt, Lesson, Question, Topic } from '@shared/types'
+import type { AssetUploadResult } from '@shared/api'
+import type { Attempt, Lesson, LessonImage, Question, Topic } from '@shared/types'
 import { getSse } from '@/utils/sse'
 
 export interface StageEntry {
@@ -26,11 +27,13 @@ function stageLabel(stage: string, detail?: unknown): string | null {
       const d = detail as { tool: string; args: Record<string, unknown> }
       if (d.tool === 'web_search') return `搜索：${String(d.args.query ?? '')}`
       if (d.tool === 'web_fetch') return `精读：${String(d.args.url ?? '').slice(0, 90)}`
+      if (d.tool === 'image_search') return `配图搜索：${String(d.args.query ?? '')}`
       return null
     }
     case 'research-note-saved': {
-      const d = detail as { sources: number }
-      return `研究笔记已保存（${d.sources} 个来源）`
+      const d = detail as { sources: number; images?: number }
+      const imgs = d.images ? `，配图 ${d.images} 张` : ''
+      return `研究笔记已保存（${d.sources} 个来源${imgs}）`
     }
     case 'outline':
       return '正在设计课程大纲…'
@@ -207,5 +210,57 @@ export const useLessonStore = defineStore('lesson', () => {
     await attach(data.lessonId)
   }
 
-  return { stages, streamingContent, generating, error, topic, lesson, questions, questionsGeneratedAt, attempts, generate, attach, revise, load, loadAttempts, regenerate, reset }
+  // 上传图片到课题素材库，返回课件引用路径
+  async function uploadImage(file: File): Promise<string> {
+    const topicId = lesson.value?.topicId
+    if (!topicId) throw new Error('课程未加载')
+    const res = await fetch(`/api/topics/${topicId}/assets`, {
+      method: 'POST',
+      headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      body: file,
+    })
+    const data = (await res.json()) as AssetUploadResult & { error?: string }
+    if (!res.ok || !data.src) throw new Error(data.error ?? `上传失败：${res.status}`)
+    return data.src
+  }
+
+  // 手动写入课件正文（插图/改图表/编辑）：走版本快照可撤销；失败抛错由调用方提示
+  async function saveContent(contentMd: string, summary?: string): Promise<void> {
+    const id = lesson.value?.id
+    if (!id) throw new Error('课程未加载')
+    const res = await fetch(`/api/lessons/${id}/content`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contentMd, summary }),
+    })
+    const data = (await res.json()) as { contentMd?: string; images?: LessonImage[]; error?: string }
+    if (!res.ok || data.contentMd == null) {
+      throw new Error(data.error ?? `保存失败：${res.status}`)
+    }
+    if (lesson.value) {
+      lesson.value.contentMd = data.contentMd
+      lesson.value.images = data.images ?? []
+    }
+  }
+
+  return {
+    stages,
+    streamingContent,
+    generating,
+    error,
+    topic,
+    lesson,
+    questions,
+    questionsGeneratedAt,
+    attempts,
+    generate,
+    attach,
+    revise,
+    load,
+    loadAttempts,
+    regenerate,
+    reset,
+    uploadImage,
+    saveContent,
+  }
 })

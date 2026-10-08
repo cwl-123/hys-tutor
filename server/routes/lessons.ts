@@ -14,6 +14,7 @@ import {
   getLessonChat,
   postLessonChat,
   undoLessonChat,
+  updateLessonContent,
 } from '../services/lesson-chat-service'
 import type { SubmitResult } from '../../shared/api'
 import type { AnswerRecord, Attempt, Question } from '../../shared/types'
@@ -258,6 +259,31 @@ export async function handleListLessons(
 }
 
 const reviseBodySchema = z.object({ instruction: z.string().max(2000).optional() })
+
+const updateContentBodySchema = z.object({
+  contentMd: z.string().max(200_000),
+  summary: z.string().max(200).optional(),
+})
+
+// PATCH /api/lessons/:id/content — 手动编辑课件正文（插图/改图表/改文字，走版本快照可撤销）
+export async function handleUpdateLessonContent(
+  req: IncomingMessage,
+  res: ServerResponse,
+  lessonId: string,
+): Promise<void> {
+  const body = updateContentBodySchema.safeParse(await readBody(req))
+  if (!body.success) {
+    sendJson(res, 400, { error: body.data ? '正文过长' : body.error.issues.map((i) => i.message).join('；') })
+    return
+  }
+  try {
+    const result = await updateLessonContent(lessonId, body.data.contentMd, body.data.summary ?? '')
+    sendJson(res, 200, { contentMd: result.contentMd, images: result.images })
+  } catch (err) {
+    const status = (err as { status?: number }).status ?? 500
+    sendJson(res, status, { error: err instanceof Error ? err.message : String(err) })
+  }
+}
 
 // POST /api/lessons/:id/revise — 发起课件 AI 优化任务（后台，原地覆盖）
 export async function handleReviseLesson(

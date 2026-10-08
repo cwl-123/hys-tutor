@@ -29,6 +29,12 @@ export interface LessonMeta {
   wordCount: number
 }
 
+// 上传图片（POST /api/topics/:tid/assets）响应：src 为课件引用路径
+export interface AssetUploadResult {
+  src: string
+  file: string
+}
+
 // 交卷接口（POST /api/lessons/:id/submit）前后端共用类型
 
 export interface SubmitAnswerInput {

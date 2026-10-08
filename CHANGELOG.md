@@ -2,6 +2,15 @@
 
 版本记录：每次改动提交 git 并在此追加「版本 + 日期 + 功能点」。
 
+## v0.22.0 - 2026-10-08
+
+- 课件配图与图表（文字讲不清的用图解决）：① 备课 Agent 新增 image_search 双路图搜（Tavily include_images / 博查 web-search images）+ web_fetch 附页面配图候选，研究笔记收藏 0~4 张贴切配图并**下载落地**到 data/topics/<tid>/assets/（内容哈希命名去重，assets.json 记原图来源）；② 写作提示词产出 ```mermaid 图（每课 1~3 张）与 ![图注](localPath) 配图（0~2 张），自查/AI 优化保留已有图示；③ 新增落图后处理 localizeImages：残留外链图下载改写本地引用、失败（编造 URL）剔除，生成 lesson.images 供图片来源展示
+- 渲染层：MarkdownRenderer 图片渲染 figure+图注+懒加载，Mermaid 懒加载渲染 SVG（按代码文本缓存，流式期间不重复渲染，语法错误保留代码块）；题目页/流式草稿同管道自动受益
+- 手动插图：章节「插图」按钮 + 粘贴截图 + 拖拽图片（编辑模式插入光标处），上传走 POST /api/topics/:tid/assets（魔数校验，仅 PNG/JPEG/GIF/WEBP，≤5MB，拒 SVG）
+- 图表与正文可改：Mermaid 图悬停「编辑图表」（代码 + 实时预览）；「编辑正文」markdown 实时预览编辑；新增 PATCH /api/lessons/:id/content，手动修改与 AI 对话修改同享版本快照可撤销（对话应用/撤销同样落图并同步配图清单）
+- 新增 server/services/asset-store.ts（下载/上传/落图）+ server/routes/assets.ts + shared/lesson-md.ts 增补 appendToSection/replaceMermaidBlock；单测 82 个（asset-store 10 / 图搜与提图 / lesson-md 新增 6）
+- PRD 同步至 v1.15.0（功能 6：课件配图与图表）
+
 ## v0.21.0 - 2026-10-08
 
 - 课件 AI 对话式优化：课件页新增右侧对话面板，可多轮跟 AI 交互打磨课件（讲不通俗/展开某节/基础差整篇重写等）；对话历史按其课件持久化

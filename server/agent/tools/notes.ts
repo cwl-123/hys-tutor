@@ -16,6 +16,16 @@ export const notePatchSchema = z.object({
   examples: z.array(z.string()).default([]),
   pitfalls: z.array(z.string()).default([]),
   sources: z.array(z.object({ title: z.string(), url: z.string() })).default([]),
+  images: z
+    .array(
+      z.object({
+        url: z.string(),
+        title: z.string().optional(),
+        pageUrl: z.string().optional(),
+        localPath: z.string().optional(),
+      }),
+    )
+    .default([]),
 })
 export type NotePatch = z.infer<typeof notePatchSchema>
 
@@ -41,12 +51,14 @@ export function mergeResearchNotes(
       examples: patch.examples,
       pitfalls: patch.pitfalls,
       sources: patch.sources.map((s) => ({ ...s, fetchedAt: now })),
+      images: patch.images,
       searchQueries: [...new Set(searchQueries)],
       version: 1,
       updatedAt: now,
     }
   }
   const seenUrls = new Set(base.sources.map((s) => s.url))
+  const seenImages = new Set((base.images ?? []).map((i) => i.url))
   return {
     ...base,
     concepts: unionStrings(base.concepts, patch.concepts),
@@ -57,6 +69,7 @@ export function mergeResearchNotes(
       ...base.sources,
       ...patch.sources.filter((s) => !seenUrls.has(s.url)).map((s) => ({ ...s, fetchedAt: now })),
     ],
+    images: [...(base.images ?? []), ...patch.images.filter((i) => !seenImages.has(i.url))],
     searchQueries: [...new Set([...base.searchQueries, ...searchQueries])],
     version: base.version + 1,
     updatedAt: now,

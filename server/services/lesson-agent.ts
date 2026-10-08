@@ -3,8 +3,10 @@ import { dataPath, newId, nowIso, readJson, writeJson } from '../repo/json-store
 import { getLLM, getLLMModel, completeJson } from '../llm/client'
 import { runAgent, type AgentTool } from '../agent/loop'
 import { searchWeb } from '../agent/tools/web-search'
+import { searchImages } from '../agent/tools/image-search'
 import { fetchPage } from '../agent/tools/web-fetch'
 import { notePatchSchema, readResearchNote, saveResearchNote } from '../agent/tools/notes'
+import { downloadImage, localizeImages } from './asset-store'
 import { RESEARCH_SYSTEM_PROMPT, researchUserPrompt } from '../llm/prompts/research'
 import {
   OUTLINE_SYSTEM_PROMPT,
@@ -130,7 +132,7 @@ async function runResearch(
     },
     {
       name: 'web_fetch',
-      description: '抓取网页并提取正文（markdown 化前的纯文本，最长 6000 字）',
+      description: '抓取网页并提取正文（markdown 化前的纯文本，最长 6000 字），并附本页配图候选',
       parameters: {
         type: 'object',
         properties: { url: { type: 'string', description: '网页 URL' } },
@@ -138,7 +140,35 @@ async function runResearch(
       },
       execute: async (args) => {
         const page = await fetchPage(String(args.url ?? ''))
-        return `标题：${page.title}\n\n${page.text}`
+        const images = page.images.length
+          ? `\n\n本页配图候选（可用 save_research_note 的 images 收藏）：\n${page.images
+              .map((img) => `- ${img.url}${img.title ? `（${img.title}）` : ''}`)
+              .join('\n')}`
+          : ''
+        return `标题：${page.title}\n\n${page.text}${images}`
+      },
+    },
+    {
+      name: 'image_search',
+      description: '搜索配图（示意图/架构图/流程图/案例截图），返回图片直链与出处网页；用于给课件配图',
+      parameters: {
+        type: 'object',
+        properties: { query: { type: 'string', description: '图片搜索关键词（中文或英文）' } },
+        required: ['query'],
+      },
+      execute: async (args) => {
+        const query = String(args.query ?? '').trim()
+        if (!query) return '搜索词为空'
+        const images = await searchImages(query)
+        return images
+          .slice(0, 8)
+          .map(
+            (img, i) =>
+              `[${i + 1}] (${img.provider}) ${img.title ?? '（无标题）'}\n${img.url}${
+                img.pageUrl ? `\n出处页：${img.pageUrl}` : ''
+              }`,
+          )
+          .join('\n\n')
       },
     },
     {
@@ -156,13 +186,41 @@ async function runResearch(
             items: { type: 'object', properties: { title: { type: 'string' }, url: { type: 'string' } }, required: ['title', 'url'] },
             description: '实际参考过的来源',
           },
+          images: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                url: { type: 'string', description: '图片直链（来自 image_search 或页面配图候选）' },
+                title: { type: 'string', description: '图片说明' },
+                pageUrl: { type: 'string', description: '图片出处网页' },
+              },
+              required: ['url'],
+            },
+            description: '给课件配图收藏的图片（0~4 张，宁缺毋滥：必须与本知识点讲解直接相关）',
+          },
         },
         required: ['concepts', 'derivations', 'examples', 'pitfalls', 'sources'],
       },
       execute: async (args) => {
         const patch = notePatchSchema.parse(args)
+        // 配图下载落地（原图可能失效，下载成功才进笔记；下载时顺带建立本地引用）
+        patch.images = (
+          await Promise.all(
+            patch.images.map(async (img) => {
+              const saved = await downloadImage(topicId, img.url, {
+                title: img.title,
+                pageUrl: img.pageUrl,
+              })
+              return saved ? { ...img, localPath: saved.src } : null
+            }),
+          )
+        ).filter((img): img is NonNullable<typeof img> => img !== null)
         const note = await saveResearchNote(topicId, node.id, patch, searchedQueries)
-        onStage({ stage: 'research-note-saved', detail: { noteId: note.id, sources: note.sources.length } })
+        onStage({
+          stage: 'research-note-saved',
+          detail: { noteId: note.id, sources: note.sources.length, images: note.images?.length ?? 0 },
+        })
         return '笔记已保存，可以收尾了'
       },
     },
@@ -284,6 +342,9 @@ export async function prepareLesson(
     detail: { issues: check.issues, corrected: Boolean(check.correctedContent?.trim()) },
   })
 
+  // 落图：外链配图下载到课题素材库并改写为本地引用（下载失败的编造 URL 直接剔除）
+  const localized = await localizeImages(topicId, contentMd, { dropFailed: true })
+
   // 落盘
   const lessonId = opts.lessonId ?? newId('l')
   const lesson: Lesson = {
@@ -295,7 +356,8 @@ export async function prepareLesson(
     injectedReports: ctx.reports.filter((r) => r.nodeId === node.id).map((r) => r.id),
     researchNoteIds: [note.id],
     sources: note.sources.map((s, i) => ({ idx: i + 1, title: s.title, url: s.url })),
-    contentMd,
+    images: localized.images,
+    contentMd: localized.contentMd,
     status: 'generated',
     createdAt: nowIso(),
   }
@@ -315,7 +377,7 @@ export async function prepareLesson(
   await writeJson(dataPath('topics', topicId, 'lessons', `${lessonId}.json`), lesson)
   await writeJson(dataPath('topics', topicId, 'lessons', `${lessonId}.questions.json`), questions)
 
-  onStage({ stage: 'done', detail: { lessonId, nodeId: node.id, wordCount: contentMd.length } })
+  onStage({ stage: 'done', detail: { lessonId, nodeId: node.id, wordCount: localized.contentMd.length } })
   return { lesson, questions }
 }
 
@@ -383,14 +445,17 @@ export async function reviseLesson(
     }
   }
 
-  lesson.contentMd = contentMd
+  // 落图（与备课产线一致：外链落地、失败剔除）
+  const localized = await localizeImages(topic.id, contentMd, { dropFailed: true })
+  lesson.contentMd = localized.contentMd
+  lesson.images = localized.images
   lesson.status = 'generated'
   lesson.revisedAt = nowIso()
   await writeJson(dataPath('topics', topic.id, 'lessons', `${lessonId}.json`), lesson)
   if (questions) {
     await writeJson(dataPath('topics', topic.id, 'lessons', `${lessonId}.questions.json`), questions)
   }
-  onStage({ stage: 'done', detail: { lessonId, wordCount: contentMd.length } })
+  onStage({ stage: 'done', detail: { lessonId, wordCount: localized.contentMd.length } })
   return lesson
 }
 

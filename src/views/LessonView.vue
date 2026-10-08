@@ -4,8 +4,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { useLessonStore } from '@/stores/lesson'
 import { useTopicStore } from '@/stores/topic'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
-import LessonBody from '@/components/LessonBody.vue'
+import LessonBody, { type InsertImagePayload } from '@/components/LessonBody.vue'
 import LessonChatPanel from '@/components/LessonChatPanel.vue'
+import { appendToSection, replaceMermaidBlock } from '@shared/lesson-md'
 import type { LessonQuote } from '@shared/lesson-chat'
 
 const route = useRoute()
@@ -18,11 +19,95 @@ const reviseOpen = ref(false)
 const reviseInstruction = ref('')
 const chatOpen = ref(false)
 const quoteRequest = ref<(LessonQuote & { nonce: number }) | null>(null)
+const opError = ref<string | null>(null)
 
 // 正文「改本节」/划词引用 → 打开对话面板并带上引用
 function onQuote(quote: LessonQuote) {
   chatOpen.value = true
   quoteRequest.value = { ...quote, nonce: Date.now() }
+}
+
+// ---------- 手动插图（章节「插图」按钮 / 粘贴 / 拖拽） ----------
+async function onInsertImage({ file, heading }: InsertImagePayload) {
+  opError.value = null
+  try {
+    const src = await lessonStore.uploadImage(file)
+    const lesson = lessonStore.lesson
+    if (!lesson) return
+    const next = appendToSection(lesson.contentMd, heading, `![](${src})`)
+    await lessonStore.saveContent(next, '插入图片')
+  } catch (err) {
+    opError.value = err instanceof Error ? err.message : String(err)
+  }
+}
+
+// ---------- Mermaid 图表编辑 ----------
+const mermaidEdit = ref<{ code: string; draft: string } | null>(null)
+const mermaidPreview = computed(() =>
+  mermaidEdit.value ? `\`\`\`mermaid\n${mermaidEdit.value.draft}\n\`\`\`` : '',
+)
+
+function openMermaidEdit(code: string) {
+  mermaidEdit.value = { code, draft: code }
+}
+
+async function saveMermaidEdit() {
+  const edit = mermaidEdit.value
+  const lesson = lessonStore.lesson
+  if (!edit || !lesson) return
+  opError.value = null
+  const next = replaceMermaidBlock(lesson.contentMd, edit.code, edit.draft)
+  if (next == null) {
+    opError.value = '未找到对应的图表代码块，请刷新页面后重试'
+    return
+  }
+  try {
+    await lessonStore.saveContent(next, '修改 Mermaid 图表')
+    mermaidEdit.value = null
+  } catch (err) {
+    opError.value = err instanceof Error ? err.message : String(err)
+  }
+}
+
+// ---------- 手动编辑正文（textarea + 实时预览） ----------
+const editing = ref(false)
+const draft = ref('')
+
+function startEditing() {
+  draft.value = lessonStore.lesson?.contentMd ?? ''
+  editing.value = true
+  opError.value = null
+}
+
+async function saveEditing() {
+  opError.value = null
+  try {
+    await lessonStore.saveContent(draft.value, '手动编辑课件')
+    editing.value = false
+  } catch (err) {
+    opError.value = err instanceof Error ? err.message : String(err)
+  }
+}
+
+// 编辑模式下粘贴/拖入图片 → 上传后插入到光标处
+async function insertDraftImage(e: ClipboardEvent | DragEvent) {
+  const files = [...((e as ClipboardEvent).clipboardData ?? (e as DragEvent).dataTransfer)?.files ?? []].filter(
+    (f) => f.type.startsWith('image/'),
+  )
+  if (!files.length) return
+  e.preventDefault()
+  const ta = e.target as HTMLTextAreaElement
+  const pos = ta.selectionStart ?? draft.value.length
+  opError.value = null
+  try {
+    for (const file of files) {
+      const src = await lessonStore.uploadImage(file)
+      const insert = `\n\n![](${src})\n\n`
+      draft.value = draft.value.slice(0, pos) + insert + draft.value.slice(pos)
+    }
+  } catch (err) {
+    opError.value = err instanceof Error ? err.message : String(err)
+  }
 }
 
 async function reloadLesson() {
@@ -187,15 +272,37 @@ async function startRevise() {
         </p>
         <div class="lesson__actions">
           <button
+            v-if="editing"
+            class="btn btn--primary"
+            @click="saveEditing"
+          >
+            保存修改
+          </button>
+          <button
+            v-if="editing"
+            class="btn"
+            @click="editing = false"
+          >
+            取消
+          </button>
+          <button
+            v-else
             class="btn"
             :disabled="lessonStore.generating"
+            @click="startEditing"
+          >
+            ✏️ 编辑正文
+          </button>
+          <button
+            class="btn"
+            :disabled="lessonStore.generating || editing"
             @click="chatOpen = !chatOpen"
           >
             {{ chatOpen ? '收起 AI 对话' : '💬 AI 对话优化' }}
           </button>
           <button
             class="btn"
-            :disabled="lessonStore.generating"
+            :disabled="lessonStore.generating || editing"
             @click="reviseOpen = true"
           >
             ✨ AI 优化本课
@@ -207,12 +314,60 @@ async function startRevise() {
             已于 {{ new Date(lessonStore.lesson.revisedAt).toLocaleString('zh-CN') }} 优化
           </span>
         </div>
+        <p
+          v-if="opError"
+          class="lesson__op-error"
+        >
+          {{ opError }}
+        </p>
       </header>
 
+      <!-- 手动编辑：左 markdown 右实时预览 -->
+      <div
+        v-if="editing"
+        class="editor"
+      >
+        <textarea
+          v-model="draft"
+          class="editor__ta"
+          spellcheck="false"
+          @paste="insertDraftImage"
+          @drop.prevent="insertDraftImage"
+          @dragover.prevent
+        />
+        <div class="editor__preview">
+          <MarkdownRenderer :content="draft" />
+        </div>
+      </div>
+
       <LessonBody
+        v-else
         :content="lessonStore.lesson.contentMd"
         @quote="onQuote"
+        @edit-mermaid="openMermaidEdit"
+        @insert-image="onInsertImage"
       />
+
+      <section
+        v-if="!editing && lessonStore.lesson.images?.length"
+        class="lesson__sources"
+      >
+        <h2>图片来源</h2>
+        <ol>
+          <li
+            v-for="(img, i) in lessonStore.lesson.images"
+            :key="i"
+          >
+            <a
+              v-if="img.pageUrl || img.originUrl"
+              :href="img.pageUrl || img.originUrl"
+              target="_blank"
+              rel="noopener"
+            >{{ img.alt || img.pageUrl || img.originUrl }}</a>
+            <span v-else>{{ img.alt || `图片 ${i + 1}` }}</span>
+          </li>
+        </ol>
+      </section>
 
       <section
         v-if="lessonStore.lesson.sources.length"
@@ -279,6 +434,43 @@ async function startRevise() {
               @click="startRevise"
             >
               开始优化
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Mermaid 图表编辑弹窗 -->
+    <Teleport to="body">
+      <div
+        v-if="mermaidEdit"
+        class="revise-mask"
+        @click.self="mermaidEdit = null"
+      >
+        <div class="mermaid-modal">
+          <h3>编辑 Mermaid 图表</h3>
+          <div class="mermaid-modal__panes">
+            <textarea
+              v-model="mermaidEdit.draft"
+              class="mermaid-modal__ta"
+              spellcheck="false"
+            />
+            <div class="mermaid-modal__preview">
+              <MarkdownRenderer :content="mermaidPreview" />
+            </div>
+          </div>
+          <div class="revise-modal__actions">
+            <button
+              class="btn"
+              @click="mermaidEdit = null"
+            >
+              取消
+            </button>
+            <button
+              class="btn btn--primary"
+              @click="saveMermaidEdit"
+            >
+              保存
             </button>
           </div>
         </div>
@@ -354,6 +546,73 @@ async function startRevise() {
 .lesson__revised {
   font-size: 12px;
   color: var(--text-dim);
+}
+.lesson__op-error {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--mastery-red);
+}
+.editor {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+}
+.editor__ta {
+  flex: 1;
+  min-height: 70vh;
+  font-family: 'SF Mono', Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  resize: vertical;
+  tab-size: 2;
+}
+.editor__preview {
+  flex: 1;
+  min-width: 0;
+  padding: 0 12px;
+  border-left: 1px solid var(--border);
+  overflow-x: hidden;
+}
+.mermaid-modal {
+  width: min(920px, 92vw);
+  background: #fff;
+  border-radius: 14px;
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.mermaid-modal h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.mermaid-modal__panes {
+  display: flex;
+  gap: 14px;
+}
+.mermaid-modal__ta {
+  flex: 1;
+  min-height: 320px;
+  font-family: 'SF Mono', Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  resize: vertical;
+}
+.mermaid-modal__preview {
+  flex: 1;
+  min-width: 0;
+  max-height: 320px;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #f8fafc;
 }
 .revise-mask {
   position: fixed;

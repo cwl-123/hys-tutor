@@ -1,10 +1,16 @@
 {
   "name": "hys-tutor",
-  "version": "0.21.0",
+  "version": "0.22.0",
   "description": "本地部署的 AI 自适应私教：多轮个性化微课 + 学习者模型持续迭代",
   "license": "MIT",
   "author": "haiyeshu",
-  "keywords": ["ai-tutor", "adaptive-learning", "llm", "knowledge-graph", "vue3"],
+  "keywords": [
+    "ai-tutor",
+    "adaptive-learning",
+    "llm",
+    "knowledge-graph",
+    "vue3"
+  ],
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -28,6 +34,7 @@
     "jsdom": "^30.1.1",
     "katex": "^0.18.9",
     "markdown-it": "^15.0.2",
+    "mermaid": "^12.1.0",
     "openai": "^7.23.0",
     "pinia": "^4.0.3",
     "shiki": "^4.4.3",

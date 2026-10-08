@@ -2,7 +2,10 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 
-export const DATA_DIR = path.resolve(process.cwd(), 'data')
+// 数据目录：默认 <cwd>/data，可用 HYS_DATA_DIR 覆盖（测试隔离用）
+export const DATA_DIR = process.env.HYS_DATA_DIR
+  ? path.resolve(process.env.HYS_DATA_DIR)
+  : path.resolve(process.cwd(), 'data')
 
 export function dataPath(...parts: string[]): string {
   return path.join(DATA_DIR, ...parts)

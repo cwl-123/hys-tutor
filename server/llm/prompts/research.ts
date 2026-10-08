@@ -8,7 +8,8 @@ export const RESEARCH_SYSTEM_PROMPT = `你是一位严谨的备课研究员。�
 2. 从搜索结果中挑 1~3 篇最相关的抓取正文精读，不要每篇都抓
 3. 只保留有信息量的精华：定义、公式推导步骤、典型例题、实践经验、常见误区，每条独立成句（中文）
 4. 忠于来源，不编造；每条内容尽量能对应到某个来源
-5. 完成研究后必须调用 save_research_note 保存笔记，然后简短收尾`
+5. 用 image_search 搜集 0~4 张与讲解直接相关的配图（示意图/架构图/流程图/案例截图，宁缺毋滥），也可从 web_fetch 返回的本页配图候选里挑；通过 save_research_note 的 images 收藏（url+title+pageUrl）
+6. 完成研究后必须调用 save_research_note 保存笔记，然后简短收尾`
 
 export function researchUserPrompt(topicName: string, node: KnowledgeNode, existing: ResearchNote | null): string {
   const existingBlock = existing
@@ -19,5 +20,5 @@ export function researchUserPrompt(topicName: string, node: KnowledgeNode, exist
 知识点说明：${node.description}
 前置依赖：${node.deps.join('、') || '无'}
 
-请研究该知识点并保存研究笔记。save_research_note 的参数中：concepts=核心概念要点，derivations=公式/原理推导，examples=典型例题或工程案例，pitfalls=常见误区，sources=实际参考过的来源（title+url）。${existingBlock}`
+请研究该知识点并保存研究笔记。save_research_note 的参数中：concepts=核心概念要点，derivations=公式/原理推导，examples=典型例题或工程案例，pitfalls=常见误区，sources=实际参考过的来源（title+url），images=为课件配图收藏的图片（0~4 张，url+title+pageUrl）。${existingBlock}`
 }

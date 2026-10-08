@@ -44,23 +44,29 @@ schedule(规则选题)
    ↓
 research    Agent 针对知识点自主发起 2~4 次搜索（web-search），
             挑选优质来源抓正文（web-fetch），提炼成研究笔记：
-            核心概念 / 公式推导 / 典型例题 / 常见误区 / 来源 URL
+            核心概念 / 公式推导 / 典型例题 / 常见误区 / 来源 URL / 配图
+            期间可用 image_search 搜集贴切配图（0~4 张），保存笔记时
+            下载落地到 data/topics/<tid>/assets/，记 localPath
             ※ 笔记按 nodeId 缓存（data/research/），同知识点二次备课直接复用+增量搜索
    ↓
 outline     结合学习者上下文（掌握度快照、错题摘要、报错记录）+ 研究笔记
             产出大纲：哪些点详讲、哪些略过、用什么例子贴合个人情况
    ↓
 write       按大纲 + 笔记写课程 markdown（15 分钟篇幅约束），
-            关键结论标注来源引用 [1][2]，流式输出给前端
+            关键结论标注来源引用 [1][2]，流式输出给前端；
+            抽象结构用 ```mermaid 图（1~3 张），配图用 ![图注](localPath)（0~2 张）
    ↓
 self-check  对照研究笔记自查一遍：无来源支撑的断言标记/修正，
             产出 3 道课末题（客观题带答案解析，简答带参考答案）
+   ↓
+落图        localizeImages：正文残留外链图下载落地改写为本地引用
+            （下载失败=编造 URL，剔除），生成 lesson.images 配图清单
 ```
 
 **为什么这样设计**
 - 搜索解决幻觉：课程事实性内容有网上精华来源背书，且页面展示引用链接，可溯源
 - 决策仍在代码里：排课、掌握分、阶段流转是工程逻辑；Agent 的"自主"限定在研究环节（搜什么、读哪篇、提炼什么）
-- 手写工具循环（openai SDK function calling + while loop），不引 LangChain——总共 3 个工具，框架是负资产
+- 手写工具循环（openai SDK function calling + while loop），不引 LangChain——备课研究共 4 个工具（web_search / web_fetch / image_search / save_research_note），框架是负资产
 - 成本可控：单课约 5~15 次 LLM 调用 + 2~4 次搜索 API，个人使用完全可接受
 
 **关键设计决策**
@@ -78,10 +84,11 @@ self-check  对照研究笔记自查一遍：无来源支撑的断言标记/修�
 | 前端框架 | Vue 3 `<script setup>` + Vite | PRD 约定 |
 | 状态 | Pinia | 图谱/掌握分全局共享 |
 | 图谱可视化 | Vue Flow + Dagre（自动布局） | 节点颜色=掌握度，支持增删改 |
-| 内容渲染 | markdown-it + Shiki + KaTeX | 课程页；Shiki 预加载常用语言 |
+| 内容渲染 | markdown-it + Shiki + KaTeX + Mermaid | 课程页；Shiki 预加载常用语言；Mermaid 懒加载渲染 SVG（按代码文本缓存） |
+| 配图素材 | 本地素材库 data/topics/&lt;tid&gt;/assets/（内容哈希命名去重）+ assets.json 清单记原图来源 | 下载/上传共用 asset-store；拒 SVG（图示走 Mermaid），限 5MB |
 | 后端 | Vite middleware（自写路由，不引入框架） | 路由量小，用 `connect` 风格 handler 足够 |
 | LLM | OpenAI 兼容 SDK（openai 包），stream + function calling | 供应商实现时通过 .env 切换 |
-| Agent 运行时 | 手写工具循环（while + tool_calls），不引 LangChain | 仅 3 个工具，框架是负资产 |
+| Agent 运行时 | 手写工具循环（while + tool_calls），不引 LangChain | 备课研究 4 个工具，框架是负资产 |
 | 搜索 API | **Tavily + 博查双接**：并行搜索、结果按 URL 去重合并（Tavily 英文/LLM 友好，博查中文生态好，CTR/CVR 中文精华多） | 单家故障时自动降级为另一家；key 进 .env |
 | 网页抓取 | fetch + @mozilla/readability + jsdom 提正文 | 备课 Agent 的 web-fetch 工具 |
 | 流式传输 | SSE（`text/event-stream`） | 备课阶段进度 + 课程逐 token 渲染 |
@@ -139,7 +146,9 @@ self-check  对照研究笔记自查一遍：无来源支撑的断言标记/修�
   "injectedReports": ["r_003"],        // 备课时注入的历史报错 id
   "researchNoteIds": ["rn_fm"],        // 备课所依据的研究笔记
   "sources": [{ "idx": 1, "title": "...", "url": "..." }],  // 引用来源，页面展示
-  "contentMd": "# 课程 markdown ...",  // 正文含 [1][2] 引用标记
+  "images": [{ "src": "/api/topics/t_x/assets/ab12.png", "alt": "图注",
+               "originUrl": "https://...", "pageUrl": "https://..." }],  // 配图清单（图片来源展示；旧课件可无）
+  "contentMd": "# 课程 markdown ...",  // 正文含 [1][2] 引用标记；图片 ![图注](src)、图示 ```mermaid
   "status": "generated",               // researching | outlining | writing | generated | failed
   "createdAt": "..."
 }
@@ -222,11 +231,23 @@ self-check  对照研究笔记自查一遍：无来源支撑的断言标记/修�
   "examples": ["典型例题/案例..."],
   "pitfalls": ["常见误区..."],
   "sources": [{ "title": "...", "url": "...", "fetchedAt": "..." }],
+  "images": [{ "url": "https://.../arch.png", "title": "架构图",
+               "pageUrl": "https://.../post", "localPath": "/api/topics/t_x/assets/ab12.png" }],
+               // 为课件配图收藏的图片（0~4 张），保存笔记时已下载落地；旧笔记可无此字段
   "searchQueries": ["FM 特征交叉 原理", "..."],   // 已搜过的 query，增量备课去重
   "version": 2,                                    // 每次增量研究 +1
   "updatedAt": "..."
 }
 ```
+
+### 3.9 assets/ + assets.json — 课件配图素材库（按课题）
+```
+data/topics/<topicId>/
+  assets/<sha256前16位>.<png|jpg|gif|webp>   // 内容哈希命名，天然去重（AI 下载 / 手动上传共用）
+  assets.json                                 // { "<file>": { originUrl?, title?, pageUrl?, size, createdAt } }
+```
+- 课件正文统一引用 `/api/topics/<tid>/assets/<file>`（hash 文件名可长期缓存）；原图 URL 记入清单与 lesson.images 供图注来源
+- 下载/上传均校验魔数（拒 SVG 防脚本，图示走 Mermaid），单图 ≤5MB；文件名白名单防路径穿越
 
 ### 掌握分算法规则（mastery-service，MVP 版）
 - 客观题：答对 +15，答错 -5（clamp 到 0~100）
@@ -249,6 +270,9 @@ self-check  对照研究笔记自查一遍：无来源支撑的断言标记/修�
 | POST | /api/lessons/:id/submit | 交卷：客观题本地秒判 + 简答 LLM 批改，同步返回判分/评语/掌握分变化/MasteryLog/答案揭示；可多次交卷（配合再次测验），每次追加一条 attempt |
 | GET | /api/lessons/:id/attempts | 该课全部测验记录（含题目快照/作答/批改/掌握分变化，升序） |
 | POST | /api/lessons/:id/questions/regenerate | 再次测验：LLM 围绕本课知识点重新出一套新题（避开历史题目），覆盖当前题集（写 generatedAt 供交卷乐观并发校验） |
+| GET | /api/topics/:tid/assets/:file | 课件配图静态资源（hash 文件名，immutable 缓存） |
+| POST | /api/topics/:tid/assets | 上传图片（raw image/* body，粘贴/拖拽截图走这里）→ {src, file} |
+| PATCH | /api/lessons/:id/content | 手动编辑课件正文（插图/改图表/编辑）：落图 + 版本快照（可撤销）+ 更新配图清单 |
 | GET | /api/topics/:id/mastery-log | 掌握分变更历史 |
 | POST | /api/reports | 报错标记（课程划词 / 题目） |
 | GET | /api/topics/:id/reports | 报错记录列表 |

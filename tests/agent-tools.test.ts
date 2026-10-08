@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { JSDOM } from 'jsdom'
 import { mergeSearchResults, normalizeUrl, type SearchResult } from '../server/agent/tools/web-search'
-import { extractMainContent } from '../server/agent/tools/web-fetch'
+import { extractMainContent, extractPageImages } from '../server/agent/tools/web-fetch'
+import { searchImages } from '../server/agent/tools/image-search'
 import { mergeResearchNotes, type NotePatch } from '../server/agent/tools/notes'
 import type { ResearchNote } from '../shared/types'
 
@@ -51,6 +53,7 @@ describe('研究笔记合并', () => {
     examples: ['广告 CTR 场景的稀疏特征交叉'],
     pitfalls: ['与 FFM 混淆：FM 每个特征只有一个隐向量'],
     sources: [{ title: 'FM 论文解读', url: 'https://a.com/fm' }],
+    images: [{ url: 'https://img.com/fm.png', title: 'FM 结构图', pageUrl: 'https://a.com/fm' }],
   }
 
   it('无旧笔记时创建 version 1，记录搜索词', () => {
@@ -70,6 +73,7 @@ describe('研究笔记合并', () => {
       examples: [],
       pitfalls: [],
       sources: [{ title: '旧来源', url: 'https://a.com/fm', fetchedAt: 'x' }],
+      images: [{ url: 'https://img.com/old.png' }],
       searchQueries: ['FM 原理'],
       version: 1,
       updatedAt: 'x',
@@ -79,6 +83,100 @@ describe('研究笔记合并', () => {
     expect(merged.version).toBe(2)
     expect(merged.concepts).toHaveLength(2) // 重复项不再加入
     expect(merged.sources).toHaveLength(1) // 同 URL 去重
+    expect(merged.images).toEqual([
+      { url: 'https://img.com/old.png' },
+      { url: 'https://img.com/fm.png', title: 'FM 结构图', pageUrl: 'https://a.com/fm' },
+    ])
     expect(merged.searchQueries).toEqual(['FM 原理', 'FM 误区'])
+  })
+
+  it('配图按 URL 去重，旧笔记无 images 字段也能合并', () => {
+    const legacy = {
+      id: 'rn_2',
+      nodeId: 'n_fm',
+      concepts: [],
+      derivations: [],
+      examples: [],
+      pitfalls: [],
+      sources: [],
+      searchQueries: [],
+      version: 1,
+      updatedAt: 'x',
+    } as ResearchNote
+    const merged = mergeResearchNotes(
+      legacy,
+      { ...patch, images: [{ url: 'https://img.com/fm.png' }, { url: 'https://img.com/b.png' }] },
+      'n_fm',
+    )
+    expect(merged.images).toHaveLength(2)
+  })
+})
+
+describe('extractPageImages 页面配图候选', () => {
+  it('og:image 优先，过滤小图标，绝对化相对路径', () => {
+    const html = `<html><head>
+      <meta property="og:image" content="/og-cover.png">
+      </head><body>
+      <img src="https://cdn.example.com/arch.png" alt="架构图" width="800" height="600">
+      <img src="/tiny-icon.png" width="16" height="16">
+      <img src="data:image/png;base64,xx">
+      <img src="diagram.svg" alt="相对路径图">
+    </body></html>`
+    const images = extractPageImages(new JSDOM(html, { url: 'https://example.com/post' }).window.document, 'https://example.com/post')
+    expect(images.map((i) => i.url)).toEqual([
+      'https://example.com/og-cover.png',
+      'https://cdn.example.com/arch.png',
+      'https://example.com/diagram.svg',
+    ])
+    expect(images[1].title).toBe('架构图')
+  })
+})
+
+describe('searchImages 图片搜索', () => {
+  it('双路合并去重、过滤小图、保留出处页', async () => {
+    const calls: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push(String(url))
+      const body = JSON.parse(String(init?.body ?? '{}'))
+      if (String(url).includes('tavily')) {
+        return new Response(JSON.stringify({
+          images: [
+            { url: 'https://img.com/a.png', title: '图A', description: 'desc A' },
+            { url: 'https://img.com/small.png', title: '图标' },
+          ],
+        }), { status: 200 })
+      }
+      void body
+      return new Response(JSON.stringify({
+        data: {
+          images: {
+            value: [
+              { name: '图A-博查', contentUrl: 'https://img.com/a.png?utm_source=x', hostPageUrl: 'https://p.com/a', width: 640, height: 480 },
+              { name: '图B', contentUrl: 'https://img.com/b.png', hostPageUrl: 'https://p.com/b', width: 20, height: 20 },
+            ],
+          },
+        },
+      }), { status: 200 })
+    }))
+    process.env.TAVILY_API_KEY = 'test-tavily'
+    process.env.BOCHA_API_KEY = 'test-bocha'
+    const images = await searchImages('双塔模型 结构图')
+    expect(calls).toHaveLength(2)
+    // 图A 去重（tavily 在前）；small 无尺寸但来自 tavily 保留？——small 有 title 无尺寸，见 usable 规则
+    expect(images.map((i) => i.url).filter((u) => u.includes('/a.png'))).toEqual(['https://img.com/a.png'])
+    expect(images.find((i) => i.url === 'https://img.com/b.png')).toBeUndefined() // 20x20 小图被过滤
+    vi.unstubAllGlobals()
+    delete process.env.TAVILY_API_KEY
+    delete process.env.BOCHA_API_KEY
+  })
+
+  it('两家都无结果时抛错', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ images: [] }), { status: 200 })))
+    process.env.TAVILY_API_KEY = 'test-tavily'
+    process.env.BOCHA_API_KEY = 'test-bocha'
+    await expect(searchImages('x')).rejects.toThrow(/无结果/)
+    vi.unstubAllGlobals()
+    delete process.env.TAVILY_API_KEY
+    delete process.env.BOCHA_API_KEY
   })
 })

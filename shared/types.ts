@@ -53,6 +53,15 @@ export const lessonSourceSchema = z.object({
 })
 export type LessonSource = z.infer<typeof lessonSourceSchema>
 
+// 课件配图：src 为本地素材路径 /api/topics/<tid>/assets/<file>；originUrl 记原图直链（图片来源展示）
+export const lessonImageSchema = z.object({
+  src: z.string(),
+  alt: z.string().optional(),
+  originUrl: z.string().optional(),
+  pageUrl: z.string().optional(),
+})
+export type LessonImage = z.infer<typeof lessonImageSchema>
+
 export const lessonSchema = z.object({
   id: z.string(),
   topicId: z.string(),
@@ -62,6 +71,7 @@ export const lessonSchema = z.object({
   injectedReports: z.array(z.string()),
   researchNoteIds: z.array(z.string()),
   sources: z.array(lessonSourceSchema),
+  images: z.array(lessonImageSchema).optional(), // 旧课件无此字段
   contentMd: z.string(),
   status: lessonStatusSchema,
   createdAt: z.string(),
@@ -176,6 +186,15 @@ export const researchSourceSchema = z.object({
 })
 export type ResearchSource = z.infer<typeof researchSourceSchema>
 
+// 研究阶段收集的配图：url 为原图直链，localPath 为下载落地后的课件引用路径
+export const researchImageSchema = z.object({
+  url: z.string(),
+  title: z.string().optional(),
+  pageUrl: z.string().optional(),
+  localPath: z.string().optional(),
+})
+export type ResearchImage = z.infer<typeof researchImageSchema>
+
 export const researchNoteSchema = z.object({
   id: z.string(),
   nodeId: z.string(),
@@ -184,6 +203,7 @@ export const researchNoteSchema = z.object({
   examples: z.array(z.string()),
   pitfalls: z.array(z.string()),
   sources: z.array(researchSourceSchema),
+  images: z.array(researchImageSchema).optional(), // 旧笔记无此字段
   searchQueries: z.array(z.string()),
   version: z.number(),
   updatedAt: z.string(),
