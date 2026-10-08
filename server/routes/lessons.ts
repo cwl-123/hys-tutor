@@ -9,6 +9,12 @@ import { gradeObjective, gradeShort } from '../services/grading-service'
 import { applyMasteryChanges, type ApplyEntry } from '../services/mastery-service'
 import { appendAttempt, listAttempts } from '../services/attempt-service'
 import { regenerateQuestions } from '../services/lesson-agent'
+import {
+  applyLessonChat,
+  getLessonChat,
+  postLessonChat,
+  undoLessonChat,
+} from '../services/lesson-chat-service'
 import type { SubmitResult } from '../../shared/api'
 import type { AnswerRecord, Attempt, Question } from '../../shared/types'
 import { readBody } from './topics'
@@ -269,6 +275,86 @@ export async function handleReviseLesson(
     sendJson(res, 200, result)
   } catch (err) {
     sendJson(res, 409, { error: err instanceof Error ? err.message : String(err) })
+  }
+}
+
+// ---------- 课件 AI 对话式优化 ----------
+
+const lessonChatBodySchema = z.object({
+  message: z.string().min(1).max(4000),
+  quote: z
+    .object({
+      heading: z.string().max(200).optional(),
+      text: z.string().max(2000).optional(),
+    })
+    .optional(),
+})
+
+const applyChatBodySchema = z.object({ messageId: z.string().min(1) })
+
+function chatErrorStatus(err: unknown): number {
+  return (err as { status?: number }).status ?? 500
+}
+
+// GET /api/lessons/:id/chat — 课件对话历史 + 版本
+export async function handleGetLessonChat(
+  _req: IncomingMessage,
+  res: ServerResponse,
+  lessonId: string,
+): Promise<void> {
+  try {
+    sendJson(res, 200, await getLessonChat(lessonId))
+  } catch (err) {
+    sendJson(res, chatErrorStatus(err), { error: err instanceof Error ? err.message : String(err) })
+  }
+}
+
+// POST /api/lessons/:id/chat — 一轮对话，返回修改建议（不落盘，前端预览后应用）
+export async function handlePostLessonChat(
+  req: IncomingMessage,
+  res: ServerResponse,
+  lessonId: string,
+): Promise<void> {
+  const body = lessonChatBodySchema.safeParse(await readBody(req))
+  if (!body.success) {
+    sendJson(res, 400, { error: body.error.issues.map((i) => i.message).join('；') })
+    return
+  }
+  try {
+    sendJson(res, 200, await postLessonChat(lessonId, body.data))
+  } catch (err) {
+    sendJson(res, chatErrorStatus(err), { error: err instanceof Error ? err.message : String(err) })
+  }
+}
+
+// POST /api/lessons/:id/chat/apply — 应用某条建议到课件
+export async function handleApplyLessonChat(
+  req: IncomingMessage,
+  res: ServerResponse,
+  lessonId: string,
+): Promise<void> {
+  const body = applyChatBodySchema.safeParse(await readBody(req))
+  if (!body.success) {
+    sendJson(res, 400, { error: body.error.issues.map((i) => i.message).join('；') })
+    return
+  }
+  try {
+    sendJson(res, 200, await applyLessonChat(lessonId, body.data.messageId))
+  } catch (err) {
+    sendJson(res, chatErrorStatus(err), { error: err instanceof Error ? err.message : String(err) })
+  }
+}
+
+// POST /api/lessons/:id/chat/undo — 撤销最近一次修改
+export async function handleUndoLessonChat(
+  _req: IncomingMessage,
+  res: ServerResponse,
+  lessonId: string,
+): Promise<void> {
+  try {
+    sendJson(res, 200, await undoLessonChat(lessonId))
+  } catch (err) {
+    sendJson(res, chatErrorStatus(err), { error: err instanceof Error ? err.message : String(err) })
   }
 }
 

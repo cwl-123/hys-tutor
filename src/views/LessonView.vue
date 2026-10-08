@@ -4,6 +4,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { useLessonStore } from '@/stores/lesson'
 import { useTopicStore } from '@/stores/topic'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
+import LessonBody from '@/components/LessonBody.vue'
+import LessonChatPanel from '@/components/LessonChatPanel.vue'
+import type { LessonQuote } from '@shared/lesson-chat'
 
 const route = useRoute()
 const router = useRouter()
@@ -13,6 +16,19 @@ const topicStore = useTopicStore()
 const stageList = ref<HTMLElement | null>(null)
 const reviseOpen = ref(false)
 const reviseInstruction = ref('')
+const chatOpen = ref(false)
+const quoteRequest = ref<(LessonQuote & { nonce: number }) | null>(null)
+
+// 正文「改本节」/划词引用 → 打开对话面板并带上引用
+function onQuote(quote: LessonQuote) {
+  chatOpen.value = true
+  quoteRequest.value = { ...quote, nonce: Date.now() }
+}
+
+async function reloadLesson() {
+  const lesson = lessonStore.lesson
+  if (lesson) await lessonStore.load(lesson.id)
+}
 
 const isNew = computed(() => route.params.id === 'new')
 const nodeName = computed(() => {
@@ -96,7 +112,10 @@ async function startRevise() {
 </script>
 
 <template>
-  <div class="lesson-view">
+  <div
+    class="lesson-view"
+    :class="{ 'lesson-view--chat': chatOpen && lessonStore.lesson }"
+  >
     <!-- 备课中：阶段进度 + 流式正文 -->
     <div
       v-if="lessonStore.generating"
@@ -170,6 +189,13 @@ async function startRevise() {
           <button
             class="btn"
             :disabled="lessonStore.generating"
+            @click="chatOpen = !chatOpen"
+          >
+            {{ chatOpen ? '收起 AI 对话' : '💬 AI 对话优化' }}
+          </button>
+          <button
+            class="btn"
+            :disabled="lessonStore.generating"
             @click="reviseOpen = true"
           >
             ✨ AI 优化本课
@@ -183,7 +209,10 @@ async function startRevise() {
         </div>
       </header>
 
-      <MarkdownRenderer :content="lessonStore.lesson.contentMd" />
+      <LessonBody
+        :content="lessonStore.lesson.contentMd"
+        @quote="onQuote"
+      />
 
       <section
         v-if="lessonStore.lesson.sources.length"
@@ -255,6 +284,15 @@ async function startRevise() {
         </div>
       </div>
     </Teleport>
+
+    <!-- AI 对话优化课件 -->
+    <LessonChatPanel
+      v-if="chatOpen && lessonStore.lesson"
+      :lesson-id="lessonStore.lesson.id"
+      :quote-request="quoteRequest"
+      @updated="reloadLesson"
+      @close="chatOpen = false"
+    />
   </div>
 </template>
 
@@ -263,6 +301,10 @@ async function startRevise() {
   max-width: 880px;
   margin: 0 auto;
   padding: 24px 32px 80px;
+  transition: padding-right 0.2s;
+}
+.lesson-view--chat {
+  padding-right: 432px;
 }
 .progress__hint {
   color: var(--text-dim);

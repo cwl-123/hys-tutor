@@ -2,18 +2,23 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { healthRoute } from './routes/health'
 import { handleGraphChat, handleTopics } from './routes/topics'
 import {
+  handleApplyLessonChat,
   handleCreateLesson,
   handleDeleteLesson,
   handleFindLesson,
   handleGetLesson,
+  handleGetLessonChat,
   handleLessonProgress,
   handleListAttempts,
   handleListLessons,
+  handlePostLessonChat,
   handleRegenerateQuestions,
   handleReviseLesson,
   handleSubmitLesson,
+  handleUndoLessonChat,
 } from './routes/lessons'
 import { handleCreateReport, handleListReports } from './routes/reports'
+import { handleGetAsset, handleUploadAsset } from './routes/assets'
 import {
   handleGetSettings,
   handleImportCandidate,
@@ -55,6 +60,27 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, next:
     const reviseMatch = url.match(/^\/lessons\/([^/]+)\/revise$/)
     if (reviseMatch && req.method === 'POST') {
       await handleReviseLesson(req, res, reviseMatch[1])
+      return
+    }
+
+    // 课件 AI 对话式优化：GET 历史 / POST 对话 / POST apply / POST undo
+    const chatApplyMatch = url.match(/^\/lessons\/([^/]+)\/chat\/apply$/)
+    if (chatApplyMatch && req.method === 'POST') {
+      await handleApplyLessonChat(req, res, chatApplyMatch[1])
+      return
+    }
+    const chatUndoMatch = url.match(/^\/lessons\/([^/]+)\/chat\/undo$/)
+    if (chatUndoMatch && req.method === 'POST') {
+      await handleUndoLessonChat(req, res, chatUndoMatch[1])
+      return
+    }
+    const chatMatch = url.match(/^\/lessons\/([^/]+)\/chat$/)
+    if (chatMatch && req.method === 'GET') {
+      await handleGetLessonChat(req, res, chatMatch[1])
+      return
+    }
+    if (chatMatch && req.method === 'POST') {
+      await handlePostLessonChat(req, res, chatMatch[1])
       return
     }
     const deleteMatch = url.match(/^\/lessons\/([^/]+)$/)
@@ -132,6 +158,18 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, next:
     const reportsMatch = url.match(/^\/topics\/([^/]+)\/reports$/)
     if (reportsMatch && req.method === 'GET') {
       await handleListReports(req, res, reportsMatch[1])
+      return
+    }
+
+    // GET /api/topics/:tid/assets/:file — 课件配图；POST /api/topics/:tid/assets — 上传图片
+    const assetFileMatch = url.match(/^\/topics\/([^/]+)\/assets\/([^/]+)$/)
+    if (assetFileMatch && req.method === 'GET') {
+      await handleGetAsset(req, res, assetFileMatch[1], assetFileMatch[2])
+      return
+    }
+    const assetUploadMatch = url.match(/^\/topics\/([^/]+)\/assets$/)
+    if (assetUploadMatch && req.method === 'POST') {
+      await handleUploadAsset(req, res, assetUploadMatch[1])
       return
     }
 
