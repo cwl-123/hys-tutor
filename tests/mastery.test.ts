@@ -8,16 +8,16 @@ function q(partial: Partial<Question>): Question {
 }
 
 describe('掌握分规则', () => {
-  it('客观题：对 +10 / 错 -8', () => {
-    expect(masteryDelta({ type: 'objective', correct: true })).toBe(10)
-    expect(masteryDelta({ type: 'objective', correct: false })).toBe(-8)
+  it('客观题：对 +15 / 错 -5', () => {
+    expect(masteryDelta({ type: 'objective', correct: true })).toBe(15)
+    expect(masteryDelta({ type: 'objective', correct: false })).toBe(-5)
   })
 
-  it('简答：delta = (score-0.6)*25，满分+10、及格0、零分-15', () => {
-    expect(masteryDelta({ type: 'short', score: 1 })).toBe(10)
-    expect(masteryDelta({ type: 'short', score: 0.6 })).toBe(0)
+  it('简答：delta = (score-0.5)*30，满分+15、及格0、零分-15', () => {
+    expect(masteryDelta({ type: 'short', score: 1 })).toBe(15)
+    expect(masteryDelta({ type: 'short', score: 0.5 })).toBe(0)
     expect(masteryDelta({ type: 'short', score: 0 })).toBe(-15)
-    expect(masteryDelta({ type: 'short', score: 0.8 })).toBe(5)
+    expect(masteryDelta({ type: 'short', score: 0.8 })).toBe(9)
   })
 
   it('clamp 到 0~100', () => {

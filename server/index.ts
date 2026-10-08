@@ -7,7 +7,9 @@ import {
   handleFindLesson,
   handleGetLesson,
   handleLessonProgress,
+  handleListAttempts,
   handleListLessons,
+  handleRegenerateQuestions,
   handleReviseLesson,
   handleSubmitLesson,
 } from './routes/lessons'
@@ -79,6 +81,20 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, next:
     const submitMatch = url.match(/^\/lessons\/([^/]+)\/submit$/)
     if (submitMatch && req.method === 'POST') {
       await handleSubmitLesson(req, res, submitMatch[1])
+      return
+    }
+
+    // GET /api/lessons/:lid/attempts — 该课全部测验记录
+    const attemptsMatch = url.match(/^\/lessons\/([^/]+)\/attempts$/)
+    if (attemptsMatch && req.method === 'GET') {
+      await handleListAttempts(req, res, attemptsMatch[1])
+      return
+    }
+
+    // POST /api/lessons/:lid/questions/regenerate — 再次测验，重新出题
+    const regenMatch = url.match(/^\/lessons\/([^/]+)\/questions\/regenerate$/)
+    if (regenMatch && req.method === 'POST') {
+      await handleRegenerateQuestions(req, res, regenMatch[1])
       return
     }
 

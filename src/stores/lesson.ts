@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { Lesson, Question, Topic } from '@shared/types'
+import type { Attempt, Lesson, Question, Topic } from '@shared/types'
 import { getSse } from '@/utils/sse'
 
 export interface StageEntry {
@@ -68,6 +68,8 @@ export const useLessonStore = defineStore('lesson', () => {
   const topic = ref<Topic | null>(null)
   const lesson = ref<Lesson | null>(null)
   const questions = ref<Question[]>([])
+  const questionsGeneratedAt = ref<string | undefined>(undefined)
+  const attempts = ref<Attempt[]>([])
 
   function reset() {
     stages.value = []
@@ -75,6 +77,8 @@ export const useLessonStore = defineStore('lesson', () => {
     error.value = null
     lesson.value = null
     questions.value = []
+    questionsGeneratedAt.value = undefined
+    attempts.value = []
   }
 
   // 发起后台备课任务并挂接进度；离开页面再回来可重新 attach 回放
@@ -148,7 +152,7 @@ export const useLessonStore = defineStore('lesson', () => {
     const data = (await res.json()) as {
       topic?: Topic
       lesson?: Lesson
-      questions?: { questions: Question[] } | null
+      questions?: { generatedAt?: string; questions: Question[] } | null
       error?: string
     }
     if (!res.ok || !data.lesson) {
@@ -158,6 +162,34 @@ export const useLessonStore = defineStore('lesson', () => {
     topic.value = data.topic ?? null
     lesson.value = data.lesson
     questions.value = data.questions?.questions ?? []
+    questionsGeneratedAt.value = data.questions?.generatedAt
+  }
+
+  // 该课全部测验记录（含题目快照与批改结果）
+  async function loadAttempts(lessonId: string) {
+    const res = await fetch(`/api/lessons/${lessonId}/attempts`)
+    const data = (await res.json()) as { attempts?: Attempt[]; error?: string }
+    if (!res.ok) {
+      error.value = data.error ?? `加载答题记录失败：${res.status}`
+      return
+    }
+    attempts.value = data.attempts ?? []
+  }
+
+  // 再次测验：LLM 重新出一套新题
+  async function regenerate(lessonId: string): Promise<boolean> {
+    const res = await fetch(`/api/lessons/${lessonId}/questions/regenerate`, { method: 'POST' })
+    const data = (await res.json()) as {
+      questions?: { generatedAt?: string; questions: Question[] }
+      error?: string
+    }
+    if (!res.ok || !data.questions) {
+      error.value = data.error ?? `出题失败：${res.status}`
+      return false
+    }
+    questions.value = data.questions.questions
+    questionsGeneratedAt.value = data.questions.generatedAt
+    return true
   }
 
   // 发起课件 AI 优化并挂接进度
@@ -175,5 +207,5 @@ export const useLessonStore = defineStore('lesson', () => {
     await attach(data.lessonId)
   }
 
-  return { stages, streamingContent, generating, error, topic, lesson, questions, generate, attach, revise, load, reset }
+  return { stages, streamingContent, generating, error, topic, lesson, questions, questionsGeneratedAt, attempts, generate, attach, revise, load, loadAttempts, regenerate, reset }
 })

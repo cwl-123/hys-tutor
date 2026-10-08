@@ -86,7 +86,10 @@ export const questionSchema = z.object({
 })
 export type Question = z.infer<typeof questionSchema>
 
-export const questionSetSchema = z.object({ questions: z.array(questionSchema) })
+export const questionSetSchema = z.object({
+  generatedAt: z.string().optional(), // 题集生成时间，交卷时做乐观并发校验
+  questions: z.array(questionSchema),
+})
 export type QuestionSet = z.infer<typeof questionSetSchema>
 
 // ---------- 答题与批改 ----------
@@ -106,10 +109,26 @@ export const answerRecordSchema = z.object({
 })
 export type AnswerRecord = z.infer<typeof answerRecordSchema>
 
+export const masteryChangeSchema = z.object({
+  nodeId: z.string(),
+  nodeName: z.string(),
+  before: z.number(),
+  after: z.number(),
+  delta: z.number(),
+  reason: z.string(),
+})
+export type MasteryChange = z.infer<typeof masteryChangeSchema>
+
+// 一次测验记录：同一课可多次测验（再次测验生成新题），每次交卷追加一条
 export const attemptSchema = z.object({
+  id: z.string(),
   lessonId: z.string(),
+  // 题目快照（含答案/讲解），回看历史记录用；旧格式记录可能缺失
+  questions: z.array(questionSchema).default([]),
   records: z.array(answerRecordSchema),
+  masteryChanges: z.array(masteryChangeSchema).default([]),
   status: z.enum(['in_progress', 'submitted', 'graded']),
+  createdAt: z.string().default(''),
 })
 export type Attempt = z.infer<typeof attemptSchema>
 

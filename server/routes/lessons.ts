@@ -2,11 +2,13 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { z } from 'zod'
 import { sendJson } from '../index'
 import { startSse } from '../sse'
-import { dataPath, nowIso, readJson, writeJson } from '../repo/json-store'
+import { newId, nowIso } from '../repo/json-store'
 import { startLessonJob, attachLesson, subscribeJob, startReviseJob } from '../services/lesson-jobs'
 import { deleteLesson, findLesson, getLessonDetail, listLessons, stripQuestions } from '../services/lesson-service'
 import { gradeObjective, gradeShort } from '../services/grading-service'
 import { applyMasteryChanges, type ApplyEntry } from '../services/mastery-service'
+import { appendAttempt, listAttempts } from '../services/attempt-service'
+import { regenerateQuestions } from '../services/lesson-agent'
 import type { SubmitResult } from '../../shared/api'
 import type { AnswerRecord, Attempt, Question } from '../../shared/types'
 import { readBody } from './topics'
@@ -114,6 +116,8 @@ export async function handleFindLesson(
 
 const submitBodySchema = z.object({
   answers: z.array(z.object({ questionId: z.string(), userAnswer: z.string() })),
+  // 乐观并发：作答时的题集生成时间，与服务端不一致说明题目已被「再次测验」换新
+  generatedAt: z.string().optional(),
 })
 
 function typeLabel(q: Question): string {
@@ -138,10 +142,12 @@ export async function handleSubmitLesson(
   }
 
   const topicId = detail.topic.id
-  const attemptFile = dataPath('topics', topicId, 'attempts', `${lessonId}.json`)
-  const existing = await readJson<Attempt | null>(attemptFile, null)
-  if (existing?.status === 'graded') {
-    sendJson(res, 409, { error: '该课已交卷批改，不能重复提交' })
+  if (
+    body.data.generatedAt &&
+    detail.questions.generatedAt &&
+    body.data.generatedAt !== detail.questions.generatedAt
+  ) {
+    sendJson(res, 409, { error: '题目已更新，请刷新页面后作答' })
     return
   }
 
@@ -185,10 +191,20 @@ export async function handleSubmitLesson(
   }
   await Promise.all(shortTasks)
 
-  const attempt: Attempt = { lessonId, records, status: 'graded' }
-  await writeJson(attemptFile, attempt)
-
   const { changes, logs } = await applyMasteryChanges(topicId, entries)
+
+  // 留档：题目快照 + 作答 + 批改 + 掌握分变化，可多次测验逐条追加
+  const attempt: Attempt = {
+    id: newId('a'),
+    lessonId,
+    questions: detail.questions.questions,
+    records,
+    masteryChanges: changes,
+    status: 'graded',
+    createdAt: nowIso(),
+  }
+  await appendAttempt(topicId, attempt)
+
   sendJson(res, 200, {
     lessonId,
     results,
@@ -196,6 +212,34 @@ export async function handleSubmitLesson(
     masteryLogs: logs,
     revealed,
   } satisfies SubmitResult)
+}
+
+// GET /api/lessons/:lid/attempts — 该课全部测验记录（含题目快照，升序）
+export async function handleListAttempts(
+  _req: IncomingMessage,
+  res: ServerResponse,
+  lessonId: string,
+): Promise<void> {
+  const detail = await findLesson(lessonId)
+  if (!detail) {
+    sendJson(res, 404, { error: '课程不存在' })
+    return
+  }
+  sendJson(res, 200, { attempts: await listAttempts(detail.topic.id, lessonId) })
+}
+
+// POST /api/lessons/:lid/questions/regenerate — 再次测验：LLM 重新出一套新题
+export async function handleRegenerateQuestions(
+  _req: IncomingMessage,
+  res: ServerResponse,
+  lessonId: string,
+): Promise<void> {
+  try {
+    const questions = await regenerateQuestions(lessonId)
+    sendJson(res, 200, { questions: stripQuestions(questions) })
+  } catch (err) {
+    sendJson(res, 500, { error: err instanceof Error ? err.message : String(err) })
+  }
 }
 
 // GET /api/topics/:id/lessons — 课题下全部课程列表（挂到知识点节点用）

@@ -2,10 +2,10 @@
 // 阈值集中在 MASTERY_RULES，便于调参；纯函数，前后端共用
 
 export const MASTERY_RULES = {
-  objectiveCorrectDelta: 10, // 客观题答对
-  objectiveWrongDelta: -8, // 客观题答错
-  shortPassScore: 0.6, // 简答及格线
-  shortScale: 25, // delta = (score - pass) * scale
+  objectiveCorrectDelta: 15, // 客观题答对
+  objectiveWrongDelta: -5, // 客观题答错
+  shortPassScore: 0.5, // 简答及格线
+  shortScale: 30, // delta = (score - pass) * scale
   min: 0,
   max: 100,
 } as const

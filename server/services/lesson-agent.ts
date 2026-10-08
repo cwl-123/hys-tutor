@@ -14,12 +14,13 @@ import {
 } from '../llm/prompts/outline'
 import { WRITE_SYSTEM_PROMPT, REVISE_SYSTEM_PROMPT, writeLessonPrompt, reviseLessonPrompt } from '../llm/prompts/write'
 import { SELFCHECK_SYSTEM_PROMPT, llmSelfCheckSchema, selfCheckPrompt } from '../llm/prompts/selfcheck'
+import { QUIZ_SYSTEM_PROMPT, llmQuizSchema, quizPrompt } from '../llm/prompts/quiz'
 import { scheduleNext } from './scheduler'
 import { getGraph, getTopic } from './graph-service'
 import { findLesson } from './lesson-service'
+import { listAttempts } from './attempt-service'
 import { MASTERY_UNLOCK_THRESHOLD } from '../../shared/types'
 import type {
-  Attempt,
   ErrorReport,
   KnowledgeNode,
   Lesson,
@@ -67,21 +68,24 @@ async function buildLearnerContext(topicId: string, nodes: KnowledgeNode[]): Pro
     // 还没有任何答题记录
   }
   for (const file of attemptFiles) {
-    const attempt = await readJson<Attempt | null>(dataPath('topics', topicId, 'attempts', file), null)
-    if (!attempt) continue
-    const questions = await readJson<QuestionSet | null>(
-      dataPath('topics', topicId, 'lessons', `${attempt.lessonId}.questions.json`),
-      null,
-    )
-    for (const record of attempt.records) {
-      const r = record.result
-      if (!r) continue
-      const isWrong = r.correct === false || (r.score !== undefined && r.score < WRONG_SCORE_THRESHOLD)
-      if (!isWrong) continue
-      const q = questions?.questions.find((x) => x.id === record.questionId)
-      const nodeName = q ? (nodeNames[q.nodeId] ?? q.nodeId) : '未知知识点'
-      const brief = q ? q.prompt.replace(/\s+/g, ' ').slice(0, 60) : record.questionId
-      wrongAnswers.push(`- [${nodeName}] 题目「${brief}…」：${r.feedback ? `批改意见「${r.feedback.slice(0, 80)}」` : '回答错误'}`)
+    const attempts = await listAttempts(topicId, file.replace(/\.json$/, ''))
+    for (const attempt of attempts) {
+      const questions = await readJson<QuestionSet | null>(
+        dataPath('topics', topicId, 'lessons', `${attempt.lessonId}.questions.json`),
+        null,
+      )
+      for (const record of attempt.records) {
+        const r = record.result
+        if (!r) continue
+        const isWrong = r.correct === false || (r.score !== undefined && r.score < WRONG_SCORE_THRESHOLD)
+        if (!isWrong) continue
+        const q =
+          attempt.questions.find((x) => x.id === record.questionId) ??
+          questions?.questions.find((x) => x.id === record.questionId)
+        const nodeName = q ? (nodeNames[q.nodeId] ?? q.nodeId) : '未知知识点'
+        const brief = q ? q.prompt.replace(/\s+/g, ' ').slice(0, 60) : record.questionId
+        wrongAnswers.push(`- [${nodeName}] 题目「${brief}…」：${r.feedback ? `批改意见「${r.feedback.slice(0, 80)}」` : '回答错误'}`)
+      }
     }
   }
 
@@ -296,6 +300,7 @@ export async function prepareLesson(
     createdAt: nowIso(),
   }
   const questions: QuestionSet = {
+    generatedAt: nowIso(),
     questions: check.questions.map<Question>((q, i) => ({
       id: `q_${i + 1}`,
       nodeId: node.id,
@@ -357,6 +362,7 @@ export async function reviseLesson(
       })
       contentMd = check.correctedContent?.trim() ? check.correctedContent : revised
       questions = {
+        generatedAt: nowIso(),
         questions: check.questions.map<Question>((q, i) => ({
           id: `q_${i + 1}`,
           nodeId: node.id,
@@ -386,4 +392,45 @@ export async function reviseLesson(
   }
   onStage({ stage: 'done', detail: { lessonId, wordCount: contentMd.length } })
   return lesson
+}
+
+// 再次测验：围绕本课知识点重新出一套新题（避开历史出过的题），覆盖当前题集
+export async function regenerateQuestions(lessonId: string): Promise<QuestionSet> {
+  const detail = await findLesson(lessonId)
+  if (!detail?.questions) throw new Error('课程不存在或题目缺失')
+  const { topic, lesson, questions: current } = detail
+  if (lesson.status !== 'generated') throw new Error('课程尚未生成完成，暂不能出题')
+
+  const graph = await getGraph(topic.id)
+  const node = graph?.nodes.find((n) => n.id === lesson.nodeIds[0])
+  if (!node) throw new Error('知识点不存在')
+  const note = await readResearchNote(topic.id, node.id)
+
+  const attempts = await listAttempts(topic.id, lessonId)
+  const avoidPrompts = [
+    ...current.questions.map((q) => q.prompt),
+    ...attempts.flatMap((a) => a.questions.map((q) => q.prompt)),
+  ]
+
+  const result = await completeJson({
+    system: QUIZ_SYSTEM_PROMPT,
+    prompt: quizPrompt(node, note, lesson.contentMd, [...new Set(avoidPrompts)]),
+    schema: llmQuizSchema,
+    temperature: 0.7,
+  })
+  const questions: QuestionSet = {
+    generatedAt: nowIso(),
+    questions: result.questions.map<Question>((q, i) => ({
+      id: `q_${i + 1}`,
+      nodeId: node.id,
+      type: q.type,
+      prompt: q.prompt,
+      options: q.options,
+      answer: q.answer,
+      referenceAnswer: q.referenceAnswer,
+      explanation: q.explanation,
+    })),
+  }
+  await writeJson(dataPath('topics', topic.id, 'lessons', `${lessonId}.questions.json`), questions)
+  return questions
 }

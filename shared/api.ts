@@ -1,4 +1,6 @@
-import type { GradeResult, MasteryLogEntry, Question, Topic } from './types'
+import type { GradeResult, MasteryChange, MasteryLogEntry, Question, Topic } from './types'
+
+export type { MasteryChange } from './types'
 
 // 课题统计（首页卡片展示）
 export interface TopicStats {
@@ -32,15 +34,6 @@ export interface LessonMeta {
 export interface SubmitAnswerInput {
   questionId: string
   userAnswer: string
-}
-
-export interface MasteryChange {
-  nodeId: string
-  nodeName: string
-  before: number
-  after: number
-  delta: number
-  reason: string
 }
 
 export interface SubmitResult {

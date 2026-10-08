@@ -4,20 +4,22 @@ import { useRoute } from 'vue-router'
 import { useLessonStore } from '@/stores/lesson'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import { submitReport } from '@/utils/report'
-import type { SubmitResult } from '@shared/api'
-import type { Question } from '@shared/types'
+import type { AnswerRecord, Attempt, Question } from '@shared/types'
 
 const route = useRoute()
 const lessonStore = useLessonStore()
 const lessonId = computed(() => String(route.params.id))
 
+const mode = ref<'answer' | 'review'>('answer')
+const activeIdx = ref(0)
 const answers = ref<Record<string, string>>({})
 const submitting = ref(false)
-const result = ref<SubmitResult | null>(null)
+const regenerating = ref(false)
 const error = ref<string | null>(null)
 
 const questions = computed(() => lessonStore.questions)
-const graded = computed(() => result.value !== null)
+const attempts = computed(() => lessonStore.attempts)
+const activeAttempt = computed<Attempt | null>(() => attempts.value[activeIdx.value] ?? null)
 const notReady = computed(
   () => !!lessonStore.lesson && lessonStore.lesson.status !== 'generated',
 )
@@ -26,8 +28,25 @@ const allAnswered = computed(
   () => questions.value.length > 0 && questions.value.every((q) => (answers.value[q.id] ?? '').trim() !== ''),
 )
 
+// 回看条目：题目快照（含答案讲解）+ 当次作答记录
+interface ReviewItem {
+  q: Question
+  record?: AnswerRecord
+}
+const reviewItems = computed<ReviewItem[]>(() => {
+  const a = activeAttempt.value
+  if (!a) return []
+  const qs = a.questions.length > 0 ? a.questions : questions.value
+  return qs.map((q) => ({ q, record: a.records.find((r) => r.questionId === q.id) }))
+})
+
 onMounted(async () => {
   await lessonStore.load(lessonId.value)
+  await lessonStore.loadAttempts(lessonId.value)
+  if (attempts.value.length > 0) {
+    activeIdx.value = attempts.value.length - 1
+    mode.value = 'review'
+  }
 })
 
 function typeLabel(q: Question): string {
@@ -35,12 +54,75 @@ function typeLabel(q: Question): string {
 }
 
 function pick(q: Question, value: string) {
-  if (graded.value) return
   answers.value = { ...answers.value, [q.id]: value }
 }
 
-function resultOf(qid: string) {
-  return result.value?.results[qid]
+function onShortInput(q: Question, e: Event) {
+  pick(q, (e.target as HTMLTextAreaElement).value)
+}
+
+function recordPassed(r?: AnswerRecord): boolean {
+  if (!r?.result) return false
+  return r.result.correct === true || (r.result.score ?? 0) >= 0.6
+}
+
+function fmtTime(iso: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function attemptSummary(a: Attempt): string {
+  const passed = a.records.filter((r) => recordPassed(r)).length
+  return `达标 ${passed}/${a.records.length}`
+}
+
+async function retake() {
+  if (regenerating.value) return
+  regenerating.value = true
+  error.value = null
+  try {
+    const ok = await lessonStore.regenerate(lessonId.value)
+    if (!ok) {
+      error.value = lessonStore.error ?? '出题失败，请重试'
+      return
+    }
+    answers.value = {}
+    mode.value = 'answer'
+  } finally {
+    regenerating.value = false
+  }
+}
+
+function backToReview() {
+  activeIdx.value = attempts.value.length - 1
+  mode.value = 'review'
+}
+
+async function submit() {
+  if (!allAnswered.value || submitting.value) return
+  submitting.value = true
+  error.value = null
+  try {
+    const res = await fetch(`/api/lessons/${lessonId.value}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        answers: questions.value.map((q) => ({ questionId: q.id, userAnswer: answers.value[q.id] ?? '' })),
+        generatedAt: lessonStore.questionsGeneratedAt,
+      }),
+    })
+    const data = (await res.json()) as { error?: string }
+    if (!res.ok) throw new Error(data.error ?? `交卷失败：${res.status}`)
+    await lessonStore.loadAttempts(lessonId.value)
+    activeIdx.value = attempts.value.length - 1
+    mode.value = 'review'
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    submitting.value = false
+  }
 }
 
 // 题目报错："这里有错"入口
@@ -51,10 +133,6 @@ const reportToast = ref<string | null>(null)
 function toggleReport(qid: string) {
   reportingQid.value = reportingQid.value === qid ? null : qid
   reportNote.value = ''
-}
-
-function onShortInput(q: Question, e: Event) {
-  pick(q, (e.target as HTMLTextAreaElement).value)
 }
 
 async function submitQuestionReport(q: Question) {
@@ -73,28 +151,6 @@ async function submitQuestionReport(q: Question) {
   } catch (err) {
     reportToast.value = err instanceof Error ? err.message : String(err)
     setTimeout(() => (reportToast.value = null), 4000)
-  }
-}
-
-async function submit() {
-  if (!allAnswered.value || submitting.value) return
-  submitting.value = true
-  error.value = null
-  try {
-    const res = await fetch(`/api/lessons/${lessonId.value}/submit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        answers: questions.value.map((q) => ({ questionId: q.id, userAnswer: answers.value[q.id] ?? '' })),
-      }),
-    })
-    const data = (await res.json()) as SubmitResult & { error?: string }
-    if (!res.ok) throw new Error(data.error ?? `交卷失败：${res.status}`)
-    result.value = data
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
-  } finally {
-    submitting.value = false
   }
 }
 </script>
@@ -121,201 +177,311 @@ async function submit() {
       </RouterLink>
     </div>
 
-    <p
-      v-else-if="!graded"
-      class="hint"
-    >
-      共 {{ questions.length }} 题：客观题提交即判，简答题由 AI 批改（约 20 秒）。全部作答后交卷。
-    </p>
-
-    <template v-if="!notReady">
-      <div
-        v-for="(q, qi) in questions"
-        :key="q.id"
-        class="question"
-      >
-        <div class="question__head">
-          <span class="question__no">第 {{ qi + 1 }} 题</span>
-          <span class="question__type">{{ typeLabel(q) }}</span>
-          <span
-            v-if="graded"
-            class="question__verdict"
-            :class="
-              resultOf(q.id)?.correct === true || (resultOf(q.id)?.score ?? 0) >= 0.6
-                ? 'question__verdict--ok'
-                : 'question__verdict--bad'
-            "
-          >
-            <template v-if="q.type === 'short'">得分 {{ ((resultOf(q.id)?.score ?? 0) * 10).toFixed(0) }}/10</template>
-            <template v-else>{{ resultOf(q.id)?.correct ? '✓ 答对' : '✗ 答错' }}</template>
-          </span>
+    <template v-else>
+      <!-- 答题记录模式 -->
+      <template v-if="mode === 'review' && activeAttempt">
+        <div class="attempts-bar">
           <button
-            class="question__report"
-            @click="toggleReport(q.id)"
+            v-for="(a, i) in attempts"
+            :key="a.id"
+            class="attempt-pill"
+            :class="{ 'attempt-pill--on': i === activeIdx }"
+            @click="activeIdx = i"
           >
-            ⚠ 这里有错
+            第 {{ i + 1 }} 次 · {{ attemptSummary(a) }}
+            <span class="attempt-pill__time">{{ fmtTime(a.createdAt) }}</span>
           </button>
         </div>
 
         <div
-          v-if="reportingQid === q.id"
-          class="report-inline"
+          v-for="(item, qi) in reviewItems"
+          :key="item.q.id"
+          class="question"
         >
+          <div class="question__head">
+            <span class="question__no">第 {{ qi + 1 }} 题</span>
+            <span class="question__type">{{ typeLabel(item.q) }}</span>
+            <span
+              class="question__verdict"
+              :class="recordPassed(item.record) ? 'question__verdict--ok' : 'question__verdict--bad'"
+            >
+              <template v-if="item.q.type === 'short'">得分 {{ ((item.record?.result?.score ?? 0) * 10).toFixed(0) }}/10</template>
+              <template v-else>{{ item.record?.result?.correct ? '✓ 答对' : '✗ 答错' }}</template>
+            </span>
+            <button
+              class="question__report"
+              @click="toggleReport(item.q.id)"
+            >
+              ⚠ 这里有错
+            </button>
+          </div>
+
+          <div
+            v-if="reportingQid === item.q.id"
+            class="report-inline"
+          >
+            <textarea
+              v-model="reportNote"
+              rows="2"
+              placeholder="备注（可选）：题目哪里有问题？"
+            />
+            <button
+              class="btn btn--small"
+              @click="submitQuestionReport(item.q)"
+            >
+              提交报错
+            </button>
+          </div>
+
+          <MarkdownRenderer :content="item.q.prompt" />
+
+          <!-- 单选（只读回看） -->
+          <div
+            v-if="item.q.type === 'single' && item.q.options"
+            class="options"
+          >
+            <label
+              v-for="(opt, oi) in item.q.options"
+              :key="oi"
+              class="option"
+              :class="{ 'option--on': item.record?.userAnswer === 'ABCD'[oi] }"
+            >
+              <input
+                type="radio"
+                :name="`review-${activeAttempt.id}-${item.q.id}`"
+                :checked="item.record?.userAnswer === 'ABCD'[oi]"
+                disabled
+              >
+              <span class="option__letter">{{ 'ABCD'[oi] }}</span>
+              <MarkdownRenderer :content="opt" />
+            </label>
+          </div>
+
+          <!-- 判断（只读回看） -->
+          <div
+            v-else-if="item.q.type === 'judge'"
+            class="options"
+          >
+            <label
+              v-for="v in ['对', '错']"
+              :key="v"
+              class="option"
+              :class="{ 'option--on': item.record?.userAnswer === v }"
+            >
+              <input
+                type="radio"
+                :name="`review-${activeAttempt.id}-${item.q.id}`"
+                :checked="item.record?.userAnswer === v"
+                disabled
+              >
+              {{ v }}
+            </label>
+          </div>
+
+          <!-- 简答（只读回看） -->
           <textarea
-            v-model="reportNote"
-            rows="2"
-            placeholder="备注（可选）：题目哪里有问题？"
+            v-else
+            class="short-input"
+            rows="5"
+            :value="item.record?.userAnswer ?? ''"
+            disabled
           />
-          <button
-            class="btn btn--small"
-            @click="submitQuestionReport(q)"
-          >
-            提交报错
-          </button>
-        </div>
 
-        <MarkdownRenderer :content="q.prompt" />
-
-        <!-- 单选 -->
-        <div
-          v-if="q.type === 'single' && q.options"
-          class="options"
-        >
-          <label
-            v-for="(opt, oi) in q.options"
-            :key="oi"
-            class="option"
-            :class="{ 'option--on': answers[q.id] === 'ABCD'[oi] }"
-          >
-            <input
-              type="radio"
-              :name="q.id"
-              :value="'ABCD'[oi]"
-              :checked="answers[q.id] === 'ABCD'[oi]"
-              :disabled="graded"
-              @change="pick(q, 'ABCD'[oi])"
+          <div class="feedback">
+            <p
+              v-if="item.record?.result?.feedback"
+              class="feedback__comment"
             >
-            <span class="option__letter">{{ 'ABCD'[oi] }}</span>
-            <MarkdownRenderer :content="opt" />
-          </label>
+              <strong>批改评语：</strong>{{ item.record.result.feedback }}
+            </p>
+            <p v-if="item.q.answer">
+              <strong>正确答案：</strong>{{ item.q.answer }}
+            </p>
+            <div v-if="item.q.referenceAnswer">
+              <strong>参考答案：</strong>
+              <MarkdownRenderer :content="item.q.referenceAnswer" />
+            </div>
+            <div v-if="item.q.explanation">
+              <strong>讲解：</strong>
+              <MarkdownRenderer :content="item.q.explanation" />
+            </div>
+          </div>
         </div>
 
-        <!-- 判断 -->
-        <div
-          v-else-if="q.type === 'judge'"
-          class="options"
+        <section
+          v-if="activeAttempt.masteryChanges.length > 0"
+          class="mastery"
         >
-          <label
-            v-for="v in ['对', '错']"
-            :key="v"
-            class="option"
-            :class="{ 'option--on': answers[q.id] === v }"
-          >
-            <input
-              type="radio"
-              :name="q.id"
-              :value="v"
-              :checked="answers[q.id] === v"
-              :disabled="graded"
-              @change="pick(q, v)"
+          <h2>本次掌握分变化</h2>
+          <ul>
+            <li
+              v-for="c in activeAttempt.masteryChanges"
+              :key="c.nodeId"
             >
-            {{ v }}
-          </label>
-        </div>
+              <strong>{{ c.nodeName }}</strong>
+              {{ c.before }} → {{ c.after }}
+              <span
+                class="mastery__delta"
+                :class="c.delta >= 0 ? 'mastery__delta--up' : 'mastery__delta--down'"
+              >
+                ({{ c.delta >= 0 ? '+' : '' }}{{ c.delta }})
+              </span>
+              <span class="mastery__reason">因 {{ c.reason }}</span>
+            </li>
+          </ul>
+        </section>
 
-        <!-- 简答 -->
-        <textarea
-          v-else
-          class="short-input"
-          rows="5"
-          placeholder="写出你的推导/思路…"
-          :value="answers[q.id] ?? ''"
-          :disabled="graded"
-          @input="onShortInput(q, $event)"
-        />
-
-        <!-- 批改反馈 -->
-        <div
-          v-if="graded && result"
-          class="feedback"
-        >
+        <footer class="submit-bar">
           <p
-            v-if="resultOf(q.id)?.feedback"
-            class="feedback__comment"
+            v-if="error"
+            class="submit-bar__error"
           >
-            <strong>批改评语：</strong>{{ resultOf(q.id)?.feedback }}
+            {{ error }}
           </p>
-          <p v-if="result.revealed[q.id]?.answer">
-            <strong>正确答案：</strong>{{ result.revealed[q.id]?.answer }}
-          </p>
-          <div v-if="result.revealed[q.id]?.referenceAnswer">
-            <strong>参考答案：</strong>
-            <MarkdownRenderer :content="result.revealed[q.id].referenceAnswer!" />
+          <div class="mastery__actions">
+            <button
+              class="btn btn--primary"
+              :disabled="regenerating"
+              @click="retake"
+            >
+              {{ regenerating ? 'AI 出题中…' : '再次测验（生成新题）' }}
+            </button>
+            <RouterLink
+              to="/"
+              class="btn"
+            >
+              查看图谱变化
+            </RouterLink>
+            <RouterLink
+              to="/lesson/new"
+              class="btn"
+            >
+              开始下一课 →
+            </RouterLink>
           </div>
-          <div v-if="result.revealed[q.id]?.explanation">
-            <strong>讲解：</strong>
-            <MarkdownRenderer :content="result.revealed[q.id].explanation!" />
+        </footer>
+      </template>
+
+      <!-- 作答模式 -->
+      <template v-else>
+        <p class="hint">
+          共 {{ questions.length }} 题：客观题提交即判，简答题由 AI 批改（约 20 秒）。全部作答后交卷。
+          <a
+            v-if="attempts.length > 0"
+            class="hint__history"
+            href="javascript:void 0"
+            @click="backToReview"
+          >查看历史答题记录（{{ attempts.length }} 次）→</a>
+        </p>
+
+        <div
+          v-for="(q, qi) in questions"
+          :key="q.id"
+          class="question"
+        >
+          <div class="question__head">
+            <span class="question__no">第 {{ qi + 1 }} 题</span>
+            <span class="question__type">{{ typeLabel(q) }}</span>
+            <button
+              class="question__report"
+              @click="toggleReport(q.id)"
+            >
+              ⚠ 这里有错
+            </button>
           </div>
+
+          <div
+            v-if="reportingQid === q.id"
+            class="report-inline"
+          >
+            <textarea
+              v-model="reportNote"
+              rows="2"
+              placeholder="备注（可选）：题目哪里有问题？"
+            />
+            <button
+              class="btn btn--small"
+              @click="submitQuestionReport(q)"
+            >
+              提交报错
+            </button>
+          </div>
+
+          <MarkdownRenderer :content="q.prompt" />
+
+          <!-- 单选 -->
+          <div
+            v-if="q.type === 'single' && q.options"
+            class="options"
+          >
+            <label
+              v-for="(opt, oi) in q.options"
+              :key="oi"
+              class="option"
+              :class="{ 'option--on': answers[q.id] === 'ABCD'[oi] }"
+            >
+              <input
+                type="radio"
+                :name="q.id"
+                :value="'ABCD'[oi]"
+                :checked="answers[q.id] === 'ABCD'[oi]"
+                @change="pick(q, 'ABCD'[oi])"
+              >
+              <span class="option__letter">{{ 'ABCD'[oi] }}</span>
+              <MarkdownRenderer :content="opt" />
+            </label>
+          </div>
+
+          <!-- 判断 -->
+          <div
+            v-else-if="q.type === 'judge'"
+            class="options"
+          >
+            <label
+              v-for="v in ['对', '错']"
+              :key="v"
+              class="option"
+              :class="{ 'option--on': answers[q.id] === v }"
+            >
+              <input
+                type="radio"
+                :name="q.id"
+                :value="v"
+                :checked="answers[q.id] === v"
+                @change="pick(q, v)"
+              >
+              {{ v }}
+            </label>
+          </div>
+
+          <!-- 简答 -->
+          <textarea
+            v-else
+            class="short-input"
+            rows="5"
+            placeholder="写出你的推导/思路…"
+            :value="answers[q.id] ?? ''"
+            @input="onShortInput(q, $event)"
+          />
         </div>
-      </div>
-    </template>
 
-    <!-- 掌握分变化 -->
-    <section
-      v-if="graded && result"
-      class="mastery"
-    >
-      <h2>掌握分变化</h2>
-      <ul>
-        <li
-          v-for="c in result.masteryChanges"
-          :key="c.nodeId"
-        >
-          <strong>{{ c.nodeName }}</strong>
-          {{ c.before }} → {{ c.after }}
-          <span
-            class="mastery__delta"
-            :class="c.delta >= 0 ? 'mastery__delta--up' : 'mastery__delta--down'"
+        <footer class="submit-bar">
+          <p
+            v-if="error"
+            class="submit-bar__error"
           >
-            ({{ c.delta >= 0 ? '+' : '' }}{{ c.delta }})
-          </span>
-          <span class="mastery__reason">因 {{ c.reason }}</span>
-        </li>
-      </ul>
-      <div class="mastery__actions">
-        <RouterLink
-          to="/"
-          class="btn"
-        >
-          查看图谱变化
-        </RouterLink>
-        <RouterLink
-          to="/lesson/new"
-          class="btn btn--primary"
-        >
-          开始下一课 →
-        </RouterLink>
-      </div>
-    </section>
-
-    <footer
-      v-if="!graded && !notReady"
-      class="submit-bar"
-    >
-      <p
-        v-if="error"
-        class="submit-bar__error"
-      >
-        {{ error }}
-      </p>
-      <button
-        class="btn btn--primary"
-        :disabled="!allAnswered || submitting"
-        @click="submit"
-      >
-        {{ submitting ? '批改中…（简答题约 20 秒）' : '交卷' }}
-      </button>
-    </footer>
+            {{ error }}
+          </p>
+          <button
+            class="btn btn--primary"
+            :disabled="!allAnswered || submitting"
+            @click="submit"
+          >
+            {{ submitting ? '批改中…（简答题约 20 秒）' : '交卷' }}
+          </button>
+        </footer>
+      </template>
+    </template>
 
     <Teleport to="body">
       <div
@@ -348,6 +514,11 @@ async function submit() {
   color: var(--text-dim);
   font-size: 13px;
 }
+.hint__history {
+  color: #2563eb;
+  text-decoration: none;
+  margin-left: 8px;
+}
 .not-ready {
   padding: 14px 16px;
   border: 1px solid var(--border);
@@ -358,6 +529,31 @@ async function submit() {
 }
 .not-ready a {
   color: #1d4ed8;
+}
+.attempts-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 4px;
+}
+.attempt-pill {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+}
+.attempt-pill--on {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+.attempt-pill__time {
+  color: var(--text-dim);
+  margin-left: 4px;
+  font-size: 12px;
 }
 .question {
   border: 1px solid var(--border);
@@ -452,6 +648,9 @@ async function submit() {
   cursor: pointer;
   font-size: 14px;
 }
+.option:has(input:disabled) {
+  cursor: default;
+}
 .option--on {
   border-color: #3b82f6;
   background: #eff6ff;
@@ -468,6 +667,10 @@ async function submit() {
   border: 1px solid var(--border);
   border-radius: 8px;
   resize: vertical;
+}
+.short-input:disabled {
+  background: #f8fafc;
+  color: var(--text);
 }
 .feedback {
   margin-top: 14px;

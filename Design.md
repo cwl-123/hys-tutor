@@ -163,10 +163,12 @@ self-check  对照研究笔记自查一遍：无来源支撑的断言标记/修�
 }
 ```
 
-### 3.5 attempts/<lessonId>.json — 答题与批改记录
+### 3.5 attempts/<lessonId>.json — 答题与批改记录（数组，每次交卷追加一条）
 ```jsonc
-{
+[{
+  "id": "a_001",
   "lessonId": "l_001",
+  "questions": [/* 题目快照，含 answer/referenceAnswer/explanation，回看用 */],
   "records": [{
     "questionId": "q_1",
     "userAnswer": "B" | "简答文本",
@@ -178,9 +180,12 @@ self-check  对照研究笔记自查一遍：无来源支撑的断言标记/修�
     },
     "submittedAt": "..."
   }],
-  "status": "in_progress" | "submitted" | "graded"
-}
+  "masteryChanges": [/* 本次掌握分变化（nodeId/nodeName/before/after/delta/reason） */],
+  "status": "graded",
+  "createdAt": "..."
+}]
 ```
+兼容旧版单对象格式（读取时自动包装为数组并回填题目快照）。「再次测验」生成新题集后交卷即追加新记录，互不覆盖。
 
 ### 3.6 mastery-log.json — 掌握分变更流水（append-only）
 ```jsonc
@@ -224,10 +229,10 @@ self-check  对照研究笔记自查一遍：无来源支撑的断言标记/修�
 ```
 
 ### 掌握分算法规则（mastery-service，MVP 版）
-- 客观题：答对 +10，答错 -8（clamp 到 0~100）
-- 简答题：`delta = round((score - 0.6) * 25)`，即 0.6 分及格线，满分 +10、零分 -15
-- 每次课程完成（3 题全部批改后）额外结算；所有变更写 MasteryLog
-- 阈值（10/8/25/0.6）集中在一个 constants 文件，便于调参
+- 客观题：答对 +15，答错 -5（clamp 到 0~100）
+- 简答题：`delta = round((score - 0.5) * 30)`，即 0.5 分及格线，满分 +15、零分 -15
+- 每次课程完成（3 题全部批改后）额外结算；所有变更写 MasteryLog；delta 为 0 的题也保留原因留痕
+- 阈值（15/5/30/0.5）集中在一个 constants 文件（shared/mastery.ts），便于调参
 
 ## 4. API 设计
 
@@ -241,7 +246,9 @@ self-check  对照研究笔记自查一遍：无来源支撑的断言标记/修�
 | GET | /api/topics/:id/lessons | 课程列表（挂到知识点节点，不含正文） |
 | POST | /api/topics/:id/lessons | 排课 + 备课 Agent，SSE：`stage(schedule/research/outline/write/self-check/done)` + 阶段详情（搜索 query、命中来源）+ 课程流式内容 |
 | GET | /api/lessons/:id | 课程 + 题目（题目不含 answer/explanation，防前端偷看） |
-| POST | /api/lessons/:id/submit | 交卷：客观题本地秒判 + 简答 LLM 批改，同步返回判分/评语/掌握分变化/MasteryLog/答案揭示 |
+| POST | /api/lessons/:id/submit | 交卷：客观题本地秒判 + 简答 LLM 批改，同步返回判分/评语/掌握分变化/MasteryLog/答案揭示；可多次交卷（配合再次测验），每次追加一条 attempt |
+| GET | /api/lessons/:id/attempts | 该课全部测验记录（含题目快照/作答/批改/掌握分变化，升序） |
+| POST | /api/lessons/:id/questions/regenerate | 再次测验：LLM 围绕本课知识点重新出一套新题（避开历史题目），覆盖当前题集（写 generatedAt 供交卷乐观并发校验） |
 | GET | /api/topics/:id/mastery-log | 掌握分变更历史 |
 | POST | /api/reports | 报错标记（课程划词 / 题目） |
 | GET | /api/topics/:id/reports | 报错记录列表 |

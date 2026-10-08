@@ -24,11 +24,10 @@ export async function applyMasteryChanges(
   const graph = await readJson<Graph | null>(graphFile, null)
   if (!graph) throw new Error('图谱不存在')
 
-  // 同节点多题变更先聚合
+  // 同节点多题变更先聚合；delta 为 0 也保留原因，保证每题都留痕
   const acc = new Map<string, { delta: number; reasons: string[] }>()
   for (const e of entries) {
     const d = masteryDelta(e.deltaInput)
-    if (d === 0) continue
     const cur = acc.get(e.nodeId) ?? { delta: 0, reasons: [] }
     cur.delta += d
     cur.reasons.push(e.reason)
