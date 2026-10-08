@@ -42,6 +42,10 @@ async function saveMermaidEdit() {
   const lesson = lessonStore.lesson
   if (!edit || !lesson) return
   opError.value = null
+  if (!edit.draft.trim()) {
+    opError.value = '图表代码不能为空'
+    return
+  }
   const next = replaceMermaidBlock(lesson.contentMd, edit.code, edit.draft)
   if (next == null) {
     opError.value = '未找到对应的图表代码块，请刷新页面后重试'

@@ -9,5 +9,5 @@
       "@shared/*": ["./shared/*"]
     }
   },
-  "include": ["server/**/*.ts", "shared/**/*.ts", "vite.config.ts", "tests/**/*.ts", "scripts/**/*.ts"]
+  "include": ["server/**/*.ts", "shared/**/*.ts", "vite.config.ts", "tests/**/*.ts", "scripts/**/*.ts", "src/utils/mermaid-render.ts"]
 }

@@ -3,6 +3,7 @@ import { computed, nextTick, ref, watch } from 'vue'
 import MarkdownIt from 'markdown-it'
 import markdownKatex from '@traptitech/markdown-it-katex'
 import { codeToHtml } from 'shiki'
+import { renderMermaid } from '@/utils/mermaid-render'
 import 'katex/dist/katex.min.css'
 
 const props = defineProps<{ content: string; editable?: boolean }>()
@@ -39,34 +40,7 @@ md.renderer.rules.image = (tokens, idx, options, env, self) => {
 const container = ref<HTMLElement | null>(null)
 const html = computed(() => md.render(props.content))
 
-// ---------- Mermaid：懒加载 + 按代码文本缓存（流式输出期间不重复渲染） ----------
-type MermaidApi = typeof import('mermaid').default
-let mermaidApi: MermaidApi | null = null
-let mermaidSeq = 0
-const mermaidCache = new Map<string, string>()
-
-async function renderMermaid(code: string): Promise<string | null> {
-  const cached = mermaidCache.get(code)
-  if (cached) return cached
-  try {
-    if (!mermaidApi) {
-      mermaidApi = (await import('mermaid')).default
-      mermaidApi.initialize({
-        startOnLoad: false,
-        securityLevel: 'antiscript',
-        theme: 'neutral',
-        suppressErrorRendering: true,
-      })
-    }
-    const { svg } = await mermaidApi.render(`hys-mmd-${++mermaidSeq}`, code)
-    mermaidCache.set(code, svg)
-    return svg
-  } catch {
-    // 语法错误（流式未闭合/画错图）保留代码块原样
-    return null
-  }
-}
-
+// Mermaid 渲染走模块级单例（懒加载 + 缓存见 utils/mermaid-render.ts）
 function mountMermaid(pre: HTMLPreElement, code: string, svg: string) {
   const wrap = document.createElement('div')
   wrap.className = 'mermaid-diagram'
