@@ -50,7 +50,11 @@ export function repairJson(raw: string): string {
       continue
     }
     if (c !== '"') {
-      out += c
+      // 字符串内出现未转义的换行/制表符是常见非法 JSON（长 markdown 尤甚），转义兜底
+      if (c === '\n') out += '\\n'
+      else if (c === '\r') out += '\\r'
+      else if (c === '\t') out += '\\t'
+      else out += c
       continue
     }
     let j = i + 1
@@ -126,4 +130,24 @@ export async function completeJson<T>(opts: {
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error('LLM JSON 输出校验失败')
+}
+
+// 单轮纯文本完成：用于长 markdown 生成（不经 JSON，避免长文本转义损坏）
+export async function completeText(opts: {
+  system: string
+  prompt: string
+  temperature?: number
+}): Promise<string> {
+  const llm = getLLM()
+  const res = await llm.chat.completions.create({
+    model: getLLMModel(),
+    messages: [
+      { role: 'system', content: opts.system },
+      { role: 'user', content: opts.prompt },
+    ],
+    temperature: opts.temperature ?? 0.5,
+  })
+  const text = res.choices[0]?.message?.content ?? ''
+  if (!text.trim()) throw new Error('LLM 未返回内容')
+  return text
 }

@@ -1,14 +1,18 @@
 import { dataPath, newId, nowIso, readJson, writeJson } from '../repo/json-store'
-import { completeJson } from '../llm/client'
+import { completeJson, completeText } from '../llm/client'
 import {
-  LESSON_CHAT_SYSTEM_PROMPT,
-  lessonChatUserPrompt,
-  llmLessonEditSchema,
+  LESSON_PLAN_SYSTEM_PROMPT,
+  LESSON_REWRITE_SYSTEM_PROMPT,
+  LESSON_SECTION_EDIT_SYSTEM_PROMPT,
+  lessonPlanUserPrompt,
+  lessonRewritePrompt,
+  lessonSectionEditPrompt,
+  llmLessonPlanSchema,
 } from '../llm/prompts/lesson-chat'
 import { readResearchNote } from '../agent/tools/notes'
 import { getGraph } from './graph-service'
 import { findLesson, type LessonDetail } from './lesson-service'
-import { listHeadings, replaceSection } from '../../shared/lesson-md'
+import { findSectionByHeading, listHeadings, replaceSection } from '../../shared/lesson-md'
 import type {
   LessonChatMessage,
   LessonQuote,
@@ -62,7 +66,15 @@ async function requireGenerated(lessonId: string): Promise<LessonDetail> {
   return detail
 }
 
+// 去掉模型可能整体包裹的 ``` 围栏
+function stripFences(text: string): string {
+  const trimmed = text.trim()
+  const m = trimmed.match(/^```[a-zA-Z]*\s*\n([\s\S]*?)\n```$/)
+  return (m ? m[1] : trimmed).trim()
+}
+
 // 基于当前课件 + 研究笔记 + 用户诉求，产出一处修改建议（不落盘）
+// 两步：先 JSON 分类（短文本，可靠），再纯文本生成正文（长 markdown，避免 JSON 转义损坏）
 async function computeEdit(
   detail: LessonDetail,
   input: { message: string; quote?: LessonQuote; history: { role: 'user' | 'assistant'; content: string }[] },
@@ -72,48 +84,83 @@ async function computeEdit(
   const graph = await getGraph(topic.id)
   const node = graph?.nodes.find((n) => n.id === nodeId)
   const note = nodeId ? await readResearchNote(topic.id, nodeId) : null
+  const noteJson = note ? JSON.stringify(note, null, 2) : '（无研究笔记）'
+  const sources = lesson.sources.map((s) => `[${s.idx}] ${s.title} ${s.url}`).join('\n') || '（无来源）'
+  const headings = listHeadings(lesson.contentMd)
 
-  const result = await completeJson({
-    system: LESSON_CHAT_SYSTEM_PROMPT,
-    prompt: lessonChatUserPrompt({
+  const plan = await completeJson({
+    system: LESSON_PLAN_SYSTEM_PROMPT,
+    prompt: lessonPlanUserPrompt({
       topicName: topic.name,
       nodeName: node?.name ?? nodeId ?? '本课',
       contentMd: lesson.contentMd,
-      headings: listHeadings(lesson.contentMd),
-      noteJson: note ? JSON.stringify(note, null, 2) : '（无研究笔记）',
-      sources: lesson.sources.map((s) => `[${s.idx}] ${s.title} ${s.url}`).join('\n') || '（无来源）',
+      headings,
+      noteJson,
+      sources,
       quote: input.quote,
       message: input.message,
       history: input.history,
     }),
-    schema: llmLessonEditSchema,
-    temperature: 0.4,
+    schema: llmLessonPlanSchema,
+    temperature: 0.3,
   })
 
-  const action = result.action
-  if (!action || action.type === 'none') return { reply: result.reply }
+  if (plan.scope === 'none') return { reply: plan.reply }
 
-  if (action.type === 'rewrite_all') {
+  if (plan.scope === 'section') {
+    const target = plan.targetHeading?.trim()
+    const section = target ? findSectionByHeading(lesson.contentMd, target) : null
+    if (!section?.heading) {
+      return {
+        reply: `${plan.reply}\n（未能确定要改的章节，请点「改本节」或直接选中要改的段落再引用一次）`,
+      }
+    }
+    const revised = await completeText({
+      system: LESSON_SECTION_EDIT_SYSTEM_PROMPT,
+      prompt: lessonSectionEditPrompt({
+        topicName: topic.name,
+        nodeName: node?.name ?? nodeId ?? '本课',
+        contentMd: lesson.contentMd,
+        targetHeading: section.heading,
+        noteJson,
+        sources,
+        quote: input.quote,
+        message: input.message,
+      }),
+      temperature: 0.5,
+    })
+    const nextContent = replaceSection(lesson.contentMd, section.heading, stripFences(revised))
+    if (nextContent === null) return { reply: plan.reply }
     return {
-      reply: result.reply,
-      proposal: { contentMd: action.revisedMd.trim(), scope: 'full', summary: action.summary },
+      reply: plan.reply,
+      proposal: {
+        contentMd: nextContent,
+        scope: 'section',
+        targetHeading: section.heading,
+        summary: plan.summary?.trim() || `修订「${section.heading}」`,
+      },
     }
   }
 
-  // edit_section：按标题定位并整节替换
-  const nextContent = replaceSection(lesson.contentMd, action.targetHeading, action.revisedMd)
-  if (nextContent === null) {
-    return {
-      reply: `${result.reply}\n（未能在课件中定位到章节「${action.targetHeading}」，请换个说法或直接粘贴要改的段落）`,
-    }
-  }
+  // full：整篇重写
+  const revised = await completeText({
+    system: LESSON_REWRITE_SYSTEM_PROMPT,
+    prompt: lessonRewritePrompt({
+      topicName: topic.name,
+      nodeName: node?.name ?? nodeId ?? '本课',
+      contentMd: lesson.contentMd,
+      noteJson,
+      sources,
+      message: input.message,
+    }),
+    temperature: 0.55,
+  })
   return {
-    reply: result.reply,
+    reply: plan.reply,
     proposal: {
-      contentMd: nextContent,
-      scope: 'section',
-      targetHeading: action.targetHeading,
-      summary: action.summary,
+      contentMd: stripFences(revised),
+      scope: 'full',
+      summary: plan.summary?.trim() || '整篇重写',
     },
   }
 }
