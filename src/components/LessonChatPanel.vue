@@ -93,13 +93,22 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onEsc))
 async function send() {
   const message = input.value.trim()
   if (!message || loading.value) return
+  const quote = pendingQuote.value ?? undefined
   error.value = null
   loading.value = true
+  // 乐观上屏：立即显示用户气泡并清空输入框（否则等待 LLM 期间像"没发出去"）
+  const tempId = `tmp_${Date.now()}`
+  messages.value = [
+    ...messages.value,
+    { id: tempId, role: 'user', content: message, quote, applied: false, createdAt: new Date().toISOString() },
+  ]
+  input.value = ''
+  pendingQuote.value = null
   try {
     const res = await fetch(`/api/lessons/${props.lessonId}/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, quote: pendingQuote.value ?? undefined }),
+      body: JSON.stringify({ message, quote }),
     })
     const data = (await res.json()) as {
       messages?: LessonChatMessage[]
@@ -109,9 +118,11 @@ async function send() {
     if (!res.ok) throw new Error(data.error ?? `请求失败：${res.status}`)
     messages.value = data.messages ?? messages.value
     versions.value = data.versions ?? versions.value
-    input.value = ''
-    pendingQuote.value = null
   } catch (err) {
+    // 回滚乐观消息，恢复输入内容便于重试
+    messages.value = messages.value.filter((m) => m.id !== tempId)
+    input.value = message
+    pendingQuote.value = quote ?? null
     error.value = err instanceof Error ? err.message : String(err)
   } finally {
     loading.value = false
