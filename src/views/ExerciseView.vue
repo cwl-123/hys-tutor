@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { useLessonStore } from '@/stores/lesson'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import { submitReport } from '@/utils/report'
+import { MASTERY_UNLOCK_THRESHOLD } from '@shared/types'
 import type { AnswerRecord, Attempt, Question } from '@shared/types'
 
 const route = useRoute()
@@ -77,6 +78,13 @@ function attemptSummary(a: Attempt): string {
   const passed = a.records.filter((r) => recordPassed(r)).length
   return `达标 ${passed}/${a.records.length}`
 }
+
+// 未解锁知识点的差距提示：让用户知道还差多少、怎么补
+const unlockHints = computed(() =>
+  (activeAttempt.value?.masteryChanges ?? [])
+    .filter((c) => c.after < MASTERY_UNLOCK_THRESHOLD)
+    .map((c) => ({ nodeName: c.nodeName, gap: MASTERY_UNLOCK_THRESHOLD - c.after })),
+)
 
 async function retake() {
   if (regenerating.value) return
@@ -329,6 +337,13 @@ async function submitQuestionReport(q: Question) {
               <span class="mastery__reason">因 {{ c.reason }}</span>
             </li>
           </ul>
+          <p
+            v-for="h in unlockHints"
+            :key="h.nodeName"
+            class="mastery__hint"
+          >
+            「{{ h.nodeName }}」距解锁（{{ MASTERY_UNLOCK_THRESHOLD }} 分）还差 {{ h.gap }} 分，可点下方「再次测验」继续提分
+          </p>
         </section>
 
         <footer class="submit-bar">
@@ -705,6 +720,11 @@ async function submitQuestionReport(q: Question) {
   color: var(--text-dim);
   font-size: 13px;
   margin-left: 6px;
+}
+.mastery__hint {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: #b45309;
 }
 .mastery__actions {
   margin-top: 14px;
