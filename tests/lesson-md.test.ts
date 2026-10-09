@@ -46,6 +46,13 @@ describe('parseSections', () => {
     const sections = parseSections(md)
     expect(sections.map((s) => s.raw).join('\n')).toBe(md)
   })
+
+  it('正文直接以 ## 开头时不产生重复全文的伪前言段', () => {
+    const noPreamble = '## 开场\n先讲背景。\n\n## 第二节\n继续讲。'
+    const sections = parseSections(noPreamble)
+    expect(sections.map((s) => s.heading)).toEqual(['开场', '第二节'])
+    expect(sections.map((s) => s.raw).join('\n')).toBe(noPreamble)
+  })
 })
 
 describe('replaceSection', () => {

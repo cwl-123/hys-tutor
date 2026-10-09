@@ -24,6 +24,10 @@ export function parseSections(md: string): LessonSection[] {
   let inFence = false
 
   const flush = (endLine: number): void => {
+    // 正文以 ## 开头时首个 flush 的 endLine 等于 startLine（0），
+    // 若继续算 end = lineStart[0]-1 = -1，md.slice(0,-1) 会产出「几乎全文」的伪前言段，
+    // 与各真实章节重复渲染，故此处直接跳过空区间
+    if (endLine <= startLine) return
     const start = lineStart[startLine] ?? 0
     const end = endLine >= lines.length ? md.length : lineStart[endLine] - 1
     const raw = md.slice(start, end)
