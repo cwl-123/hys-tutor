@@ -511,7 +511,7 @@ function quoteLabel(q?: LessonQuote | null): string {
 .chat__empty {
   background: #fff;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--r-md);
   padding: 16px;
   margin-top: 8px;
 }
@@ -540,7 +540,7 @@ function quoteLabel(q?: LessonQuote | null): string {
   font-size: 12px;
   padding: 5px 12px;
   border: 1px solid var(--primary-border);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--primary-bg);
   color: var(--primary-hover);
   cursor: pointer;
@@ -574,7 +574,7 @@ function quoteLabel(q?: LessonQuote | null): string {
   font-size: 11px;
   color: var(--text-dim);
   background: var(--bg-muted);
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   padding: 3px 8px;
   margin-bottom: 6px;
 }
@@ -617,7 +617,7 @@ function quoteLabel(q?: LessonQuote | null): string {
   margin-top: 10px;
   background: var(--bg-subtle);
   border: 1px solid var(--primary-border);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
@@ -634,7 +634,7 @@ function quoteLabel(q?: LessonQuote | null): string {
   font-weight: 600;
   color: var(--primary-hover);
   background: var(--primary-bg-strong);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 2px 9px;
 }
 .msg__summary {
@@ -658,7 +658,7 @@ function quoteLabel(q?: LessonQuote | null): string {
   font-size: 12px;
   color: var(--mastery-red);
   background: var(--red-bg);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
 }
 .chat__quote {
   display: flex;
@@ -671,7 +671,7 @@ function quoteLabel(q?: LessonQuote | null): string {
   color: var(--primary-hover);
   background: var(--primary-bg);
   border: 1px solid var(--primary-border);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
 }
 .chat__quote-label {
   overflow: hidden;
@@ -700,7 +700,7 @@ function quoteLabel(q?: LessonQuote | null): string {
   gap: 8px;
   padding: 8px 8px 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: #fff;
   transition: border-color 0.15s;
 }
@@ -718,6 +718,9 @@ function quoteLabel(q?: LessonQuote | null): string {
   line-height: 1.6;
   max-height: 120px;
   background: transparent;
+}
+.chat__inputbox textarea:focus-visible {
+  box-shadow: none;
 }
 .chat__send {
   flex-shrink: 0;

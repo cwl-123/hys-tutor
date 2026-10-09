@@ -434,7 +434,7 @@ async function deleteLesson(lessonId: string) {
   color: var(--text-dim);
   cursor: pointer;
   padding: 2px;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
 }
 .done-toast__close:hover {
   color: var(--text);

@@ -205,7 +205,7 @@ function applyProposal(msg: ChatMsg) {
   cursor: pointer;
   color: var(--text-dim);
   padding: 4px;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   transition:
     color var(--dur-fast) var(--ease),
     background var(--dur-fast) var(--ease);
@@ -291,7 +291,7 @@ function applyProposal(msg: ChatMsg) {
   font-size: 12px;
   color: var(--primary-hover);
   background: var(--primary-bg);
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   padding: 4px 8px;
 }
 .msg__apply {

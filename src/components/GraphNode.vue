@@ -67,15 +67,18 @@ const level = computed(() => masteryLevel(props.data.node.mastery))
 .knode {
   width: 190px;
   padding: 10px 14px;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   border: 1px solid var(--border);
   border-left: 4px solid var(--border);
-  background: #fff;
-  box-shadow: 0 1px 3px rgb(var(--ink-rgb) / 6%);
-  transition: box-shadow 0.15s;
+  background: var(--bg);
+  box-shadow: var(--shadow-sm);
+  transition:
+    box-shadow var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
 }
 .knode:hover {
-  box-shadow: 0 4px 12px rgb(var(--ink-rgb) / 10%);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
 }
 .knode--red {
   border-left-color: var(--mastery-red);

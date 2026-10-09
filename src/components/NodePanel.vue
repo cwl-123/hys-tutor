@@ -194,9 +194,9 @@ function confirmDelete(id: string) {
 
 <style scoped>
 .panel {
-  width: 320px;
+  width: 340px;
   border-left: 1px solid var(--border);
-  background: #fff;
+  background: var(--bg);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -226,7 +226,7 @@ function confirmDelete(id: string) {
   cursor: pointer;
   color: var(--text-dim);
   padding: 4px;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   transition:
     color var(--dur-fast) var(--ease),
     background var(--dur-fast) var(--ease);
@@ -266,7 +266,7 @@ function confirmDelete(id: string) {
 .mastery__level {
   font-size: 12px;
   padding: 2px 10px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
 }
 .mastery__level--red {
   background: var(--red-bg);
@@ -314,7 +314,7 @@ function confirmDelete(id: string) {
 .dep-chip {
   font-size: 12px;
   padding: 3px 10px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--bg-muted);
   color: var(--text-secondary);
 }
@@ -328,7 +328,7 @@ function confirmDelete(id: string) {
   align-items: center;
   gap: 6px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   padding: 7px 10px;
 }
 .lesson-item:hover {
@@ -375,7 +375,7 @@ function confirmDelete(id: string) {
   cursor: pointer;
   color: var(--text-dim);
   padding: 4px;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   opacity: 0;
   transition:
     opacity var(--dur-fast) var(--ease),

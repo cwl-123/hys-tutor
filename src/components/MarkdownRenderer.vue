@@ -118,8 +118,9 @@ watch(html, () => void enhanceCodeBlocks(), { immediate: true })
 }
 .md-body :deep(pre) {
   background: var(--bg-subtle);
-  padding: 12px;
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  padding: 14px 16px;
+  border-radius: var(--r-md);
   overflow-x: auto;
   font-size: 13px;
 }
@@ -144,7 +145,11 @@ watch(html, () => void enhanceCodeBlocks(), { immediate: true })
 .md-body :deep(th),
 .md-body :deep(td) {
   border: 1px solid var(--border);
-  padding: 5px 10px;
+  padding: 6px 12px;
+}
+.md-body :deep(th) {
+  background: var(--bg-subtle);
+  font-weight: 600;
 }
 .md-body :deep(a) {
   color: var(--primary-strong);
@@ -156,7 +161,7 @@ watch(html, () => void enhanceCodeBlocks(), { immediate: true })
 .md-body :deep(.md-figure img) {
   max-width: 100%;
   height: auto;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   border: 1px solid var(--border);
 }
 .md-body :deep(.md-figure figcaption) {
@@ -170,7 +175,7 @@ watch(html, () => void enhanceCodeBlocks(), { immediate: true })
   padding: 16px;
   background: #fff;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   overflow-x: auto;
   text-align: center;
 }
@@ -187,7 +192,7 @@ watch(html, () => void enhanceCodeBlocks(), { immediate: true })
   color: var(--text-dim);
   background: #fff;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.15s;

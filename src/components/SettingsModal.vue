@@ -547,7 +547,7 @@ async function save() {
   cursor: pointer;
   color: var(--text-dim);
   padding: 4px;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   transition:
     color var(--dur-fast) var(--ease),
     background var(--dur-fast) var(--ease);
@@ -562,7 +562,7 @@ async function save() {
   color: var(--text-dim);
   background: var(--bg-subtle);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   padding: 8px 12px;
 }
 .modal__effective strong {
@@ -582,7 +582,7 @@ async function save() {
   align-items: center;
   gap: 10px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   padding: 10px 12px;
   cursor: pointer;
 }
@@ -608,7 +608,7 @@ async function save() {
   flex-direction: column;
   gap: 6px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   padding: 10px;
   background: var(--bg-subtle);
 }
@@ -622,7 +622,7 @@ async function save() {
   align-items: center;
   gap: 10px;
   padding: 6px 8px;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: #fff;
   border: 1px solid var(--border);
 }
@@ -717,7 +717,7 @@ async function save() {
   cursor: pointer;
   color: var(--text-dim);
   padding: 5px;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   transition:
     color var(--dur-fast) var(--ease),
     background var(--dur-fast) var(--ease);
@@ -728,7 +728,7 @@ async function save() {
 }
 .edit {
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   padding: 14px;
   display: flex;
   flex-direction: column;
@@ -754,7 +754,7 @@ async function save() {
   font-size: 13px;
   padding: 8px 10px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
 }
 .field input:focus {
   outline: none;

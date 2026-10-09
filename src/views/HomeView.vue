@@ -265,6 +265,10 @@ function fmtRelative(iso: string): string {
   line-height: 1.25;
   letter-spacing: -0.5px;
   font-weight: 700;
+  background: linear-gradient(120deg, var(--text) 30%, var(--primary-hover));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 .hero__sub {
   margin: 18px 0 0;
@@ -273,11 +277,11 @@ function fmtRelative(iso: string): string {
   color: var(--text-dim);
 }
 .create {
-  background: #fff;
+  background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--r-lg);
   padding: 26px 28px;
-  box-shadow: 0 8px 30px rgb(var(--ink-rgb) / 6%);
+  box-shadow: var(--shadow-lg);
 }
 .create__name {
   width: 100%;
@@ -285,13 +289,15 @@ function fmtRelative(iso: string): string {
   font-size: 16px;
   padding: 12px 16px;
   border: 1px solid var(--border);
-  border-radius: 10px;
-  transition: border-color 0.15s;
+  border-radius: var(--r-md);
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 .create__name:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgb(var(--primary-rgb) / 12%);
+  box-shadow: var(--ring-primary);
 }
 .create__guide {
   margin-top: 18px;
@@ -319,21 +325,24 @@ function fmtRelative(iso: string): string {
   font: inherit;
   font-size: 13px;
   padding: 5px 14px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--bg);
   color: var(--text);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--dur-fast) var(--ease);
 }
-.chip:hover {
+.chip:hover:not(:disabled) {
   border-color: var(--primary-soft);
+  color: var(--primary-hover);
 }
-.chip--on {
+.chip--on,
+.chip--on:hover:not(:disabled) {
   border-color: var(--primary);
   background: var(--primary-bg);
   color: var(--primary-hover);
   font-weight: 500;
+  box-shadow: 0 0 0 3px rgb(var(--primary-rgb) / 8%);
 }
 .create__extra {
   width: 100%;
@@ -341,13 +350,14 @@ function fmtRelative(iso: string): string {
   font-size: 13px;
   padding: 9px 14px;
   border: 1px dashed var(--border);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   color: var(--text);
 }
 .create__extra:focus {
   outline: none;
   border-color: var(--primary);
   border-style: solid;
+  box-shadow: var(--ring-primary);
 }
 .create__footer {
   margin-top: 20px;
@@ -372,7 +382,7 @@ function fmtRelative(iso: string): string {
   font-weight: 600;
   padding: 11px 26px;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--text);
   color: #fff;
   cursor: pointer;
@@ -381,7 +391,8 @@ function fmtRelative(iso: string): string {
     transform var(--dur-fast) var(--ease);
 }
 .create__submit:hover:not(:disabled) {
-  opacity: 0.85;
+  opacity: 0.92;
+  transform: translateY(-1px);
 }
 .create__submit:disabled {
   opacity: 0.4;
@@ -393,7 +404,7 @@ function fmtRelative(iso: string): string {
   align-items: center;
   gap: 12px;
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--primary-bg);
   border: 1px solid var(--primary-border);
 }
@@ -459,14 +470,15 @@ function fmtRelative(iso: string): string {
   flex-direction: column;
   gap: 12px;
   padding: 22px 24px;
-  background: #fff;
+  background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
   text-decoration: none;
   transition:
-    transform 0.15s,
-    box-shadow 0.15s,
-    border-color 0.15s;
+    transform var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
 }
 .card:hover {
   transform: translateY(-2px);
@@ -524,7 +536,7 @@ function fmtRelative(iso: string): string {
 .tag {
   font-size: 11px;
   padding: 2px 10px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--bg-muted);
   color: var(--text-secondary);
 }
@@ -558,7 +570,7 @@ function fmtRelative(iso: string): string {
   color: var(--text-dim);
   font-size: 14px;
   border: 1px dashed var(--border);
-  border-radius: 14px;
+  border-radius: var(--r-lg);
 }
 
 @media (max-width: 900px) {

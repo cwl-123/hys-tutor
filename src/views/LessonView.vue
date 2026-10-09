@@ -514,7 +514,7 @@ onUnmounted(() => {
       <footer class="lesson__footer">
         <RouterLink
           :to="`/lesson/${lessonStore.lesson.id}/exercise`"
-          class="btn btn--primary"
+          class="btn btn--primary btn--lg"
         >
           去随堂练习（{{ lessonStore.questions.length }} 题）
         </RouterLink>
@@ -643,14 +643,14 @@ onUnmounted(() => {
 .progress__bar {
   margin-top: 20px;
   height: 8px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--bg-muted);
   overflow: hidden;
 }
 .progress__bar-fill {
   display: block;
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: linear-gradient(90deg, var(--primary), var(--mastery-green));
   transition: width 0.4s ease;
 }
@@ -681,7 +681,7 @@ onUnmounted(() => {
   color: var(--text-dim);
   padding: 5px 12px 5px 6px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: #fff;
 }
 .progress__steps li.is-done {
@@ -734,7 +734,7 @@ onUnmounted(() => {
 .progress__log {
   margin-top: 14px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--bg-subtle);
   font-size: 13px;
 }
@@ -790,7 +790,7 @@ onUnmounted(() => {
   color: var(--green-hover);
   cursor: pointer;
   padding: 2px;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
 }
 .lesson__done-close:hover {
   background: var(--green-border);
@@ -811,11 +811,11 @@ onUnmounted(() => {
 }
 .lesson__reason {
   font-size: 13px;
-  color: var(--text-dim);
-  background: var(--bg-subtle);
+  color: var(--text-secondary);
+  background: var(--primary-bg);
   border-left: 3px solid var(--primary);
-  padding: 8px 12px;
-  border-radius: 0 6px 6px 0;
+  padding: 10px 14px;
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
 }
 .lesson__actions {
   margin-top: 12px;
@@ -846,7 +846,7 @@ onUnmounted(() => {
   line-height: 1.7;
   padding: 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   resize: vertical;
   tab-size: 2;
 }
@@ -883,7 +883,7 @@ onUnmounted(() => {
   line-height: 1.7;
   padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   resize: vertical;
 }
 .mermaid-modal__preview {
@@ -893,7 +893,7 @@ onUnmounted(() => {
   overflow: auto;
   padding: 10px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: var(--bg-subtle);
 }
 .revise-modal {
@@ -921,7 +921,7 @@ onUnmounted(() => {
   font-size: 14px;
   padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   resize: vertical;
 }
 .revise-modal__actions {

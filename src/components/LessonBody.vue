@@ -123,7 +123,7 @@ onBeforeUnmount(() => window.removeEventListener('scroll', clearTip, true))
   font-size: 12px;
   padding: 2px 8px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   background: #fff;
   color: var(--text-dim);
   cursor: pointer;

@@ -562,7 +562,7 @@ async function submitQuestionReport(q: Question) {
             {{ error }}
           </p>
           <button
-            class="btn btn--primary"
+            class="btn btn--primary btn--lg"
             :disabled="!allAnswered || submitting"
             @click="submit"
           >
@@ -614,7 +614,7 @@ async function submitQuestionReport(q: Question) {
 .not-ready {
   padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--amber-bg);
   color: var(--amber-text);
   font-size: 14px;
@@ -633,10 +633,16 @@ async function submitQuestionReport(q: Question) {
   font-size: 13px;
   padding: 6px 12px;
   border: 1px solid var(--border);
-  border-radius: 999px;
-  background: #fff;
+  border-radius: var(--r-pill);
+  background: var(--bg);
   color: var(--text);
   cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
+}
+.attempt-pill:hover {
+  border-color: var(--primary-soft);
 }
 .attempt-pill--on {
   border-color: var(--primary);
@@ -649,9 +655,10 @@ async function submitQuestionReport(q: Question) {
 }
 .question {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--r-md);
   padding: 18px 20px;
   margin: 16px 0;
+  box-shadow: var(--shadow-sm);
 }
 .question__head {
   display: flex;
@@ -667,7 +674,7 @@ async function submitQuestionReport(q: Question) {
   color: var(--text-dim);
   border: 1px solid var(--border);
   padding: 1px 8px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
 }
 .question__verdict {
   margin-left: auto;
@@ -736,10 +743,16 @@ async function submitQuestionReport(q: Question) {
   align-items: flex-start;
   gap: 8px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   padding: 8px 12px;
   cursor: pointer;
   font-size: 14px;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
+}
+.option:hover:not(:has(input:disabled)) {
+  border-color: var(--primary-soft);
 }
 .option:has(input:disabled) {
   cursor: default;
@@ -772,7 +785,7 @@ async function submitQuestionReport(q: Question) {
   font-size: 14px;
   padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   resize: vertical;
 }
 .short-input:disabled {
@@ -783,7 +796,7 @@ async function submitQuestionReport(q: Question) {
   margin-top: 14px;
   padding: 12px 14px;
   background: var(--bg-subtle);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   font-size: 14px;
 }
 .feedback__comment {
@@ -792,8 +805,9 @@ async function submitQuestionReport(q: Question) {
 .mastery {
   margin-top: 24px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--r-md);
   padding: 16px 20px;
+  box-shadow: var(--shadow-sm);
 }
 .mastery h2 {
   font-size: 16px;

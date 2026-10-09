@@ -48,6 +48,9 @@
   /* 遮罩 */
   --mask-bg: rgb(15 23 42 / 40%);
 
+  /* 聚焦光晕 */
+  --ring-primary: 0 0 0 3px rgb(59 130 246 / 12%);
+
   /* RGB 通道（用于透明度合成） */
   --ink-rgb: 15 23 42;
   --primary-rgb: 59 130 246;
@@ -191,4 +194,12 @@ body {
 /* lucide 图标在文本行内垂直居中 */
 .lucide {
   vertical-align: -2px;
+}
+
+/* ---- 输入控件统一聚焦态 ---- */
+input:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: var(--ring-primary);
 }
