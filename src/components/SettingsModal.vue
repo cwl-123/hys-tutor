@@ -577,7 +577,7 @@ async function save() {
   position: fixed;
   inset: 0;
   z-index: 200;
-  background: rgb(15 23 42 / 35%);
+  background: var(--mask-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -592,7 +592,7 @@ async function save() {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  box-shadow: 0 20px 60px rgb(15 23 42 / 25%);
+  box-shadow: 0 20px 60px rgb(var(--ink-rgb) / 25%);
 }
 .modal__header {
   display: flex;
@@ -613,7 +613,7 @@ async function save() {
   margin: 0;
   font-size: 13px;
   color: var(--text-dim);
-  background: #f8fafc;
+  background: var(--bg-subtle);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 12px;
@@ -640,8 +640,8 @@ async function save() {
   cursor: pointer;
 }
 .provider--active {
-  border-color: #3b82f6;
-  background: #eff6ff;
+  border-color: var(--primary);
+  background: var(--primary-bg);
 }
 .provider--add {
   justify-content: center;
@@ -652,8 +652,8 @@ async function save() {
   font-family: inherit;
 }
 .provider--add:hover {
-  color: #1d4ed8;
-  border-color: #93c5fd;
+  color: var(--primary-hover);
+  border-color: var(--primary-soft);
 }
 .candidates {
   display: flex;
@@ -662,7 +662,7 @@ async function save() {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px;
-  background: #fafbfc;
+  background: var(--bg-subtle);
 }
 .candidates__empty {
   margin: 0;
@@ -694,8 +694,8 @@ async function save() {
   font-style: normal;
   font-size: 11px;
   font-weight: 500;
-  color: #1d4ed8;
-  background: #eff6ff;
+  color: var(--primary-hover);
+  background: var(--primary-bg);
   border-radius: 4px;
   padding: 1px 6px;
   margin-right: 6px;
@@ -723,7 +723,7 @@ async function save() {
 }
 .field__link {
   margin-left: 6px;
-  color: #3b82f6;
+  color: var(--primary);
   text-decoration: none;
 }
 .field__link:hover {
@@ -744,8 +744,8 @@ async function save() {
 .provider__warn {
   font-style: normal;
   font-size: 11px;
-  color: #b45309;
-  background: #fffbeb;
+  color: var(--amber-text);
+  background: var(--amber-bg);
   border-radius: 4px;
   padding: 1px 6px;
   margin-left: 6px;
@@ -778,7 +778,7 @@ async function save() {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: #fafbfc;
+  background: var(--bg-subtle);
 }
 .edit__row {
   display: grid;
@@ -803,7 +803,7 @@ async function save() {
 }
 .field input:focus {
   outline: none;
-  border-color: #3b82f6;
+  border-color: var(--primary);
 }
 .key-field {
   position: relative;
@@ -841,7 +841,7 @@ async function save() {
 .modal__msg {
   margin: 0;
   font-size: 13px;
-  color: #15803d;
+  color: var(--green-hover);
 }
 .modal__msg--err {
   color: var(--mastery-red);
@@ -870,8 +870,8 @@ async function save() {
   cursor: pointer;
 }
 .btn--primary {
-  background: #3b82f6;
-  border-color: #3b82f6;
+  background: var(--primary);
+  border-color: var(--primary);
   color: #fff;
 }
 .btn--primary:disabled {

@@ -207,8 +207,8 @@ function applyProposal(msg: ChatMsg) {
   margin: 0;
   padding: 8px 14px;
   font-size: 12px;
-  color: #b45309;
-  background: #fffbeb;
+  color: var(--amber-text);
+  background: var(--amber-bg);
 }
 .chat__list {
   flex: 1;
@@ -232,18 +232,18 @@ function applyProposal(msg: ChatMsg) {
 }
 .msg--user {
   align-self: flex-end;
-  background: #3b82f6;
+  background: var(--primary);
   color: #fff;
 }
 .msg--assistant {
   align-self: flex-start;
-  background: #f3f4f6;
+  background: var(--bg-muted);
 }
 .msg__diff {
   margin-top: 6px;
   font-size: 12px;
-  color: #1d4ed8;
-  background: #eff6ff;
+  color: var(--primary-hover);
+  background: var(--primary-bg);
   border-radius: 6px;
   padding: 4px 8px;
 }
@@ -282,8 +282,8 @@ function applyProposal(msg: ChatMsg) {
   cursor: pointer;
 }
 .btn--primary {
-  background: #3b82f6;
-  border-color: #3b82f6;
+  background: var(--primary);
+  border-color: var(--primary);
   color: #fff;
 }
 .btn:disabled {

@@ -261,22 +261,22 @@ function confirmDelete(id: string) {
   border-radius: 999px;
 }
 .mastery__level--red {
-  background: #fef2f2;
+  background: var(--red-bg);
   color: var(--mastery-red);
 }
 .mastery__level--yellow {
-  background: #fffbeb;
-  color: #b45309;
+  background: var(--amber-bg);
+  color: var(--amber-text);
 }
 .mastery__level--green {
-  background: #f0fdf4;
-  color: #15803d;
+  background: var(--green-bg);
+  color: var(--green-hover);
 }
 .mastery__bar {
   position: relative;
   height: 6px;
   border-radius: 3px;
-  background: #f1f5f9;
+  background: var(--bg-muted);
 }
 .mastery__bar i {
   position: absolute;
@@ -296,7 +296,7 @@ function confirmDelete(id: string) {
 .mastery__unlock {
   left: 80%;
   width: 2px;
-  background: #94a3b8;
+  background: var(--text-faint);
 }
 .deps {
   display: flex;
@@ -307,8 +307,8 @@ function confirmDelete(id: string) {
   font-size: 12px;
   padding: 3px 10px;
   border-radius: 999px;
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--bg-muted);
+  color: var(--text-secondary);
 }
 .lessons {
   display: flex;
@@ -324,8 +324,8 @@ function confirmDelete(id: string) {
   padding: 7px 10px;
 }
 .lesson-item:hover {
-  border-color: #3b82f6;
-  background: #eff6ff;
+  border-color: var(--primary);
+  background: var(--primary-bg);
 }
 .lesson-item__link {
   flex: 1;
@@ -345,15 +345,15 @@ function confirmDelete(id: string) {
 .lesson-item__live {
   font-style: normal;
   font-size: 11px;
-  color: #b45309;
-  background: #fffbeb;
+  color: var(--amber-text);
+  background: var(--amber-bg);
   border-radius: 4px;
   padding: 1px 6px;
   margin-left: 6px;
 }
 .lesson-item__live--bad {
   color: var(--mastery-red);
-  background: #fef2f2;
+  background: var(--red-bg);
 }
 .lesson-item__meta {
   font-size: 11px;
@@ -387,7 +387,7 @@ function confirmDelete(id: string) {
   color: #fff;
 }
 .lesson-item__no {
-  background: #f1f5f9;
+  background: var(--bg-muted);
   color: var(--text);
 }
 .panel__footer {
@@ -404,7 +404,7 @@ function confirmDelete(id: string) {
   padding: 10px 16px;
   border: none;
   border-radius: 10px;
-  background: #16a34a;
+  background: var(--green-strong);
   color: #fff;
   cursor: pointer;
 }

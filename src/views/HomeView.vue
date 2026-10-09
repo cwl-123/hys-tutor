@@ -235,9 +235,9 @@ function fmtRelative(iso: string): string {
 
 <style scoped>
 .home {
-  min-height: calc(100vh - 53px);
+  min-height: calc(100vh - var(--header-h));
   background:
-    radial-gradient(1200px 400px at 50% -100px, rgb(59 130 246 / 7%), transparent),
+    radial-gradient(1200px 400px at 50% -100px, rgb(var(--primary-rgb) / 7%), transparent),
     var(--bg);
 }
 
@@ -269,7 +269,7 @@ function fmtRelative(iso: string): string {
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 26px 28px;
-  box-shadow: 0 8px 30px rgb(15 23 42 / 6%);
+  box-shadow: 0 8px 30px rgb(var(--ink-rgb) / 6%);
 }
 .create__name {
   width: 100%;
@@ -282,8 +282,8 @@ function fmtRelative(iso: string): string {
 }
 .create__name:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgb(59 130 246 / 12%);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgb(var(--primary-rgb) / 12%);
 }
 .create__guide {
   margin-top: 18px;
@@ -319,12 +319,12 @@ function fmtRelative(iso: string): string {
   transition: all 0.15s;
 }
 .chip:hover {
-  border-color: #93c5fd;
+  border-color: var(--primary-soft);
 }
 .chip--on {
-  border-color: #3b82f6;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border-color: var(--primary);
+  background: var(--primary-bg);
+  color: var(--primary-hover);
   font-weight: 500;
 }
 .create__extra {
@@ -338,7 +338,7 @@ function fmtRelative(iso: string): string {
 }
 .create__extra:focus {
   outline: none;
-  border-color: #3b82f6;
+  border-color: var(--primary);
   border-style: solid;
 }
 .create__footer {
@@ -362,7 +362,7 @@ function fmtRelative(iso: string): string {
   padding: 11px 26px;
   border: none;
   border-radius: 10px;
-  background: #1f2328;
+  background: var(--text);
   color: #fff;
   cursor: pointer;
   transition: opacity 0.15s;
@@ -381,16 +381,16 @@ function fmtRelative(iso: string): string {
   gap: 12px;
   padding: 12px 14px;
   border-radius: 10px;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
+  background: var(--primary-bg);
+  border: 1px solid var(--primary-border);
 }
 .create__spinner {
   flex: none;
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  border: 2px solid #bfdbfe;
-  border-top-color: #3b82f6;
+  border: 2px solid var(--primary-border);
+  border-top-color: var(--primary);
   animation: create-spin 0.7s linear infinite;
 }
 @keyframes create-spin {
@@ -401,12 +401,12 @@ function fmtRelative(iso: string): string {
 .create__stage {
   font-size: 13px;
   font-weight: 600;
-  color: #1d4ed8;
+  color: var(--primary-hover);
 }
 .create__stage-sub {
   margin-top: 2px;
   font-size: 12px;
-  color: #3b82f6;
+  color: var(--primary);
   opacity: 0.85;
 }
 .create__error {
@@ -457,8 +457,8 @@ function fmtRelative(iso: string): string {
 }
 .card:hover {
   transform: translateY(-2px);
-  border-color: #bfdbfe;
-  box-shadow: 0 10px 28px rgb(59 130 246 / 10%);
+  border-color: var(--primary-border);
+  box-shadow: 0 10px 28px rgb(var(--primary-rgb) / 10%);
 }
 .card__top {
   display: flex;
@@ -485,9 +485,9 @@ function fmtRelative(iso: string): string {
   font-size: 11px;
   padding: 2px 9px;
   border-radius: 999px;
-  color: #b45309;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
+  color: var(--amber-text);
+  background: var(--amber-bg);
+  border: 1px solid var(--amber-border);
   white-space: nowrap;
 }
 .card__arrow {
@@ -498,7 +498,7 @@ function fmtRelative(iso: string): string {
 }
 .card:hover .card__arrow {
   transform: translateX(3px);
-  color: #2563eb;
+  color: var(--primary-strong);
 }
 .card__tags {
   display: flex;
@@ -508,12 +508,12 @@ function fmtRelative(iso: string): string {
   font-size: 11px;
   padding: 2px 10px;
   border-radius: 999px;
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--bg-muted);
+  color: var(--text-secondary);
 }
 .tag--style {
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: var(--primary-bg);
+  color: var(--primary-hover);
 }
 .card__stats {
   display: flex;

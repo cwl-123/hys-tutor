@@ -590,7 +590,7 @@ async function submitQuestionReport(q: Question) {
   margin-bottom: 8px;
 }
 .crumb a {
-  color: #2563eb;
+  color: var(--primary-strong);
   text-decoration: none;
 }
 .hint {
@@ -598,7 +598,7 @@ async function submitQuestionReport(q: Question) {
   font-size: 13px;
 }
 .hint__history {
-  color: #2563eb;
+  color: var(--primary-strong);
   text-decoration: none;
   margin-left: 8px;
 }
@@ -606,12 +606,12 @@ async function submitQuestionReport(q: Question) {
   padding: 14px 16px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: #fffbeb;
-  color: #b45309;
+  background: var(--amber-bg);
+  color: var(--amber-text);
   font-size: 14px;
 }
 .not-ready a {
-  color: #1d4ed8;
+  color: var(--primary-hover);
 }
 .attempts-bar {
   display: flex;
@@ -630,8 +630,8 @@ async function submitQuestionReport(q: Question) {
   cursor: pointer;
 }
 .attempt-pill--on {
-  border-color: #3b82f6;
-  background: #eff6ff;
+  border-color: var(--primary);
+  background: var(--primary-bg);
 }
 .attempt-pill__time {
   color: var(--text-dim);
@@ -675,7 +675,7 @@ async function submitQuestionReport(q: Question) {
   margin-left: auto;
   font: inherit;
   font-size: 12px;
-  color: #b45309;
+  color: var(--amber-text);
   background: none;
   border: none;
   cursor: pointer;
@@ -695,9 +695,9 @@ async function submitQuestionReport(q: Question) {
   font: inherit;
   font-size: 13px;
   padding: 6px 10px;
-  border: 1px solid #f59e0b;
+  border: 1px solid var(--mastery-yellow);
   border-radius: 8px;
-  background: #fffbeb;
+  background: var(--amber-bg);
 }
 .btn--small {
   font-size: 12px;
@@ -709,7 +709,7 @@ async function submitQuestionReport(q: Question) {
   left: 50%;
   transform: translateX(-50%);
   z-index: 300;
-  background: #1f2328;
+  background: var(--text);
   color: #fff;
   font-size: 13px;
   padding: 8px 16px;
@@ -735,12 +735,12 @@ async function submitQuestionReport(q: Question) {
   cursor: default;
 }
 .option--on {
-  border-color: #3b82f6;
-  background: #eff6ff;
+  border-color: var(--primary);
+  background: var(--primary-bg);
 }
 .option--right {
   border-color: var(--mastery-green);
-  background: #f0fdf4;
+  background: var(--green-bg);
 }
 .legacy-answer {
   margin: 4px 0 0;
@@ -766,13 +766,13 @@ async function submitQuestionReport(q: Question) {
   resize: vertical;
 }
 .short-input:disabled {
-  background: #f8fafc;
+  background: var(--bg-subtle);
   color: var(--text);
 }
 .feedback {
   margin-top: 14px;
   padding: 12px 14px;
-  background: #f8fafc;
+  background: var(--bg-subtle);
   border-radius: 8px;
   font-size: 14px;
 }
@@ -806,7 +806,7 @@ async function submitQuestionReport(q: Question) {
 .mastery__hint {
   margin: 10px 0 0;
   font-size: 13px;
-  color: #b45309;
+  color: var(--amber-text);
 }
 .mastery__actions {
   margin-top: 14px;
@@ -834,8 +834,8 @@ async function submitQuestionReport(q: Question) {
   cursor: pointer;
 }
 .btn--primary {
-  background: #3b82f6;
-  border-color: #3b82f6;
+  background: var(--primary);
+  border-color: var(--primary);
   color: #fff;
 }
 .btn--primary:disabled {

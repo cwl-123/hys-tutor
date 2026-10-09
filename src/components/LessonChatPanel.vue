@@ -412,7 +412,7 @@ function quoteLabel(q?: LessonQuote | null): string {
   flex-direction: column;
   background: #fff;
   border-left: 1px solid var(--border);
-  box-shadow: -8px 0 24px rgb(15 23 42 / 8%);
+  box-shadow: -8px 0 24px rgb(var(--ink-rgb) / 8%);
 }
 
 /* ---- 头部 ---- */
@@ -455,9 +455,9 @@ function quoteLabel(q?: LessonQuote | null): string {
   cursor: pointer;
 }
 .chat__ghost:hover:not(:disabled) {
-  color: #2563eb;
-  border-color: #93c5fd;
-  background: #eff6ff;
+  color: var(--primary-strong);
+  border-color: var(--primary-soft);
+  background: var(--primary-bg);
 }
 .chat__ghost:disabled {
   opacity: 0.45;
@@ -475,7 +475,7 @@ function quoteLabel(q?: LessonQuote | null): string {
   color: var(--text-dim);
 }
 .chat__close:hover {
-  background: #f1f5f9;
+  background: var(--bg-muted);
   color: var(--text);
 }
 
@@ -487,7 +487,7 @@ function quoteLabel(q?: LessonQuote | null): string {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: #f7f8fa;
+  background: var(--bg-subtle);
 }
 .chat__empty {
   background: #fff;
@@ -520,14 +520,14 @@ function quoteLabel(q?: LessonQuote | null): string {
   font: inherit;
   font-size: 12px;
   padding: 5px 12px;
-  border: 1px solid #bfdbfe;
+  border: 1px solid var(--primary-border);
   border-radius: 999px;
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: var(--primary-bg);
+  color: var(--primary-hover);
   cursor: pointer;
 }
 .chat__chip:hover {
-  background: #dbeafe;
+  background: var(--primary-bg-strong);
 }
 
 .msg {
@@ -538,7 +538,7 @@ function quoteLabel(q?: LessonQuote | null): string {
 .msg--user {
   align-self: flex-end;
   max-width: 88%;
-  background: #3b82f6;
+  background: var(--primary);
   color: #fff;
   padding: 9px 13px;
   border-radius: 14px 14px 4px 14px;
@@ -554,7 +554,7 @@ function quoteLabel(q?: LessonQuote | null): string {
 .msg__quote {
   font-size: 11px;
   color: var(--text-dim);
-  background: #f1f5f9;
+  background: var(--bg-muted);
   border-radius: 6px;
   padding: 3px 8px;
   margin-bottom: 6px;
@@ -573,7 +573,7 @@ function quoteLabel(q?: LessonQuote | null): string {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #94a3b8;
+  background: var(--text-faint);
   animation: chat-blink 1.2s infinite ease-in-out;
 }
 .msg__dot:nth-child(2) {
@@ -596,8 +596,8 @@ function quoteLabel(q?: LessonQuote | null): string {
 /* ---- 修改建议卡 ---- */
 .msg__proposal {
   margin-top: 10px;
-  background: #f8fafc;
-  border: 1px solid #bfdbfe;
+  background: var(--bg-subtle);
+  border: 1px solid var(--primary-border);
   border-radius: 10px;
   padding: 10px 12px;
   display: flex;
@@ -613,8 +613,8 @@ function quoteLabel(q?: LessonQuote | null): string {
   align-self: flex-start;
   font-size: 11px;
   font-weight: 600;
-  color: #1d4ed8;
-  background: #dbeafe;
+  color: var(--primary-hover);
+  background: var(--primary-bg-strong);
   border-radius: 999px;
   padding: 2px 9px;
 }
@@ -631,13 +631,13 @@ function quoteLabel(q?: LessonQuote | null): string {
   font-size: 12px;
   padding: 5px 16px;
   border-radius: 7px;
-  border: 1px solid #3b82f6;
-  background: #3b82f6;
+  border: 1px solid var(--primary);
+  background: var(--primary);
   color: #fff;
   cursor: pointer;
 }
 .chat__apply:hover:not(:disabled) {
-  background: #2563eb;
+  background: var(--primary-strong);
 }
 .chat__apply:disabled {
   opacity: 0.55;
@@ -655,7 +655,7 @@ function quoteLabel(q?: LessonQuote | null): string {
   padding: 6px 10px;
   font-size: 12px;
   color: var(--mastery-red);
-  background: #fef2f2;
+  background: var(--red-bg);
   border-radius: 8px;
 }
 .chat__quote {
@@ -666,9 +666,9 @@ function quoteLabel(q?: LessonQuote | null): string {
   margin-bottom: 8px;
   padding: 5px 6px 5px 12px;
   font-size: 12px;
-  color: #1d4ed8;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
+  color: var(--primary-hover);
+  background: var(--primary-bg);
+  border: 1px solid var(--primary-border);
   border-radius: 999px;
 }
 .chat__quote-label {
@@ -686,10 +686,10 @@ function quoteLabel(q?: LessonQuote | null): string {
   font-size: 15px;
   line-height: 1;
   cursor: pointer;
-  color: #1d4ed8;
+  color: var(--primary-hover);
 }
 .chat__quote-remove:hover {
-  background: #dbeafe;
+  background: var(--primary-bg-strong);
 }
 .chat__inputbox {
   display: flex;
@@ -702,8 +702,8 @@ function quoteLabel(q?: LessonQuote | null): string {
   transition: border-color 0.15s;
 }
 .chat__inputbox:focus-within {
-  border-color: #93c5fd;
-  box-shadow: 0 0 0 3px rgb(59 130 246 / 12%);
+  border-color: var(--primary-soft);
+  box-shadow: 0 0 0 3px rgb(var(--primary-rgb) / 12%);
 }
 .chat__inputbox textarea {
   flex: 1;
@@ -723,12 +723,12 @@ function quoteLabel(q?: LessonQuote | null): string {
   padding: 6px 16px;
   border: none;
   border-radius: 8px;
-  background: #3b82f6;
+  background: var(--primary);
   color: #fff;
   cursor: pointer;
 }
 .chat__send:hover:not(:disabled) {
-  background: #2563eb;
+  background: var(--primary-strong);
 }
 .chat__send:disabled {
   opacity: 0.45;
@@ -745,7 +745,7 @@ function quoteLabel(q?: LessonQuote | null): string {
   position: fixed;
   inset: 0;
   z-index: 400;
-  background: rgb(15 23 42 / 45%);
+  background: rgb(var(--ink-rgb) / 45%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -759,7 +759,7 @@ function quoteLabel(q?: LessonQuote | null): string {
   background: #fff;
   border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 18px 50px rgb(15 23 42 / 28%);
+  box-shadow: 0 18px 50px rgb(var(--ink-rgb) / 28%);
 }
 .preview-modal__head {
   display: flex;
@@ -768,7 +768,7 @@ function quoteLabel(q?: LessonQuote | null): string {
   gap: 12px;
   padding: 14px 18px;
   border-bottom: 1px solid var(--border);
-  background: #f8fafc;
+  background: var(--bg-subtle);
 }
 .preview-modal__title {
   display: flex;
@@ -794,7 +794,7 @@ function quoteLabel(q?: LessonQuote | null): string {
   color: var(--text-dim);
 }
 .preview-modal__close:hover {
-  background: #e2e8f0;
+  background: var(--border);
   color: var(--text);
 }
 .preview-modal__body {

@@ -41,9 +41,10 @@ const showSettings = ref(false)
 }
 .app-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 12px;
-  padding: 12px 24px;
+  height: var(--header-h);
+  padding: 0 24px;
   border-bottom: 1px solid var(--border);
 }
 .app-title {

@@ -67,11 +67,11 @@ const level = computed(() => masteryLevel(props.data.node.mastery))
   border: 1px solid var(--border);
   border-left: 4px solid var(--border);
   background: #fff;
-  box-shadow: 0 1px 3px rgb(15 23 42 / 6%);
+  box-shadow: 0 1px 3px rgb(var(--ink-rgb) / 6%);
   transition: box-shadow 0.15s;
 }
 .knode:hover {
-  box-shadow: 0 4px 12px rgb(15 23 42 / 10%);
+  box-shadow: 0 4px 12px rgb(var(--ink-rgb) / 10%);
 }
 .knode--red {
   border-left-color: var(--mastery-red);
@@ -83,9 +83,9 @@ const level = computed(() => masteryLevel(props.data.node.mastery))
   border-left-color: var(--mastery-green);
 }
 .knode--selected {
-  border-color: #3b82f6;
-  border-left-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgb(59 130 246 / 15%);
+  border-color: var(--primary);
+  border-left-color: var(--primary);
+  box-shadow: 0 0 0 3px rgb(var(--primary-rgb) / 15%);
 }
 .knode__name {
   font-size: 13px;
@@ -125,7 +125,7 @@ const level = computed(() => masteryLevel(props.data.node.mastery))
 }
 .knode__lessons {
   font-size: 11px;
-  color: #2563eb;
+  color: var(--primary-strong);
 }
 .knode__badge {
   font-size: 10px;
@@ -134,15 +134,15 @@ const level = computed(() => masteryLevel(props.data.node.mastery))
   white-space: nowrap;
 }
 .knode__badge--gen {
-  color: #b45309;
-  background: #fffbeb;
+  color: var(--amber-text);
+  background: var(--amber-bg);
 }
 .knode__badge--ok {
-  color: #15803d;
-  background: #f0fdf4;
+  color: var(--green-hover);
+  background: var(--green-bg);
 }
 .knode__badge--bad {
   color: var(--mastery-red);
-  background: #fef2f2;
+  background: var(--red-bg);
 }
 </style>

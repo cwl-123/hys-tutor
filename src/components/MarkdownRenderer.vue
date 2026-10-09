@@ -117,7 +117,7 @@ watch(html, () => void enhanceCodeBlocks(), { immediate: true })
   font-size: 16px;
 }
 .md-body :deep(pre) {
-  background: #f6f8fa;
+  background: var(--bg-subtle);
   padding: 12px;
   border-radius: 8px;
   overflow-x: auto;
@@ -128,7 +128,7 @@ watch(html, () => void enhanceCodeBlocks(), { immediate: true })
   font-size: 0.92em;
 }
 .md-body :deep(:not(pre) > code) {
-  background: #f0f1f3;
+  background: var(--bg-muted);
   padding: 1px 5px;
   border-radius: 4px;
 }
@@ -147,7 +147,7 @@ watch(html, () => void enhanceCodeBlocks(), { immediate: true })
   padding: 5px 10px;
 }
 .md-body :deep(a) {
-  color: #2563eb;
+  color: var(--primary-strong);
 }
 .md-body :deep(.md-figure) {
   margin: 16px 0;

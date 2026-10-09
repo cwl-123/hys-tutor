@@ -633,14 +633,14 @@ onUnmounted(() => {
   margin-top: 20px;
   height: 8px;
   border-radius: 999px;
-  background: #eef2f7;
+  background: var(--bg-muted);
   overflow: hidden;
 }
 .progress__bar-fill {
   display: block;
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #3b82f6, #22c55e);
+  background: linear-gradient(90deg, var(--primary), var(--mastery-green));
   transition: width 0.4s ease;
 }
 .progress__meta {
@@ -651,7 +651,7 @@ onUnmounted(() => {
   color: var(--text-dim);
 }
 .progress__phase {
-  color: #2563eb;
+  color: var(--primary-strong);
   font-weight: 600;
 }
 .progress__steps {
@@ -674,21 +674,21 @@ onUnmounted(() => {
   background: #fff;
 }
 .progress__steps li.is-done {
-  color: #15803d;
-  border-color: #bbf7d0;
-  background: #f0fdf4;
+  color: var(--green-hover);
+  border-color: var(--green-border);
+  background: var(--green-bg);
 }
 .progress__steps li.is-active {
-  color: #1d4ed8;
-  border-color: #93c5fd;
-  background: #eff6ff;
+  color: var(--primary-hover);
+  border-color: var(--primary-soft);
+  background: var(--primary-bg);
   font-weight: 600;
 }
 .progress__dot {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #e2e8f0;
+  background: var(--border);
   color: #fff;
   font-size: 11px;
   display: inline-flex;
@@ -700,7 +700,7 @@ onUnmounted(() => {
   background: var(--mastery-green);
 }
 .progress__steps li.is-active .progress__dot {
-  background: #3b82f6;
+  background: var(--primary);
   animation: progress-pulse 1.1s ease-in-out infinite;
 }
 @keyframes progress-pulse {
@@ -724,7 +724,7 @@ onUnmounted(() => {
   margin-top: 14px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: #f8fafc;
+  background: var(--bg-subtle);
   font-size: 13px;
 }
 .progress__log summary {
@@ -760,16 +760,16 @@ onUnmounted(() => {
   margin-bottom: 16px;
   padding: 12px 16px;
   border-radius: 10px;
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  color: #15803d;
+  background: var(--green-bg);
+  border: 1px solid var(--green-border);
+  color: var(--green-hover);
   font-size: 14px;
   font-weight: 600;
 }
 .lesson__done-close {
   border: none;
   background: none;
-  color: #15803d;
+  color: var(--green-hover);
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
@@ -782,14 +782,14 @@ onUnmounted(() => {
   margin-bottom: 8px;
 }
 .lesson__crumb a {
-  color: #2563eb;
+  color: var(--primary-strong);
   text-decoration: none;
 }
 .lesson__reason {
   font-size: 13px;
   color: var(--text-dim);
-  background: #f8fafc;
-  border-left: 3px solid #3b82f6;
+  background: var(--bg-subtle);
+  border-left: 3px solid var(--primary);
   padding: 8px 12px;
   border-radius: 0 6px 6px 0;
 }
@@ -869,13 +869,13 @@ onUnmounted(() => {
   padding: 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: #f8fafc;
+  background: var(--bg-subtle);
 }
 .revise-mask {
   position: fixed;
   inset: 0;
   z-index: 200;
-  background: rgb(15 23 42 / 35%);
+  background: var(--mask-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -926,7 +926,7 @@ onUnmounted(() => {
   color: var(--text-dim);
 }
 .lesson__sources a {
-  color: #2563eb;
+  color: var(--primary-strong);
 }
 .lesson__footer {
   margin-top: 32px;
@@ -945,8 +945,8 @@ onUnmounted(() => {
   cursor: pointer;
 }
 .btn--primary {
-  background: #3b82f6;
-  border-color: #3b82f6;
+  background: var(--primary);
+  border-color: var(--primary);
   color: #fff;
 }
 .state {

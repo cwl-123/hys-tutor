@@ -132,9 +132,9 @@ onBeforeUnmount(() => window.removeEventListener('scroll', clearTip, true))
   opacity: 1;
 }
 .lesson-body__tool:hover {
-  color: #2563eb;
-  border-color: #93c5fd;
-  background: #eff6ff;
+  color: var(--primary-strong);
+  border-color: var(--primary-soft);
+  background: var(--primary-bg);
 }
 </style>
 
@@ -148,9 +148,9 @@ onBeforeUnmount(() => window.removeEventListener('scroll', clearTip, true))
   padding: 5px 10px;
   border: none;
   border-radius: 8px;
-  background: #1f2937;
+  background: var(--text);
   color: #fff;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgb(15 23 42 / 25%);
+  box-shadow: 0 2px 8px rgb(var(--ink-rgb) / 25%);
 }
 </style>

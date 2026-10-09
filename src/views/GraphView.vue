@@ -265,7 +265,7 @@ async function deleteLesson(lessonId: string) {
           :nodes="flowNodes"
           :edges="flowEdges"
           :default-viewport="{ zoom: 0.85 }"
-          :default-edge-options="{ style: { stroke: '#cbd5e1' } }"
+          :default-edge-options="{ style: { stroke: 'var(--border-strong)' } }"
           fit-view-on-init
           @node-click="onNodeClick"
         >
@@ -301,7 +301,7 @@ async function deleteLesson(lessonId: string) {
 .graph-view {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 53px);
+  height: calc(100vh - var(--header-h));
 }
 .state {
   margin: auto;
@@ -324,7 +324,7 @@ async function deleteLesson(lessonId: string) {
   font-size: 16px;
 }
 .toolbar__home:hover {
-  color: #2563eb;
+  color: var(--primary-strong);
 }
 .toolbar__count {
   font-size: 13px;
@@ -365,7 +365,7 @@ async function deleteLesson(lessonId: string) {
   margin: 0;
   color: var(--mastery-red);
   font-size: 13px;
-  background: #fef2f2;
+  background: var(--red-bg);
 }
 .done-toast {
   position: fixed;
@@ -377,10 +377,10 @@ async function deleteLesson(lessonId: string) {
   gap: 12px;
   padding: 12px 14px 12px 18px;
   background: #fff;
-  border: 1px solid #bbf7d0;
+  border: 1px solid var(--green-border);
   border-left: 4px solid var(--mastery-green);
   border-radius: 12px;
-  box-shadow: 0 12px 32px rgb(15 23 42 / 16%);
+  box-shadow: 0 12px 32px rgb(var(--ink-rgb) / 16%);
   animation: toast-in 0.25s ease;
 }
 @keyframes toast-in {
@@ -406,7 +406,7 @@ async function deleteLesson(lessonId: string) {
   flex: none;
   font-size: 13px;
   color: #fff;
-  background: #16a34a;
+  background: var(--green-strong);
   border-radius: 7px;
   padding: 6px 12px;
   text-decoration: none;
@@ -439,8 +439,8 @@ async function deleteLesson(lessonId: string) {
   color: var(--text);
 }
 .btn--primary {
-  background: #3b82f6;
-  border-color: #3b82f6;
+  background: var(--primary);
+  border-color: var(--primary);
   color: #fff;
 }
 .btn--primary:disabled {
@@ -448,22 +448,22 @@ async function deleteLesson(lessonId: string) {
   cursor: not-allowed;
 }
 .btn--go {
-  background: #16a34a;
-  border-color: #16a34a;
+  background: var(--green-strong);
+  border-color: var(--green-strong);
   color: #fff;
   text-decoration: none;
   display: inline-flex;
   align-items: center;
 }
 .btn--on {
-  border-color: #3b82f6;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border-color: var(--primary);
+  background: var(--primary-bg);
+  color: var(--primary-hover);
 }
 .btn--progress {
-  background: #fffbeb;
-  border-color: #f59e0b;
-  color: #b45309;
+  background: var(--amber-bg);
+  border-color: var(--mastery-yellow);
+  color: var(--amber-text);
   text-decoration: none;
   display: inline-flex;
   align-items: center;
