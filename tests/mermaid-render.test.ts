@@ -1,19 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { JSDOM } from 'jsdom'
-import { mermaidCacheKey, renderMermaid, stripRootSvgId } from '../src/utils/mermaid-render'
-
-describe('stripRootSvgId', () => {
-  it('只剥 svg 根 id，内部 id 原样保留', () => {
-    expect(stripRootSvgId('<svg id="hys-mmd-1" width="100%"><g id="keep">x</g></svg>')).toBe(
-      '<svg width="100%"><g id="keep">x</g></svg>',
-    )
-    expect(stripRootSvgId('<svg width="100%" id="a" class="b"><defs id="d"/></svg>')).toBe(
-      '<svg width="100%" class="b"><defs id="d"/></svg>',
-    )
-    expect(stripRootSvgId('<svg><g id="keep"/></svg>')).toBe('<svg><g id="keep"/></svg>')
-    expect(stripRootSvgId('<svg viewBox="0 0 1 1"></svg>')).toBe('<svg viewBox="0 0 1 1"></svg>')
-  })
-})
+import { mermaidCacheKey, renderMermaid } from '../src/utils/mermaid-render'
 
 describe('mermaidCacheKey', () => {
   it('按去首尾空白的代码文本归一', () => {
@@ -54,31 +41,34 @@ describe('renderMermaid（jsdom 回归）', () => {
     }
   })
 
-  // 回归 bug：渲染状态曾放在 <script setup>（每组件实例一份），正文与编辑弹窗各自从 1
-  // 编渲染 id 相撞，mermaid.removeExistingElements 会删掉页面上同 id 的旧图——
-  // 表现为“一打开编辑图表弹窗，原图就消失”
-  it('多实例先后渲染互不误删，产出 svg 无渲染 id', async () => {
+  // 回归 1（图表消失）：渲染状态曾放在 <script setup>（每实例一份），正文与编辑弹窗
+  // 渲染 id 相撞，mermaid.removeExistingElements 按 id 删掉了页面上的旧图
+  // 回归 2（图表变黑块）：样式作用域 #id 就挂在根 svg 上，剥掉根 id 会让整套配色失效
+  it('样式作用域与根 id 保持一致，多实例先后渲染互不误删', async () => {
     const document = globalThis.document as Document
     const CODE = 'flowchart LR\n  A[曝光] --> B[点击]'
 
-    // 实例 A（正文）：渲染并挂载
     const svgA = await renderMermaid(CODE)
     expect(svgA).toBeTruthy()
-    // 根 svg 上不得有 id（mermaid 清理逻辑按 getElementById(渲染id) 删节点）
-    const rootTag = svgA!.slice(0, svgA!.indexOf('>') + 1)
-    expect(rootTag).not.toContain('id="')
+
+    // 根 svg 必须带 id（mermaid 配色样式按 #id 作用域挂载），且样式表引用同一 id
+    const rootId = svgA!.match(/^<svg id="([^"]+)"/)?.[1]
+    expect(rootId).toBeTruthy()
+    expect(svgA).toContain(`#${rootId}{`)
+    expect(svgA).toContain(`#${rootId} .node`)
+    // 挂载 id 与渲染 id 不同命名空间：mermaid 后续 render 的清理碰不到它
+    expect(rootId).toMatch(/^hys-m/)
+
     const wrapA = document.createElement('div')
     wrapA.innerHTML = svgA!
     document.body.appendChild(wrapA)
     expect(wrapA.querySelector('svg')).not.toBeNull()
 
-    // 实例 B（编辑弹窗预览）：渲染另一张图
+    // 实例 B（编辑弹窗预览）渲染另一张图，A 的图必须还活着
     const svgB = await renderMermaid('graph TD\n  X --> Y')
     const wrapB = document.createElement('div')
     wrapB.innerHTML = svgB!
     document.body.appendChild(wrapB)
-
-    // A 的图必须还活着（修复前此处 wrapA 被清空）
     expect(wrapA.querySelector('svg')).not.toBeNull()
     expect(wrapA.innerHTML.length).toBeGreaterThan(0)
 

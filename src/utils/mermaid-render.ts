@@ -9,13 +9,12 @@ let mermaidApi: MermaidApi | null = null
 let renderSeq = 0
 const cache = new Map<string, string>()
 
-// 挂载前剥掉 svg 根 id：页面上永远不出现渲染 id，mermaid 后续 render 的清理再也碰不到已挂载的图
-export function stripRootSvgId(svg: string): string {
-  return svg.replace(/^(<svg\b[^>]*?)\s+id="[^"]*"/, '$1')
-}
-
 export function mermaidCacheKey(code: string): string {
   return code.trim()
+}
+
+function randomSuffix(): string {
+  return Math.random().toString(36).slice(2, 10)
 }
 
 // 渲染 mermaid 代码为 SVG 字符串；语法错误/空代码返回 null（调用方保留代码块原样）
@@ -34,8 +33,14 @@ export async function renderMermaid(code: string): Promise<string | null> {
         suppressErrorRendering: true,
       })
     }
-    const { svg } = await mermaidApi.render(`hys-mmd-${++renderSeq}-${Math.random().toString(36).slice(2, 8)}`, key)
-    const clean = stripRootSvgId(svg)
+    const renderId = `hys-r${++renderSeq}-${randomSuffix()}`
+    const { svg } = await mermaidApi.render(renderId, key)
+    // 整体重写渲染 id 为挂载 id：
+    // - 样式作用域 #id 挂在根 svg 上，id 必须保留（删了整个配色会失效、图变黑块）
+    // - 但页面上的 id 绝不能与后续 mermaid.render 传入的 id 相同
+    //   （render 前的 removeExistingElements 会删掉页面上同 id 的节点）
+    const mountId = `hys-m${randomSuffix()}`
+    const clean = svg.split(renderId).join(mountId)
     cache.set(key, clean)
     return clean
   } catch {
