@@ -15,6 +15,17 @@ describe('出题 schema', () => {
     expect(llmSelfCheckSchema.safeParse({ ...five, questions: [...five.questions, q('judge')] }).success).toBe(false)
   })
 
+  it('自查出题：issues 为对象数组时也能解析并归一成字符串', () => {
+    const five = {
+      issues: [{ location: '第 4 节', problem: '与笔记矛盾' }],
+      questions: [q('single'), q('single'), q('judge'), q('judge'), q('short')],
+    }
+    const parsed = llmSelfCheckSchema.safeParse(five)
+    expect(parsed.success).toBe(true)
+    expect(parsed.success && parsed.data.issues).toEqual(['第 4 节：与笔记矛盾'])
+    expect(parsed.success && parsed.data.needsCorrection).toBe(false)
+  })
+
   it('再次测验出题：恰好 5 题', () => {
     const five = { questions: [q('single'), q('single'), q('judge'), q('judge'), q('short')] }
     expect(llmQuizSchema.safeParse(five).success).toBe(true)

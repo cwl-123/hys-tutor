@@ -1,6 +1,6 @@
 import { readdir } from 'node:fs/promises'
 import { dataPath, newId, nowIso, readJson, writeJson } from '../repo/json-store'
-import { getLLM, getLLMModel, completeJson } from '../llm/client'
+import { getLLM, getLLMModel, completeJson, completeText } from '../llm/client'
 import { runAgent, type AgentTool } from '../agent/loop'
 import { searchWeb } from '../agent/tools/web-search'
 import { searchImages } from '../agent/tools/image-search'
@@ -15,7 +15,13 @@ import {
   outlineUserPrompt,
 } from '../llm/prompts/outline'
 import { WRITE_SYSTEM_PROMPT, REVISE_SYSTEM_PROMPT, writeLessonPrompt, reviseLessonPrompt } from '../llm/prompts/write'
-import { SELFCHECK_SYSTEM_PROMPT, llmSelfCheckSchema, selfCheckPrompt } from '../llm/prompts/selfcheck'
+import {
+  SELFCHECK_SYSTEM_PROMPT,
+  CORRECT_CONTENT_SYSTEM_PROMPT,
+  llmSelfCheckSchema,
+  selfCheckPrompt,
+  correctContentPrompt,
+} from '../llm/prompts/selfcheck'
 import { QUIZ_SYSTEM_PROMPT, llmQuizSchema, quizPrompt } from '../llm/prompts/quiz'
 import { scheduleNext } from './scheduler'
 import { getGraph, getTopic } from './graph-service'
@@ -336,10 +342,18 @@ export async function prepareLesson(
     schema: llmSelfCheckSchema,
     temperature: 0.2,
   })
-  const contentMd = check.correctedContent?.trim() ? check.correctedContent : draft
+  const contentMd =
+    check.needsCorrection && check.issues.length
+      ? await completeText({
+          system: CORRECT_CONTENT_SYSTEM_PROMPT,
+          prompt: correctContentPrompt(node, draft, check.issues),
+          temperature: 0.2,
+        })
+      : draft
+  const corrected = contentMd !== draft
   onStage({
     stage: 'self-check-done',
-    detail: { issues: check.issues, corrected: Boolean(check.correctedContent?.trim()) },
+    detail: { issues: check.issues, corrected },
   })
 
   // 落图：外链配图下载到课题素材库并改写为本地引用（下载失败的编造 URL 直接剔除）
@@ -422,7 +436,14 @@ export async function reviseLesson(
         schema: llmSelfCheckSchema,
         temperature: 0.2,
       })
-      contentMd = check.correctedContent?.trim() ? check.correctedContent : revised
+      contentMd =
+        check.needsCorrection && check.issues.length
+          ? await completeText({
+              system: CORRECT_CONTENT_SYSTEM_PROMPT,
+              prompt: correctContentPrompt(node, revised, check.issues),
+              temperature: 0.2,
+            })
+          : revised
       questions = {
         generatedAt: nowIso(),
         questions: check.questions.map<Question>((q, i) => ({
