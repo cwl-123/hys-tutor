@@ -40,6 +40,8 @@ async function patchLessonStatus(
 ): Promise<void> {
   const lesson = await readJson<Lesson | null>(lessonFile(topicId, lessonId), null)
   if (!lesson) return
+  // 迟到的状态回写不得覆盖已落盘的成品（防止并发写入把正文冲成空占位）
+  if (lesson.status === 'generated') return
   lesson.status = status
   lesson.error = error
   await writeJson(lessonFile(topicId, lessonId), lesson)
@@ -85,7 +87,7 @@ export function startLessonJob(
         emit(job, { type: 'stage', e })
         const status = STAGE_TO_STATUS[e.stage]
         if (status) void patchLessonStatus(topicId, lessonId, status)
-      }, opts)
+      }, { ...opts, lessonId })
       job.status = 'done'
       emit(job, { type: 'result' })
     } catch (err) {
@@ -180,4 +182,9 @@ export function subscribeJob(job: Job, listener: JobListener): () => void {
 
 export function jobsRunningFor(lessonId: string): boolean {
   return jobsByLesson.get(lessonId)?.status === 'running'
+}
+
+// 该方向是否有后台备课/优化任务在跑（首页/图谱据此提示「课件生成中」）
+export function topicJobRunning(topicId: string): boolean {
+  return runningByTopic.get(topicId)?.status === 'running'
 }

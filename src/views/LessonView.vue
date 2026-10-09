@@ -7,6 +7,7 @@ import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import LessonBody from '@/components/LessonBody.vue'
 import LessonChatPanel from '@/components/LessonChatPanel.vue'
 import { replaceMermaidBlock } from '@shared/lesson-md'
+import { LESSON_PHASES } from '@/stores/lesson'
 import type { LessonQuote } from '@shared/lesson-chat'
 
 const route = useRoute()
@@ -95,6 +96,56 @@ const topicHome = computed(
   () => `/topic/${lessonStore.lesson?.topicId ?? topicStore.topic?.id ?? ''}`,
 )
 
+// 只有真正落盘完成、且有正文的课程才渲染正文；否则一律走进度/失败/中断分支
+const isGenerated = computed(
+  () => lessonStore.lesson?.status === 'generated' && lessonStore.lesson.contentMd.trim().length > 0,
+)
+// 记录存在但既未生成完成、又已不在生成中（例如服务重启把任务丢了）
+const isInterrupted = computed(
+  () =>
+    !!lessonStore.lesson &&
+    !lessonStore.generating &&
+    lessonStore.lesson.status !== 'generated' &&
+    lessonStore.lesson.status !== 'failed' &&
+    !lessonStore.error,
+)
+// 占位原因（如「备课任务已创建…」）没有展示价值，仅在选题完成后才显示
+const scheduleReason = computed(() => {
+  const r = lessonStore.lesson?.scheduleReason?.trim() ?? ''
+  return r && !r.endsWith('…') ? r : ''
+})
+
+// ---------- 进度视图 ----------
+const phases = LESSON_PHASES
+const progressPercent = computed(() =>
+  Math.min(100, Math.round(((lessonStore.phase + 1) / phases.length) * 100)),
+)
+const currentPhaseLabel = computed(() => phases[Math.min(lessonStore.phase, phases.length - 1)])
+// 生成中的课程名：优先后台选题阶段给出的知识点名，其次已加载课程
+const generatingName = computed(() => {
+  const picked = lessonStore.stages.find((s) => s.label.startsWith('已选题：'))
+  if (picked) return picked.label.replace(/^已选题：/, '').split(' —— ')[0]
+  return nodeName.value || topicStore.topic?.name || '这门课'
+})
+const nowTick = ref(Date.now())
+let tickTimer: number | undefined
+watch(
+  () => lessonStore.generating,
+  (on) => {
+    window.clearInterval(tickTimer)
+    if (on) tickTimer = window.setInterval(() => (nowTick.value = Date.now()), 1000)
+  },
+  { immediate: true },
+)
+const elapsedText = computed(() => {
+  const start = lessonStore.startedAt
+  if (!start) return ''
+  const sec = Math.max(0, Math.floor((nowTick.value - start) / 1000))
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  return m > 0 ? `${m} 分 ${s} 秒` : `${s} 秒`
+})
+
 // 备课进行中自动滚动进度列表
 watch(
   () => lessonStore.stages.length,
@@ -128,6 +179,8 @@ onMounted(async () => {
     if (isNew.value) {
       await startGeneration()
     } else {
+      // 直接进入已有课程时不带「刚刚生成完成」的提示（仅实时挂接完成才提示）
+      lessonStore.justCompleted = false
       await lessonStore.load(String(route.params.id))
       const lessonTopicId = lessonStore.lesson?.topicId
       if (lessonTopicId && topicStore.topic?.id !== lessonTopicId) {
@@ -165,7 +218,10 @@ async function startRevise() {
 }
 
 // 离开备课页时断开进度流；备课任务在后台继续，可从图谱页再次进入回放
-onUnmounted(() => lessonStore.detach())
+onUnmounted(() => {
+  window.clearInterval(tickTimer)
+  lessonStore.detach()
+})
 </script>
 
 <template>
@@ -179,7 +235,12 @@ onUnmounted(() => lessonStore.detach())
       class="progress"
     >
       <div class="progress__head">
-        <h1>正在备课…</h1>
+        <div>
+          <h1>{{ lessonStore.lesson?.status === 'revising' ? '正在优化课件…' : '正在备课…' }}</h1>
+          <p class="progress__sub">
+            《{{ generatingName }}》· AI 正在联网研究并撰写
+          </p>
+        </div>
         <RouterLink
           :to="topicHome"
           class="btn"
@@ -187,24 +248,58 @@ onUnmounted(() => lessonStore.detach())
           ← 返回图谱
         </RouterLink>
       </div>
-      <p class="progress__hint">
-        Agent 正在联网研究并撰写课程，全程约 2~5 分钟（缓存命中约 1 分钟）。可先返回图谱，备课在后台继续，随时点「课件生成中」再进来查看进度。
-      </p>
-      <ol
-        ref="stageList"
-        class="progress__stages"
-      >
+
+      <div class="progress__bar">
+        <i
+          class="progress__bar-fill"
+          :style="{ width: `${progressPercent}%` }"
+        />
+      </div>
+      <div class="progress__meta">
+        <span class="progress__phase">{{ currentPhaseLabel }}</span>
+        <span>{{ progressPercent }}% · 已用 {{ elapsedText }}</span>
+      </div>
+
+      <ol class="progress__steps">
         <li
-          v-for="s in lessonStore.stages"
-          :key="s.key"
+          v-for="(p, i) in phases"
+          :key="p"
+          :class="{ 'is-done': i < lessonStore.phase, 'is-active': i === lessonStore.phase }"
         >
-          {{ s.label }}
+          <span class="progress__dot">{{ i < lessonStore.phase ? '✓' : '' }}</span>
+          <span>{{ p }}</span>
         </li>
       </ol>
+
+      <p class="progress__hint">
+        全程约 2~5 分钟（研究笔记命中缓存约 1 分钟）。可先返回图谱，备课在后台继续，随时点顶部「课件生成中」再进来查看。
+      </p>
+
+      <details
+        v-if="lessonStore.stages.length"
+        class="progress__log"
+      >
+        <summary>展开实时日志（{{ lessonStore.stages.length }} 条）</summary>
+        <ol
+          ref="stageList"
+          class="progress__log-list"
+        >
+          <li
+            v-for="s in lessonStore.stages"
+            :key="s.key"
+          >
+            {{ s.label }}
+          </li>
+        </ol>
+      </details>
+
       <div
         v-if="lessonStore.streamingContent"
         class="progress__stream"
       >
+        <div class="progress__stream-title">
+          正文预览（实时）
+        </div>
         <MarkdownRenderer :content="lessonStore.streamingContent" />
       </div>
     </div>
@@ -234,11 +329,49 @@ onUnmounted(() => lessonStore.detach())
       </div>
     </div>
 
+    <!-- 记录存在但未生成完成（任务中断/丢失） -->
+    <div
+      v-else-if="isInterrupted"
+      class="state"
+    >
+      <h1>课件尚未生成完成</h1>
+      <p class="state__error">
+        后台备课任务已中断（可能是服务重启导致）。当前进度：{{ lessonStore.lesson?.status }}
+      </p>
+      <div class="state__actions">
+        <button
+          class="btn btn--primary"
+          @click="retry"
+        >
+          重新备课
+        </button>
+        <RouterLink
+          :to="topicHome"
+          class="btn"
+        >
+          返回图谱
+        </RouterLink>
+      </div>
+    </div>
+
     <!-- 课程正文 -->
     <article
-      v-else-if="lessonStore.lesson"
+      v-else-if="lessonStore.lesson && isGenerated"
       class="lesson"
     >
+      <div
+        v-if="lessonStore.justCompleted"
+        class="lesson__done-banner"
+      >
+        <span>✅ 课件已生成，可以开始学习了</span>
+        <button
+          class="lesson__done-close"
+          title="关闭"
+          @click="lessonStore.justCompleted = false"
+        >
+          ×
+        </button>
+      </div>
       <header class="lesson__header">
         <div class="lesson__crumb">
           <RouterLink :to="topicHome">
@@ -247,8 +380,11 @@ onUnmounted(() => lessonStore.detach())
           <span>{{ lessonStore.topic?.name }}</span>
         </div>
         <h1>{{ nodeName }}</h1>
-        <p class="lesson__reason">
-          为什么这节课讲这个：{{ lessonStore.lesson.scheduleReason }}
+        <p
+          v-if="scheduleReason"
+          class="lesson__reason"
+        >
+          为什么这节课讲这个：{{ scheduleReason }}
         </p>
         <div class="lesson__actions">
           <button
@@ -480,33 +616,163 @@ onUnmounted(() => lessonStore.detach())
 }
 .progress__head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
 }
 .progress__head h1 {
-  margin-bottom: 0;
+  margin: 0;
+  font-size: 22px;
+}
+.progress__sub {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.progress__bar {
+  margin-top: 20px;
+  height: 8px;
+  border-radius: 999px;
+  background: #eef2f7;
+  overflow: hidden;
+}
+.progress__bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #3b82f6, #22c55e);
+  transition: width 0.4s ease;
+}
+.progress__meta {
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.progress__phase {
+  color: #2563eb;
+  font-weight: 600;
+}
+.progress__steps {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.progress__steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--text-dim);
+  padding: 5px 12px 5px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+}
+.progress__steps li.is-done {
+  color: #15803d;
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+.progress__steps li.is-active {
+  color: #1d4ed8;
+  border-color: #93c5fd;
+  background: #eff6ff;
+  font-weight: 600;
+}
+.progress__dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: #fff;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.progress__steps li.is-done .progress__dot {
+  background: var(--mastery-green);
+}
+.progress__steps li.is-active .progress__dot {
+  background: #3b82f6;
+  animation: progress-pulse 1.1s ease-in-out infinite;
+}
+@keyframes progress-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.78);
+  }
 }
 .progress__hint {
+  margin-top: 16px;
   color: var(--text-dim);
   font-size: 13px;
   line-height: 1.7;
 }
-.progress__stages {
-  margin: 16px 0;
-  padding: 12px 16px 12px 36px;
-  background: #f8fafc;
+.progress__log {
+  margin-top: 14px;
   border: 1px solid var(--border);
   border-radius: 10px;
+  background: #f8fafc;
   font-size: 13px;
+}
+.progress__log summary {
+  cursor: pointer;
+  padding: 9px 14px;
+  color: var(--text-dim);
+  user-select: none;
+}
+.progress__log-list {
+  margin: 0;
+  padding: 0 16px 12px 36px;
   line-height: 1.9;
-  max-height: 220px;
+  max-height: 200px;
   overflow-y: auto;
+  color: var(--text-dim);
 }
 .progress__stream {
+  margin-top: 22px;
   border-top: 1px dashed var(--border);
   padding-top: 16px;
-  opacity: 0.9;
+  opacity: 0.92;
+}
+.progress__stream-title {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+.lesson__done-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+  font-size: 14px;
+  font-weight: 600;
+}
+.lesson__done-close {
+  border: none;
+  background: none;
+  color: #15803d;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
 }
 .lesson__crumb {
   display: flex;

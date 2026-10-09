@@ -61,6 +61,39 @@ function stageLabel(stage: string, detail?: unknown): string | null {
   }
 }
 
+// 备课大阶段（进度条与步骤条用）：把后端的细粒度 stage 归并成 6 个阶段
+export const LESSON_PHASES = ['选题', '联网研究', '设计大纲', '撰写正文', '自查出题', '完成'] as const
+
+// 后端 stage → 大阶段下标
+function stagePhase(stage: string): number | null {
+  switch (stage) {
+    case 'schedule':
+    case 'scheduled':
+      return 0
+    case 'research':
+    case 'research-tool':
+    case 'research-tool-failed':
+    case 'research-note-saved':
+      return 1
+    case 'outline':
+    case 'outline-done':
+      return 2
+    case 'write':
+    case 'write-delta':
+      return 3
+    case 'self-check':
+    case 'self-check-done':
+    case 'self-check-skipped':
+      return 4
+    case 'done':
+      return 5
+    case 'revise':
+      return 3
+    default:
+      return null
+  }
+}
+
 // 当前挂接中的进度流；重新挂接/离开页面时中断旧连接，避免重复阶段
 let attachAbort: AbortController | null = null
 
@@ -69,6 +102,10 @@ export const useLessonStore = defineStore('lesson', () => {
   const streamingContent = ref('')
   const generating = ref(false)
   const error = ref<string | null>(null)
+  const phase = ref(0)
+  const startedAt = ref<number | null>(null)
+  // 本次挂接的进度流以「完成」收尾（用于生成完成后的显式提示）
+  const justCompleted = ref(false)
 
   const topic = ref<Topic | null>(null)
   const lesson = ref<Lesson | null>(null)
@@ -84,6 +121,9 @@ export const useLessonStore = defineStore('lesson', () => {
     questions.value = []
     questionsGeneratedAt.value = undefined
     attempts.value = []
+    phase.value = 0
+    startedAt.value = null
+    justCompleted.value = false
   }
 
   // 发起后台备课任务并挂接进度；离开页面再回来可重新 attach 回放
@@ -91,6 +131,7 @@ export const useLessonStore = defineStore('lesson', () => {
     reset()
     // 立即进入进度视图，避免任何窗口期只显示"加载中"
     generating.value = true
+    startedAt.value = Date.now()
     stages.value = [{ key: 'init', label: '正在发起备课任务…', ts: Date.now() }]
     try {
       const res = await fetch(`/api/topics/${topicId}/lessons`, {
@@ -122,6 +163,9 @@ export const useLessonStore = defineStore('lesson', () => {
     streamingContent.value = ''
     error.value = null
     generating.value = true
+    phase.value = 0
+    startedAt.value = Date.now()
+    justCompleted.value = false
     let pendingLoad: Promise<void> | null = null
     try {
       await getSse(
@@ -130,6 +174,8 @@ export const useLessonStore = defineStore('lesson', () => {
           onEvent(event, data) {
             if (event === 'stage') {
               const e = data as { stage: string; detail?: unknown }
+              const p = stagePhase(e.stage)
+              if (p !== null) phase.value = Math.max(phase.value, p)
               if (e.stage === 'write-delta') {
                 streamingContent.value += (e.detail as { text: string }).text
                 return
@@ -142,6 +188,8 @@ export const useLessonStore = defineStore('lesson', () => {
                 ]
               }
             } else if (event === 'result') {
+              justCompleted.value = true
+              phase.value = LESSON_PHASES.length - 1
               pendingLoad = load(lessonId)
             } else if (event === 'error') {
               error.value = (data as { message: string }).message
@@ -255,6 +303,9 @@ export const useLessonStore = defineStore('lesson', () => {
     streamingContent,
     generating,
     error,
+    phase,
+    startedAt,
+    justCompleted,
     topic,
     lesson,
     questions,

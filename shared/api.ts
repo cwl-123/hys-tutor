@@ -7,6 +7,8 @@ export interface TopicStats {
   nodeCount: number
   lessonCount: number
   lastLessonAt: string | null
+  // 该方向是否有后台备课/优化任务在跑（首页卡片据此显示「课件生成中」）
+  generatingLesson: boolean
 }
 export type TopicWithStats = Topic & { stats: TopicStats }
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTopicStore } from '@/stores/topic'
 
@@ -18,6 +18,18 @@ const creating = ref(false)
 onMounted(async () => {
   await store.fetchTopics()
 })
+
+// 有方向正在后台备课/优化时轮询刷新，卡片上的「课件生成中」状态无需手动刷新
+let pollTimer: number | undefined
+watch(
+  () => store.topics.some((t) => t.stats.generatingLesson),
+  (running) => {
+    window.clearInterval(pollTimer)
+    if (running) pollTimer = window.setInterval(() => void store.fetchTopics(), 5000)
+  },
+  { immediate: true },
+)
+onUnmounted(() => window.clearInterval(pollTimer))
 
 function pick(list: string[], current: string | null, value: string): string | null {
   return current === value ? null : value
@@ -133,12 +145,20 @@ function fmtRelative(iso: string): string {
             {{ creating ? 'AI 调研生成中…' : '开启学习方向 →' }}
           </button>
         </div>
-        <p
+        <div
           v-if="store.stageText"
-          class="create__stage"
+          class="create__progress"
         >
-          {{ store.stageText }}
-        </p>
+          <span class="create__spinner" />
+          <div>
+            <div class="create__stage">
+              {{ store.stageText }}
+            </div>
+            <div class="create__stage-sub">
+              联网调研 → 生成知识图谱，约 1~3 分钟，请勿关闭页面
+            </div>
+          </div>
+        </div>
         <p
           v-if="store.error"
           class="create__error"
@@ -163,7 +183,13 @@ function fmtRelative(iso: string): string {
           class="card"
         >
           <div class="card__top">
-            <span class="card__name">{{ t.name }}</span>
+            <div class="card__title">
+              <span class="card__name">{{ t.name }}</span>
+              <span
+                v-if="t.stats.generatingLesson"
+                class="card__live"
+              >⏳ 课件生成中</span>
+            </div>
             <span class="card__arrow">→</span>
           </div>
 
@@ -348,10 +374,40 @@ function fmtRelative(iso: string): string {
   opacity: 0.4;
   cursor: not-allowed;
 }
+.create__progress {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+.create__spinner {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #bfdbfe;
+  border-top-color: #3b82f6;
+  animation: create-spin 0.7s linear infinite;
+}
+@keyframes create-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .create__stage {
-  margin: 12px 0 0;
   font-size: 13px;
+  font-weight: 600;
+  color: #1d4ed8;
+}
+.create__stage-sub {
+  margin-top: 2px;
+  font-size: 12px;
   color: #3b82f6;
+  opacity: 0.85;
 }
 .create__error {
   margin: 12px 0 0;
@@ -410,10 +466,29 @@ function fmtRelative(iso: string): string {
   justify-content: space-between;
   gap: 12px;
 }
+.card__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
 .card__name {
   font-size: 17px;
   font-weight: 600;
   color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.card__live {
+  flex: none;
+  font-size: 11px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  color: #b45309;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  white-space: nowrap;
 }
 .card__arrow {
   color: var(--text-dim);

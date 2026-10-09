@@ -53,6 +53,8 @@ export interface TopicStats {
   nodeCount: number
   lessonCount: number
   lastLessonAt: string | null
+  // 该方向是否有后台备课/优化任务在跑（首页卡片据此显示「课件生成中」）
+  generatingLesson: boolean
 }
 
 export async function getTopicStats(topicId: string): Promise<TopicStats> {
@@ -61,10 +63,13 @@ export async function getTopicStats(topicId: string): Promise<TopicStats> {
     null,
   )
   const lessons = await listLessons(topicId)
+  // 延迟引入避免 lesson-service ↔ lesson-jobs 循环依赖
+  const { topicJobRunning } = await import('./lesson-jobs')
   return {
     nodeCount: graph?.nodes?.length ?? 0,
     lessonCount: lessons.length,
     lastLessonAt: lessons[0]?.createdAt ?? null,
+    generatingLesson: topicJobRunning(topicId),
   }
 }
 

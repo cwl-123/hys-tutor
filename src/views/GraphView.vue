@@ -12,6 +12,7 @@ import { layoutGraph } from '@/utils/layout'
 import GraphNode from '@/components/GraphNode.vue'
 import NodePanel from '@/components/NodePanel.vue'
 import GraphChatPanel from '@/components/GraphChatPanel.vue'
+import type { LessonMeta } from '@shared/api'
 import type { KnowledgeNode } from '@shared/types'
 
 const route = useRoute()
@@ -42,15 +43,32 @@ function stopPolling() {
     pollTimer = undefined
   }
 }
+
+// 生成/优化刚结束时给一个明确提示（否则用户不知道课件已就绪）
+const doneToast = ref<LessonMeta | null>(null)
+let toastTimer: number | undefined
 watch(
   () => activeLesson.value?.id,
-  (id) => {
+  (id, prevId) => {
     stopPolling()
     if (id) pollTimer = window.setInterval(() => void store.fetchLessons(topicId.value), 8000)
+    if (!id && prevId) {
+      const finished = [...store.lessons]
+        .filter((l) => l.status === 'generated' && l.nodeIds.length)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
+      if (finished) {
+        doneToast.value = finished
+        window.clearTimeout(toastTimer)
+        toastTimer = window.setTimeout(() => (doneToast.value = null), 10_000)
+      }
+    }
   },
   { immediate: true },
 )
-onUnmounted(stopPolling)
+onUnmounted(() => {
+  stopPolling()
+  window.clearTimeout(toastTimer)
+})
 
 const positions = computed(() => layoutGraph(store.nodes))
 
@@ -62,12 +80,36 @@ const lessonCountByNode = computed(() => {
   return counts
 })
 
+// 每个知识点节点上挂载的课件状态（生成中 / 已生成 / 失败），用于卡片角标
+type NodeLessonStatus = 'generating' | 'generated' | 'failed'
+const nodeStatusByNode = computed(() => {
+  const m = new Map<string, NodeLessonStatus>()
+  for (const l of store.lessons) {
+    for (const nid of l.nodeIds) {
+      const cur = m.get(nid)
+      if (l.status === 'generated') {
+        if (cur !== 'generating') m.set(nid, 'generated')
+      } else if (l.status === 'failed') {
+        if (!cur) m.set(nid, 'failed')
+      } else {
+        m.set(nid, 'generating')
+      }
+    }
+  }
+  return m
+})
+
 const flowNodes = computed<Node[]>(() =>
   store.nodes.map((n) => ({
     id: n.id,
     type: 'knode',
     position: positions.value.get(n.id) ?? { x: 0, y: 0 },
-    data: { node: n, selected: n.id === selectedId.value, lessonCount: lessonCountByNode.value.get(n.id) ?? 0 },
+    data: {
+      node: n,
+      selected: n.id === selectedId.value,
+      lessonCount: lessonCountByNode.value.get(n.id) ?? 0,
+      lessonStatus: nodeStatusByNode.value.get(n.id),
+    },
     draggable: false,
   })),
 )
@@ -198,6 +240,26 @@ async function deleteLesson(lessonId: string) {
         {{ applyError }}
       </p>
 
+      <div
+        v-if="doneToast"
+        class="done-toast"
+      >
+        <span class="done-toast__text">🎉 课件已生成：{{ doneToast.title }}</span>
+        <RouterLink
+          :to="`/lesson/${doneToast.id}`"
+          class="done-toast__go"
+        >
+          去查看 →
+        </RouterLink>
+        <button
+          class="done-toast__close"
+          title="关闭"
+          @click="doneToast = null"
+        >
+          ×
+        </button>
+      </div>
+
       <div class="canvas-wrap">
         <VueFlow
           :nodes="flowNodes"
@@ -304,6 +366,58 @@ async function deleteLesson(lessonId: string) {
   color: var(--mastery-red);
   font-size: 13px;
   background: #fef2f2;
+}
+.done-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px 12px 18px;
+  background: #fff;
+  border: 1px solid #bbf7d0;
+  border-left: 4px solid var(--mastery-green);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgb(15 23 42 / 16%);
+  animation: toast-in 0.25s ease;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.done-toast__text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.done-toast__go {
+  flex: none;
+  font-size: 13px;
+  color: #fff;
+  background: #16a34a;
+  border-radius: 7px;
+  padding: 6px 12px;
+  text-decoration: none;
+}
+.done-toast__close {
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
 }
 .canvas-wrap {
   flex: 1;

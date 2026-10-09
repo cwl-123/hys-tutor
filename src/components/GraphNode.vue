@@ -3,7 +3,14 @@ import { Handle, Position } from '@vue-flow/core'
 import { computed } from 'vue'
 import { masteryLevel, type KnowledgeNode } from '@shared/types'
 
-const props = defineProps<{ data: { node: KnowledgeNode; selected: boolean; lessonCount: number } }>()
+const props = defineProps<{
+  data: {
+    node: KnowledgeNode
+    selected: boolean
+    lessonCount: number
+    lessonStatus?: 'generating' | 'generated' | 'failed'
+  }
+}>()
 
 const level = computed(() => masteryLevel(props.data.node.mastery))
 </script>
@@ -25,7 +32,22 @@ const level = computed(() => masteryLevel(props.data.node.mastery))
         <i class="knode__dot" />{{ data.node.mastery }} 分
       </span>
       <span
-        v-if="data.lessonCount > 0"
+        v-if="data.lessonStatus === 'generating'"
+        class="knode__badge knode__badge--gen"
+        title="课件正在生成中"
+      >生成中</span>
+      <span
+        v-else-if="data.lessonStatus === 'generated'"
+        class="knode__badge knode__badge--ok"
+        :title="`${data.lessonCount} 节已生成课件`"
+      >✓ 已生成<template v-if="data.lessonCount > 1"> ×{{ data.lessonCount }}</template></span>
+      <span
+        v-else-if="data.lessonStatus === 'failed'"
+        class="knode__badge knode__badge--bad"
+        title="最近一次生成失败"
+      >⚠ 失败</span>
+      <span
+        v-else-if="data.lessonCount > 0"
         class="knode__lessons"
         :title="`${data.lessonCount} 节历史课程`"
       >📖 {{ data.lessonCount }}</span>
@@ -104,5 +126,23 @@ const level = computed(() => masteryLevel(props.data.node.mastery))
 .knode__lessons {
   font-size: 11px;
   color: #2563eb;
+}
+.knode__badge {
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.knode__badge--gen {
+  color: #b45309;
+  background: #fffbeb;
+}
+.knode__badge--ok {
+  color: #15803d;
+  background: #f0fdf4;
+}
+.knode__badge--bad {
+  color: var(--mastery-red);
+  background: #fef2f2;
 }
 </style>
