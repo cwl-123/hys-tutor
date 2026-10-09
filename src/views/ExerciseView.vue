@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import { ArrowLeft, ArrowRight, TriangleAlert } from 'lucide-vue-next'
 import { useLessonStore } from '@/stores/lesson'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import { submitReport } from '@/utils/report'
@@ -185,9 +186,11 @@ async function submitQuestionReport(q: Question) {
   <div class="exercise-view">
     <div class="crumb">
       <RouterLink :to="lessonStore.lesson?.topicId ? `/topic/${lessonStore.lesson.topicId}` : '/'">
-        ← 知识图谱
+        <ArrowLeft :size="13" />
+        知识图谱
       </RouterLink>
       <RouterLink :to="`/lesson/${lessonId}`">
+        <ArrowLeft :size="13" />
         返回课程
       </RouterLink>
     </div>
@@ -281,7 +284,8 @@ async function submitQuestionReport(q: Question) {
                 class="question__report"
                 @click="toggleReport(item.q.id)"
               >
-                ⚠ 这里有错
+                <TriangleAlert :size="12" />
+                这里有错
               </button>
             </div>
 
@@ -295,7 +299,7 @@ async function submitQuestionReport(q: Question) {
                 placeholder="备注（可选）：题目哪里有问题？"
               />
               <button
-                class="btn btn--small"
+                class="btn btn--sm"
                 @click="submitQuestionReport(item.q)"
               >
                 提交报错
@@ -439,7 +443,8 @@ async function submitQuestionReport(q: Question) {
               to="/lesson/new"
               class="btn"
             >
-              开始下一课 →
+              开始下一课
+              <ArrowRight :size="14" />
             </RouterLink>
           </div>
         </footer>
@@ -469,7 +474,8 @@ async function submitQuestionReport(q: Question) {
               class="question__report"
               @click="toggleReport(q.id)"
             >
-              ⚠ 这里有错
+              <TriangleAlert :size="12" />
+              这里有错
             </button>
           </div>
 
@@ -483,7 +489,7 @@ async function submitQuestionReport(q: Question) {
               placeholder="备注（可选）：题目哪里有问题？"
             />
             <button
-              class="btn btn--small"
+              class="btn btn--sm"
               @click="submitQuestionReport(q)"
             >
               提交报错
@@ -590,6 +596,9 @@ async function submitQuestionReport(q: Question) {
   margin-bottom: 8px;
 }
 .crumb a {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   color: var(--primary-strong);
   text-decoration: none;
 }
@@ -673,6 +682,9 @@ async function submitQuestionReport(q: Question) {
 }
 .question__report {
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font: inherit;
   font-size: 12px;
   color: var(--amber-text);
@@ -696,24 +708,22 @@ async function submitQuestionReport(q: Question) {
   font-size: 13px;
   padding: 6px 10px;
   border: 1px solid var(--mastery-yellow);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: var(--amber-bg);
-}
-.btn--small {
-  font-size: 12px;
-  padding: 6px 10px;
 }
 .report-toast {
   position: fixed;
   bottom: 32px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 300;
+  z-index: var(--z-toast);
   background: var(--text);
   color: #fff;
   font-size: 13px;
-  padding: 8px 16px;
-  border-radius: 8px;
+  padding: 9px 18px;
+  border-radius: var(--r-pill);
+  box-shadow: var(--shadow-lg);
+  animation: toast-in var(--dur) var(--ease);
 }
 .options {
   display: flex;
@@ -821,25 +831,5 @@ async function submitQuestionReport(q: Question) {
 .submit-bar__error {
   color: var(--mastery-red);
   font-size: 13px;
-}
-.btn {
-  display: inline-block;
-  font: inherit;
-  padding: 8px 22px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: #fff;
-  color: var(--text);
-  text-decoration: none;
-  cursor: pointer;
-}
-.btn--primary {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: #fff;
-}
-.btn--primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 </style>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Handle, Position } from '@vue-flow/core'
 import { computed } from 'vue'
+import { BookOpen, Check, LoaderCircle, TriangleAlert } from 'lucide-vue-next'
 import { masteryLevel, type KnowledgeNode } from '@shared/types'
 
 const props = defineProps<{
@@ -35,22 +36,25 @@ const level = computed(() => masteryLevel(props.data.node.mastery))
         v-if="data.lessonStatus === 'generating'"
         class="knode__badge knode__badge--gen"
         title="课件正在生成中"
-      >生成中</span>
+      ><LoaderCircle
+        :size="9"
+        class="spin"
+      /> 生成中</span>
       <span
         v-else-if="data.lessonStatus === 'generated'"
         class="knode__badge knode__badge--ok"
         :title="`${data.lessonCount} 节已生成课件`"
-      >✓ 已生成<template v-if="data.lessonCount > 1"> ×{{ data.lessonCount }}</template></span>
+      ><Check :size="9" /> 已生成<template v-if="data.lessonCount > 1"> ×{{ data.lessonCount }}</template></span>
       <span
         v-else-if="data.lessonStatus === 'failed'"
         class="knode__badge knode__badge--bad"
         title="最近一次生成失败"
-      >⚠ 失败</span>
+      ><TriangleAlert :size="9" /> 失败</span>
       <span
         v-else-if="data.lessonCount > 0"
         class="knode__lessons"
         :title="`${data.lessonCount} 节历史课程`"
-      >📖 {{ data.lessonCount }}</span>
+      ><BookOpen :size="10" /> {{ data.lessonCount }}</span>
     </div>
     <Handle
       type="source"
@@ -124,13 +128,19 @@ const level = computed(() => masteryLevel(props.data.node.mastery))
   background: var(--mastery-green);
 }
 .knode__lessons {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font-size: 11px;
   color: var(--primary-strong);
 }
 .knode__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font-size: 10px;
   padding: 1px 7px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   white-space: nowrap;
 }
 .knode__badge--gen {

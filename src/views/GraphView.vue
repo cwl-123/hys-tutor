@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { VueFlow, type Node, type Edge, type NodeMouseEvent } from '@vue-flow/core'
 import { Controls } from '@vue-flow/controls'
 import { Background } from '@vue-flow/background'
+import { ArrowLeft, ArrowRight, Bot, LoaderCircle, PartyPopper, X } from 'lucide-vue-next'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import '@vue-flow/controls/dist/style.css'
@@ -189,7 +190,8 @@ async function deleteLesson(lessonId: string) {
         to="/"
         class="btn"
       >
-        ← 返回学习方向
+        <ArrowLeft :size="14" />
+        返回学习方向
       </RouterLink>
     </div>
 
@@ -199,7 +201,7 @@ async function deleteLesson(lessonId: string) {
           to="/"
           class="toolbar__home"
         >
-          ←
+          <ArrowLeft :size="16" />
         </RouterLink>
         <strong>{{ store.topic.name }}</strong>
         <span class="toolbar__count">{{ store.nodes.length }} 个知识点</span>
@@ -215,21 +217,27 @@ async function deleteLesson(lessonId: string) {
             class="btn btn--progress"
             title="后台备课尚未完成，点击查看实时进度"
           >
-            ⏳ {{ activeLessonLabel }} · 查看进度
+            <LoaderCircle
+              :size="13"
+              class="spin"
+            />
+            {{ activeLessonLabel }} · 查看进度
           </RouterLink>
           <RouterLink
             :to="`/lesson/new?topic=${topicId}`"
             class="btn btn--go"
             title="由排课引擎自动选择：已解锁且掌握分最低的知识点"
           >
-            开始下一课 →
+            开始下一课
+            <ArrowRight :size="14" />
           </RouterLink>
           <button
             class="btn"
             :class="{ 'btn--on': chatVisible }"
             @click="chatVisible = !chatVisible"
           >
-            🤖 AI 调整
+            <Bot :size="14" />
+            AI 调整
           </button>
         </div>
       </div>
@@ -244,19 +252,24 @@ async function deleteLesson(lessonId: string) {
         v-if="doneToast"
         class="done-toast"
       >
-        <span class="done-toast__text">🎉 课件已生成：{{ doneToast.title }}</span>
+        <PartyPopper
+          :size="16"
+          class="done-toast__icon"
+        />
+        <span class="done-toast__text">课件已生成：{{ doneToast.title }}</span>
         <RouterLink
           :to="`/lesson/${doneToast.id}`"
           class="done-toast__go"
         >
-          去查看 →
+          去查看
+          <ArrowRight :size="13" />
         </RouterLink>
         <button
           class="done-toast__close"
           title="关闭"
           @click="doneToast = null"
         >
-          ×
+          <X :size="15" />
         </button>
       </div>
 
@@ -319,9 +332,10 @@ async function deleteLesson(lessonId: string) {
   border-bottom: 1px solid var(--border);
 }
 .toolbar__home {
+  display: inline-flex;
+  align-items: center;
   color: var(--text-dim);
   text-decoration: none;
-  font-size: 16px;
 }
 .toolbar__home:hover {
   color: var(--primary-strong);
@@ -371,27 +385,21 @@ async function deleteLesson(lessonId: string) {
   position: fixed;
   right: 24px;
   bottom: 24px;
-  z-index: 300;
+  z-index: var(--z-toast);
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 14px 12px 18px;
-  background: #fff;
+  gap: 10px;
+  padding: 12px 14px 12px 16px;
+  background: var(--bg);
   border: 1px solid var(--green-border);
   border-left: 4px solid var(--mastery-green);
-  border-radius: 12px;
-  box-shadow: 0 12px 32px rgb(var(--ink-rgb) / 16%);
-  animation: toast-in 0.25s ease;
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+  animation: toast-in var(--dur) var(--ease);
 }
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.done-toast__icon {
+  flex: none;
+  color: var(--green-strong);
 }
 .done-toast__text {
   font-size: 13px;
@@ -404,20 +412,33 @@ async function deleteLesson(lessonId: string) {
 }
 .done-toast__go {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 13px;
   color: #fff;
   background: var(--green-strong);
-  border-radius: 7px;
+  border-radius: var(--r-sm);
   padding: 6px 12px;
   text-decoration: none;
+  transition: background var(--dur-fast) var(--ease);
+}
+.done-toast__go:hover {
+  background: var(--green-hover);
 }
 .done-toast__close {
+  display: inline-flex;
+  align-items: center;
   border: none;
   background: none;
   color: var(--text-dim);
-  font-size: 18px;
-  line-height: 1;
   cursor: pointer;
+  padding: 2px;
+  border-radius: 6px;
+}
+.done-toast__close:hover {
+  color: var(--text);
+  background: var(--bg-muted);
 }
 .canvas-wrap {
   flex: 1;
@@ -427,33 +448,14 @@ async function deleteLesson(lessonId: string) {
 .canvas-wrap :deep(.vue-flow) {
   flex: 1;
 }
-.btn {
-  font: inherit;
-  font-size: 13px;
-  padding: 5px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: #fff;
-  cursor: pointer;
-  text-decoration: none;
-  color: var(--text);
-}
-.btn--primary {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: #fff;
-}
-.btn--primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
 .btn--go {
   background: var(--green-strong);
   border-color: var(--green-strong);
   color: #fff;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
+}
+.btn--go:hover {
+  background: var(--green-hover);
+  border-color: var(--green-hover);
 }
 .btn--on {
   border-color: var(--primary);
@@ -464,8 +466,5 @@ async function deleteLesson(lessonId: string) {
   background: var(--amber-bg);
   border-color: var(--mastery-yellow);
   color: var(--amber-text);
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
 }
 </style>

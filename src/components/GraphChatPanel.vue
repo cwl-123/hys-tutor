@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
+import { X } from 'lucide-vue-next'
 import type { KnowledgeNode } from '@shared/types'
 
 interface GraphDiff {
@@ -94,9 +95,10 @@ function applyProposal(msg: ChatMsg) {
       <span>AI 调整图谱</span>
       <button
         class="chat__close"
+        title="关闭"
         @click="emit('close')"
       >
-        ×
+        <X :size="15" />
       </button>
     </header>
 
@@ -134,7 +136,7 @@ function applyProposal(msg: ChatMsg) {
         </div>
         <button
           v-if="m.proposal"
-          class="btn btn--apply"
+          class="btn btn--primary btn--sm msg__apply"
           :disabled="m.applied || disabled"
           @click="applyProposal(m)"
         >
@@ -143,11 +145,9 @@ function applyProposal(msg: ChatMsg) {
       </div>
       <div
         v-if="loading"
-        class="msg msg--assistant"
+        class="msg msg--assistant msg--typing"
       >
-        <div class="msg__content">
-          思考中…
-        </div>
+        <span class="msg__dot" /><span class="msg__dot" /><span class="msg__dot" />
       </div>
     </div>
 
@@ -159,7 +159,7 @@ function applyProposal(msg: ChatMsg) {
     </p>
 
     <form
-      class="chat__input"
+      class="chat__inputbox"
       @submit.prevent="send"
     >
       <input
@@ -169,7 +169,7 @@ function applyProposal(msg: ChatMsg) {
         :disabled="loading || disabled"
       >
       <button
-        class="btn btn--primary"
+        class="btn btn--primary btn--sm"
         type="submit"
         :disabled="loading || disabled || !input.trim()"
       >
@@ -186,6 +186,7 @@ function applyProposal(msg: ChatMsg) {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  background: var(--bg);
 }
 .chat__header {
   display: flex;
@@ -197,11 +198,21 @@ function applyProposal(msg: ChatMsg) {
   border-bottom: 1px solid var(--border);
 }
 .chat__close {
+  display: inline-flex;
+  align-items: center;
   border: none;
   background: none;
-  font-size: 18px;
   cursor: pointer;
   color: var(--text-dim);
+  padding: 4px;
+  border-radius: 6px;
+  transition:
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
+}
+.chat__close:hover {
+  color: var(--text);
+  background: var(--bg-muted);
 }
 .chat__disabled {
   margin: 0;
@@ -213,31 +224,67 @@ function applyProposal(msg: ChatMsg) {
 .chat__list {
   flex: 1;
   overflow-y: auto;
-  padding: 12px;
+  padding: 14px 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  background: var(--bg-subtle);
 }
 .chat__empty {
   font-size: 12px;
   color: var(--text-dim);
   line-height: 1.7;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
 }
 .msg {
   max-width: 92%;
   font-size: 13px;
   line-height: 1.6;
-  padding: 8px 12px;
-  border-radius: 10px;
+  padding: 9px 13px;
 }
 .msg--user {
   align-self: flex-end;
   background: var(--primary);
   color: #fff;
+  border-radius: 14px 14px 4px 14px;
 }
 .msg--assistant {
   align-self: flex-start;
-  background: var(--bg-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 14px 14px 14px 4px;
+}
+.msg--typing {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  padding: 12px 16px;
+}
+.msg__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  animation: chat-blink 1.2s infinite ease-in-out;
+}
+.msg__dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.msg__dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes chat-blink {
+  0%,
+  60%,
+  100% {
+    opacity: 0.25;
+  }
+  30% {
+    opacity: 1;
+  }
 }
 .msg__diff {
   margin-top: 6px;
@@ -247,47 +294,39 @@ function applyProposal(msg: ChatMsg) {
   border-radius: 6px;
   padding: 4px 8px;
 }
-.btn--apply {
+.msg__apply {
   margin-top: 8px;
-  font-size: 12px;
-  padding: 4px 12px;
 }
 .chat__error {
   margin: 0;
   padding: 6px 14px;
   font-size: 12px;
   color: var(--mastery-red);
+  background: var(--red-bg);
 }
-.chat__input {
+.chat__inputbox {
   display: flex;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
   padding: 10px 12px;
   border-top: 1px solid var(--border);
+  background: var(--bg);
 }
-.chat__input input {
+.chat__inputbox input {
   flex: 1;
+  min-width: 0;
   font: inherit;
   font-size: 13px;
-  padding: 7px 10px;
+  padding: 7px 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
-.btn {
-  font: inherit;
-  font-size: 13px;
-  padding: 5px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: #fff;
-  cursor: pointer;
-}
-.btn--primary {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: #fff;
-}
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.chat__inputbox input:focus {
+  outline: none;
+  border-color: var(--primary-soft);
+  box-shadow: 0 0 0 3px rgb(var(--primary-rgb) / 12%);
 }
 </style>

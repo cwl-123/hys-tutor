@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { Download, Eye, EyeOff, Pencil, Plus, Trash2, X } from 'lucide-vue-next'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
@@ -219,9 +220,10 @@ async function save() {
           <span>模型设置</span>
           <button
             class="modal__close"
+            title="关闭"
             @click="emit('close')"
           >
-            ×
+            <X :size="17" />
           </button>
         </header>
 
@@ -267,14 +269,14 @@ async function save() {
                 title="编辑"
                 @click.prevent="startEdit(i)"
               >
-                ✎
+                <Pencil :size="13" />
               </button>
               <button
                 type="button"
                 title="删除"
                 @click.prevent="removeProvider(i)"
               >
-                🗑
+                <Trash2 :size="13" />
               </button>
             </span>
           </label>
@@ -284,7 +286,8 @@ async function save() {
             class="provider provider--add"
             @click="startAdd"
           >
-            ＋ 添加模型源
+            <Plus :size="14" />
+            添加模型源
           </button>
 
           <button
@@ -293,7 +296,8 @@ async function save() {
             :disabled="candidatesLoading"
             @click="loadCandidates"
           >
-            {{ candidatesLoading ? '扫描中…' : candidates !== null ? '收起导入列表' : '⇩ 从本机 AI 工具导入（OpenCode / Codex / Claude Code）' }}
+            <Download :size="14" />
+            {{ candidatesLoading ? '扫描中…' : candidates !== null ? '收起导入列表' : '从本机 AI 工具导入（OpenCode / Codex / Claude Code）' }}
           </button>
 
           <div
@@ -357,33 +361,14 @@ async function save() {
                   :title="showTavilyKey ? '隐藏' : '显示'"
                   @click="showTavilyKey = !showTavilyKey"
                 >
-                  <svg
+                  <Eye
                     v-if="showTavilyKey"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  ><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle
-                    cx="12"
-                    cy="12"
-                    r="3"
-                  /></svg>
-                  <svg
+                    :size="15"
+                  />
+                  <EyeOff
                     v-else
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  ><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line
-                    x1="1"
-                    y1="1"
-                    x2="23"
-                    y2="23"
-                  /></svg>
+                    :size="15"
+                  />
                 </button>
               </span>
             </label>
@@ -408,33 +393,14 @@ async function save() {
                   :title="showBochaKey ? '隐藏' : '显示'"
                   @click="showBochaKey = !showBochaKey"
                 >
-                  <svg
+                  <Eye
                     v-if="showBochaKey"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  ><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle
-                    cx="12"
-                    cy="12"
-                    r="3"
-                  /></svg>
-                  <svg
+                    :size="15"
+                  />
+                  <EyeOff
                     v-else
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  ><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line
-                    x1="1"
-                    y1="1"
-                    x2="23"
-                    y2="23"
-                  /></svg>
+                    :size="15"
+                  />
                 </button>
               </span>
             </label>
@@ -487,33 +453,14 @@ async function save() {
                 :title="showEditKey ? '隐藏' : '显示'"
                 @click="showEditKey = !showEditKey"
               >
-                <svg
+                <Eye
                   v-if="showEditKey"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                ><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle
-                  cx="12"
-                  cy="12"
-                  r="3"
-                /></svg>
-                <svg
+                  :size="15"
+                />
+                <EyeOff
                   v-else
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                ><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line
-                  x1="1"
-                  y1="1"
-                  x2="23"
-                  y2="23"
-                /></svg>
+                  :size="15"
+                />
               </button>
             </span>
           </label>
@@ -573,26 +520,17 @@ async function save() {
 </template>
 
 <style scoped>
-.mask {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-  background: var(--mask-bg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 .modal {
   width: 560px;
   max-height: 86vh;
   overflow-y: auto;
-  background: #fff;
-  border-radius: 14px;
+  background: var(--bg);
+  border-radius: var(--r-lg);
   padding: 22px 24px;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  box-shadow: 0 20px 60px rgb(var(--ink-rgb) / 25%);
+  box-shadow: var(--shadow-xl);
 }
 .modal__header {
   display: flex;
@@ -602,12 +540,21 @@ async function save() {
   font-weight: 600;
 }
 .modal__close {
+  display: inline-flex;
+  align-items: center;
   border: none;
   background: none;
-  font-size: 20px;
-  line-height: 1;
   cursor: pointer;
   color: var(--text-dim);
+  padding: 4px;
+  border-radius: 6px;
+  transition:
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
+}
+.modal__close:hover {
+  color: var(--text);
+  background: var(--bg-muted);
 }
 .modal__effective {
   margin: 0;
@@ -645,6 +592,7 @@ async function save() {
 }
 .provider--add {
   justify-content: center;
+  gap: 6px;
   border-style: dashed;
   color: var(--text-dim);
   font-size: 13px;
@@ -762,14 +710,21 @@ async function save() {
   gap: 4px;
 }
 .provider__ops button {
+  display: inline-flex;
+  align-items: center;
   border: none;
   background: none;
   cursor: pointer;
-  font-size: 13px;
-  opacity: 0.55;
+  color: var(--text-dim);
+  padding: 5px;
+  border-radius: 6px;
+  transition:
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
 }
 .provider__ops button:hover {
-  opacity: 1;
+  color: var(--text);
+  background: var(--bg-muted);
 }
 .edit {
   border: 1px solid var(--border);
@@ -859,23 +814,5 @@ async function save() {
 .modal__buttons {
   display: flex;
   gap: 8px;
-}
-.btn {
-  font: inherit;
-  font-size: 13px;
-  padding: 7px 16px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: #fff;
-  cursor: pointer;
-}
-.btn--primary {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: #fff;
-}
-.btn--primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 </style>

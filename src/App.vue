@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { Settings } from 'lucide-vue-next'
 import SettingsModal from '@/components/SettingsModal.vue'
 
 const showSettings = ref(false)
@@ -20,7 +21,8 @@ const showSettings = ref(false)
         title="模型设置"
         @click="showSettings = true"
       >
-        ⚙ 设置
+        <Settings :size="14" />
+        设置
       </button>
     </header>
     <main class="app-main">
@@ -59,15 +61,21 @@ const showSettings = ref(false)
 }
 .app-settings {
   margin-left: auto;
-  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font: inherit;
   font-size: 13px;
   color: var(--text-dim);
   background: none;
   border: 1px solid transparent;
-  border-radius: 8px;
-  padding: 4px 10px;
+  border-radius: var(--r-sm);
+  padding: 5px 12px;
   cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
 }
 .app-settings:hover {
   color: var(--text);

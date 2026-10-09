@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { Sparkles } from 'lucide-vue-next'
 import { parseSections } from '@shared/lesson-md'
 import type { LessonQuote } from '@shared/lesson-chat'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
@@ -99,6 +100,7 @@ onBeforeUnmount(() => window.removeEventListener('scroll', clearTip, true))
         :style="{ left: `${selectionTip.x}px`, top: `${selectionTip.y}px` }"
         @mousedown.prevent="quoteSelection"
       >
+        <Sparkles :size="12" />
         引用这段让 AI 优化
       </button>
     </Teleport>
@@ -142,15 +144,22 @@ onBeforeUnmount(() => window.removeEventListener('scroll', clearTip, true))
 .lesson-body__quote-btn {
   position: fixed;
   transform: translate(-50%, calc(-100% - 8px));
-  z-index: 300;
+  z-index: var(--z-modal);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font: inherit;
   font-size: 12px;
-  padding: 5px 10px;
+  padding: 6px 12px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--r-pill);
   background: var(--text);
   color: #fff;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgb(var(--ink-rgb) / 25%);
+  box-shadow: var(--shadow-lg);
+  transition: transform var(--dur-fast) var(--ease);
+}
+.lesson-body__quote-btn:hover {
+  transform: translate(-50%, calc(-100% - 10px));
 }
 </style>

@@ -33,6 +33,7 @@
     "dagre": "^0.8.5",
     "jsdom": "^30.1.1",
     "katex": "^0.18.9",
+    "lucide-vue-next": "^1.0.0",
     "markdown-it": "^15.0.2",
     "mermaid": "^12.1.0",
     "openai": "^7.23.0",

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ArrowLeft, CircleCheckBig, MessageSquare, Pencil, Sparkles, X } from 'lucide-vue-next'
 import { useLessonStore } from '@/stores/lesson'
 import { useTopicStore } from '@/stores/topic'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
@@ -245,7 +246,8 @@ onUnmounted(() => {
           :to="topicHome"
           class="btn"
         >
-          ← 返回图谱
+          <ArrowLeft :size="14" />
+          返回图谱
         </RouterLink>
       </div>
 
@@ -324,6 +326,7 @@ onUnmounted(() => {
           :to="topicHome"
           class="btn"
         >
+          <ArrowLeft :size="14" />
           返回图谱
         </RouterLink>
       </div>
@@ -349,6 +352,7 @@ onUnmounted(() => {
           :to="topicHome"
           class="btn"
         >
+          <ArrowLeft :size="14" />
           返回图谱
         </RouterLink>
       </div>
@@ -363,19 +367,23 @@ onUnmounted(() => {
         v-if="lessonStore.justCompleted"
         class="lesson__done-banner"
       >
-        <span>✅ 课件已生成，可以开始学习了</span>
+        <span class="lesson__done-text">
+          <CircleCheckBig :size="15" />
+          课件已生成，可以开始学习了
+        </span>
         <button
           class="lesson__done-close"
           title="关闭"
           @click="lessonStore.justCompleted = false"
         >
-          ×
+          <X :size="15" />
         </button>
       </div>
       <header class="lesson__header">
         <div class="lesson__crumb">
           <RouterLink :to="topicHome">
-            ← 知识图谱
+            <ArrowLeft :size="13" />
+            知识图谱
           </RouterLink>
           <span>{{ lessonStore.topic?.name }}</span>
         </div>
@@ -407,21 +415,24 @@ onUnmounted(() => {
             :disabled="lessonStore.generating"
             @click="startEditing"
           >
-            ✏️ 编辑正文
+            <Pencil :size="13" />
+            编辑正文
           </button>
           <button
             class="btn"
             :disabled="lessonStore.generating || editing"
             @click="chatOpen = !chatOpen"
           >
-            {{ chatOpen ? '收起 AI 对话' : '💬 AI 对话优化' }}
+            <MessageSquare :size="13" />
+            {{ chatOpen ? '收起 AI 对话' : 'AI 对话优化' }}
           </button>
           <button
             class="btn"
             :disabled="lessonStore.generating || editing"
             @click="reviseOpen = true"
           >
-            ✨ AI 优化本课
+            <Sparkles :size="13" />
+            AI 优化本课
           </button>
           <span
             v-if="lessonStore.lesson.revisedAt"
@@ -521,7 +532,7 @@ onUnmounted(() => {
     <Teleport to="body">
       <div
         v-if="reviseOpen"
-        class="revise-mask"
+        class="mask"
         @click.self="reviseOpen = false"
       >
         <div class="revise-modal">
@@ -556,7 +567,7 @@ onUnmounted(() => {
     <Teleport to="body">
       <div
         v-if="mermaidEdit"
-        class="revise-mask"
+        class="mask"
         @click.self="mermaidEdit = null"
       >
         <div class="mermaid-modal">
@@ -759,20 +770,30 @@ onUnmounted(() => {
   gap: 12px;
   margin-bottom: 16px;
   padding: 12px 16px;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--green-bg);
   border: 1px solid var(--green-border);
   color: var(--green-hover);
   font-size: 14px;
   font-weight: 600;
 }
+.lesson__done-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
 .lesson__done-close {
+  display: inline-flex;
+  align-items: center;
   border: none;
   background: none;
   color: var(--green-hover);
-  font-size: 18px;
-  line-height: 1;
   cursor: pointer;
+  padding: 2px;
+  border-radius: 6px;
+}
+.lesson__done-close:hover {
+  background: var(--green-border);
 }
 .lesson__crumb {
   display: flex;
@@ -782,6 +803,9 @@ onUnmounted(() => {
   margin-bottom: 8px;
 }
 .lesson__crumb a {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   color: var(--primary-strong);
   text-decoration: none;
 }
@@ -835,12 +859,13 @@ onUnmounted(() => {
 }
 .mermaid-modal {
   width: min(920px, 92vw);
-  background: #fff;
-  border-radius: 14px;
+  background: var(--bg);
+  border-radius: var(--r-lg);
   padding: 22px 24px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  box-shadow: var(--shadow-xl);
 }
 .mermaid-modal h3 {
   margin: 0;
@@ -871,23 +896,15 @@ onUnmounted(() => {
   border-radius: 8px;
   background: var(--bg-subtle);
 }
-.revise-mask {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-  background: var(--mask-bg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 .revise-modal {
   width: 520px;
-  background: #fff;
-  border-radius: 14px;
+  background: var(--bg);
+  border-radius: var(--r-lg);
   padding: 22px 24px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  box-shadow: var(--shadow-xl);
 }
 .revise-modal h3 {
   margin: 0;
@@ -931,23 +948,6 @@ onUnmounted(() => {
 .lesson__footer {
   margin-top: 32px;
   text-align: center;
-}
-.btn {
-  display: inline-block;
-  font: inherit;
-  padding: 8px 20px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: #fff;
-  color: var(--text);
-  text-decoration: none;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.btn--primary {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: #fff;
 }
 .state {
   text-align: center;

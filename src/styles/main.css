@@ -43,6 +43,7 @@
   --shadow-md: 0 1px 2px rgb(15 23 42 / 4%), 0 4px 12px rgb(15 23 42 / 8%);
   --shadow-lg: 0 4px 8px rgb(15 23 42 / 6%), 0 12px 32px rgb(15 23 42 / 12%);
   --shadow-xl: 0 8px 16px rgb(15 23 42 / 8%), 0 24px 56px rgb(15 23 42 / 16%);
+  --shadow-drawer: -8px 0 24px rgb(15 23 42 / 8%);
 
   /* 遮罩 */
   --mask-bg: rgb(15 23 42 / 40%);
@@ -83,4 +84,111 @@ body {
 
 ::selection {
   background: var(--primary-bg-strong);
+}
+
+/* ---- 全局按钮 ---- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  padding: 7px 16px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
+}
+.btn:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--bg-subtle);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(var(--primary-rgb) / 25%);
+}
+.btn--primary {
+  background: var(--primary-strong);
+  border-color: var(--primary-strong);
+  color: #fff;
+}
+.btn--primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+.btn--success {
+  background: var(--green-strong);
+  border-color: var(--green-strong);
+  color: #fff;
+}
+.btn--success:hover:not(:disabled) {
+  background: var(--green-hover);
+  border-color: var(--green-hover);
+}
+.btn--sm {
+  font-size: 12px;
+  padding: 5px 10px;
+}
+.btn--lg {
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 22px;
+  border-radius: 10px;
+}
+
+/* ---- 遮罩弹层 ---- */
+.mask {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  background: var(--mask-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: mask-in var(--dur-fast) var(--ease);
+}
+@keyframes mask-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ---- 通用动效 ---- */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+/* lucide 图标在文本行内垂直居中 */
+.lucide {
+  vertical-align: -2px;
 }

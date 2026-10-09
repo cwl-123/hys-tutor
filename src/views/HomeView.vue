@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { ArrowRight, LoaderCircle } from 'lucide-vue-next'
 import { useTopicStore } from '@/stores/topic'
 
 const store = useTopicStore()
@@ -142,7 +143,11 @@ function fmtRelative(iso: string): string {
             type="submit"
             :disabled="creating || !topicName.trim()"
           >
-            {{ creating ? 'AI 调研生成中…' : '开启学习方向 →' }}
+            {{ creating ? 'AI 调研生成中…' : '开启学习方向' }}
+            <ArrowRight
+              v-if="!creating"
+              :size="16"
+            />
           </button>
         </div>
         <div
@@ -188,9 +193,12 @@ function fmtRelative(iso: string): string {
               <span
                 v-if="t.stats.generatingLesson"
                 class="card__live"
-              >⏳ 课件生成中</span>
+              ><LoaderCircle
+                :size="11"
+                class="spin"
+              /> 课件生成中</span>
             </div>
-            <span class="card__arrow">→</span>
+            <span class="card__arrow"><ArrowRight :size="17" /></span>
           </div>
 
           <div
@@ -356,6 +364,9 @@ function fmtRelative(iso: string): string {
 }
 .create__submit {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font: inherit;
   font-size: 15px;
   font-weight: 600;
@@ -365,7 +376,9 @@ function fmtRelative(iso: string): string {
   background: var(--text);
   color: #fff;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition:
+    opacity var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
 }
 .create__submit:hover:not(:disabled) {
   opacity: 0.85;
@@ -482,19 +495,23 @@ function fmtRelative(iso: string): string {
 }
 .card__live {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 11px;
   padding: 2px 9px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   color: var(--amber-text);
   background: var(--amber-bg);
   border: 1px solid var(--amber-border);
   white-space: nowrap;
 }
 .card__arrow {
+  display: inline-flex;
   color: var(--text-dim);
   transition:
-    transform 0.15s,
-    color 0.15s;
+    transform var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 .card:hover .card__arrow {
   transform: translateX(3px);

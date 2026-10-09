@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { Check, Maximize2, Undo2, X } from 'lucide-vue-next'
 import { findSectionByHeading } from '@shared/lesson-md'
 import type { LessonChatMessage, LessonQuote, LessonVersion } from '@shared/lesson-chat'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
@@ -209,7 +210,8 @@ function quoteLabel(q?: LessonQuote | null): string {
           title="撤销最近一次已应用的修改"
           @click="undo"
         >
-          ↩ 撤销
+          <Undo2 :size="12" />
+          撤销
         </button>
         <button
           class="chat__close"
@@ -217,7 +219,7 @@ function quoteLabel(q?: LessonQuote | null): string {
           title="收起面板"
           @click="emit('close')"
         >
-          ×
+          <X :size="16" />
         </button>
       </div>
     </header>
@@ -279,15 +281,20 @@ function quoteLabel(q?: LessonQuote | null): string {
               type="button"
               @click="previewMsgId = m.id"
             >
-              🔍 放大预览
+              <Maximize2 :size="12" />
+              放大预览
             </button>
             <button
-              class="chat__apply"
+              class="btn btn--primary btn--sm"
               type="button"
               :disabled="m.applied || applyingId === m.id"
               @click="applyProposal(m)"
             >
-              {{ m.applied ? '✓ 已应用' : applyingId === m.id ? '应用中…' : '应用修改' }}
+              <Check
+                v-if="m.applied"
+                :size="12"
+              />
+              {{ m.applied ? '已应用' : applyingId === m.id ? '应用中…' : '应用修改' }}
             </button>
           </div>
         </div>
@@ -319,7 +326,7 @@ function quoteLabel(q?: LessonQuote | null): string {
           title="取消引用"
           @click="pendingQuote = null"
         >
-          ×
+          <X :size="12" />
         </button>
       </div>
       <form
@@ -335,7 +342,7 @@ function quoteLabel(q?: LessonQuote | null): string {
           @keydown.enter.exact.prevent="send"
         />
         <button
-          class="chat__send"
+          class="btn btn--primary btn--sm chat__send"
           type="submit"
           :disabled="loading || !input.trim()"
         >
@@ -352,7 +359,7 @@ function quoteLabel(q?: LessonQuote | null): string {
   <Teleport to="body">
     <div
       v-if="previewMsg?.proposal"
-      class="preview-mask"
+      class="mask preview-mask"
       @click.self="previewMsgId = null"
     >
       <div class="preview-modal">
@@ -367,7 +374,7 @@ function quoteLabel(q?: LessonQuote | null): string {
             title="关闭（Esc）"
             @click="previewMsgId = null"
           >
-            ×
+            <X :size="16" />
           </button>
         </header>
         <div class="preview-modal__body">
@@ -386,12 +393,16 @@ function quoteLabel(q?: LessonQuote | null): string {
               关闭
             </button>
             <button
-              class="chat__apply"
+              class="btn btn--primary btn--sm"
               type="button"
               :disabled="previewMsg.applied || applyingId === previewMsg.id"
               @click="applyProposal(previewMsg)"
             >
-              {{ previewMsg.applied ? '✓ 已应用' : applyingId === previewMsg.id ? '应用中…' : '应用修改' }}
+              <Check
+                v-if="previewMsg.applied"
+                :size="12"
+              />
+              {{ previewMsg.applied ? '已应用' : applyingId === previewMsg.id ? '应用中…' : '应用修改' }}
             </button>
           </div>
         </footer>
@@ -405,14 +416,14 @@ function quoteLabel(q?: LessonQuote | null): string {
   position: fixed;
   top: 0;
   right: 0;
-  z-index: 150;
+  z-index: var(--z-drawer);
   width: 400px;
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--bg);
   border-left: 1px solid var(--border);
-  box-shadow: -8px 0 24px rgb(var(--ink-rgb) / 8%);
+  box-shadow: var(--shadow-drawer);
 }
 
 /* ---- 头部 ---- */
@@ -445,14 +456,21 @@ function quoteLabel(q?: LessonQuote | null): string {
   flex-shrink: 0;
 }
 .chat__ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--bg);
   color: var(--text-dim);
   font: inherit;
   font-size: 12px;
   padding: 4px 10px;
-  border-radius: 7px;
+  border-radius: var(--r-sm);
   cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
 }
 .chat__ghost:hover:not(:disabled) {
   color: var(--primary-strong);
@@ -464,13 +482,14 @@ function quoteLabel(q?: LessonQuote | null): string {
   cursor: not-allowed;
 }
 .chat__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 28px;
   height: 28px;
   border: none;
-  border-radius: 7px;
+  border-radius: var(--r-sm);
   background: none;
-  font-size: 18px;
-  line-height: 1;
   cursor: pointer;
   color: var(--text-dim);
 }
@@ -626,23 +645,6 @@ function quoteLabel(q?: LessonQuote | null): string {
   display: flex;
   gap: 8px;
 }
-.chat__apply {
-  font: inherit;
-  font-size: 12px;
-  padding: 5px 16px;
-  border-radius: 7px;
-  border: 1px solid var(--primary);
-  background: var(--primary);
-  color: #fff;
-  cursor: pointer;
-}
-.chat__apply:hover:not(:disabled) {
-  background: var(--primary-strong);
-}
-.chat__apply:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
 
 /* ---- 输入区 ---- */
 .chat__composer {
@@ -678,13 +680,14 @@ function quoteLabel(q?: LessonQuote | null): string {
 }
 .chat__quote-remove {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 20px;
   height: 20px;
   border: none;
   border-radius: 50%;
   background: none;
-  font-size: 15px;
-  line-height: 1;
   cursor: pointer;
   color: var(--primary-hover);
 }
@@ -718,21 +721,6 @@ function quoteLabel(q?: LessonQuote | null): string {
 }
 .chat__send {
   flex-shrink: 0;
-  font: inherit;
-  font-size: 13px;
-  padding: 6px 16px;
-  border: none;
-  border-radius: 8px;
-  background: var(--primary);
-  color: #fff;
-  cursor: pointer;
-}
-.chat__send:hover:not(:disabled) {
-  background: var(--primary-strong);
-}
-.chat__send:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 .chat__hint {
   margin: 6px 2px 0;
@@ -742,13 +730,6 @@ function quoteLabel(q?: LessonQuote | null): string {
 
 /* ---- 放大预览弹层 ---- */
 .preview-mask {
-  position: fixed;
-  inset: 0;
-  z-index: 400;
-  background: rgb(var(--ink-rgb) / 45%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   padding: 32px;
 }
 .preview-modal {
@@ -756,10 +737,10 @@ function quoteLabel(q?: LessonQuote | null): string {
   max-height: 88vh;
   display: flex;
   flex-direction: column;
-  background: #fff;
-  border-radius: 14px;
+  background: var(--bg);
+  border-radius: var(--r-lg);
   overflow: hidden;
-  box-shadow: 0 18px 50px rgb(var(--ink-rgb) / 28%);
+  box-shadow: var(--shadow-xl);
 }
 .preview-modal__head {
   display: flex;
@@ -783,13 +764,14 @@ function quoteLabel(q?: LessonQuote | null): string {
 }
 .preview-modal__close {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 30px;
   height: 30px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: none;
-  font-size: 20px;
-  line-height: 1;
   cursor: pointer;
   color: var(--text-dim);
 }

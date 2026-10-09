@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { ArrowRight, Trash2, X } from 'lucide-vue-next'
 import type { LessonMeta } from '@shared/api'
 import { masteryLevel, type KnowledgeNode } from '@shared/types'
 
@@ -64,7 +65,7 @@ function confirmDelete(id: string) {
         title="关闭"
         @click="emit('close')"
       >
-        ×
+        <X :size="16" />
       </button>
     </header>
 
@@ -142,7 +143,7 @@ function confirmDelete(id: string) {
             title="删除该课件"
             @click="confirmDeleteId = l.id"
           >
-            🗑
+            <Trash2 :size="13" />
           </button>
           <span
             v-else
@@ -173,12 +174,13 @@ function confirmDelete(id: string) {
 
     <footer class="panel__footer">
       <button
-        class="learn-btn"
+        class="btn btn--success btn--lg learn-btn"
         :disabled="lockedDeps.length > 0"
         :title="lockedDeps.length ? `前置未达标：${lockedDeps.map((d) => `${d.name}=${d.mastery}`).join('、')}` : ''"
         @click="emit('learn', node.id)"
       >
-        {{ node.mastery >= 80 ? '再学一遍这个知识点 →' : '学这个知识点 →' }}
+        {{ node.mastery >= 80 ? '再学一遍这个知识点' : '学这个知识点' }}
+        <ArrowRight :size="15" />
       </button>
       <p
         v-if="lockedDeps.length"
@@ -217,15 +219,21 @@ function confirmDelete(id: string) {
   font-weight: 600;
 }
 .panel__close {
+  display: inline-flex;
+  align-items: center;
   border: none;
   background: none;
-  font-size: 20px;
-  line-height: 1;
   cursor: pointer;
   color: var(--text-dim);
+  padding: 4px;
+  border-radius: 6px;
+  transition:
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
 }
 .panel__close:hover {
   color: var(--text);
+  background: var(--bg-muted);
 }
 .panel__section {
   padding: 16px 20px;
@@ -360,11 +368,21 @@ function confirmDelete(id: string) {
   color: var(--text-dim);
 }
 .lesson-item__del {
+  display: inline-flex;
+  align-items: center;
   border: none;
   background: none;
   cursor: pointer;
-  font-size: 12px;
-  opacity: 0.35;
+  color: var(--text-dim);
+  padding: 4px;
+  border-radius: 6px;
+  opacity: 0;
+  transition:
+    opacity var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+.lesson-item__del:hover {
+  color: var(--mastery-red);
 }
 .lesson-item:hover .lesson-item__del {
   opacity: 1;
@@ -398,21 +416,6 @@ function confirmDelete(id: string) {
   gap: 8px;
 }
 .learn-btn {
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  padding: 10px 16px;
-  border: none;
-  border-radius: 10px;
-  background: var(--green-strong);
-  color: #fff;
-  cursor: pointer;
-}
-.learn-btn:hover:not(:disabled) {
-  opacity: 0.9;
-}
-.learn-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+  width: 100%;
 }
 </style>
