@@ -156,6 +156,9 @@ watch(
   },
 )
 
+// 用户可能在备课尚未结束时离开本页（返回图谱）；离开后不再用后台 promise 的 router.replace 把用户拽回课件
+let disposed = false
+
 async function startGeneration() {
   lessonStore.reset()
   // 优先用路由 query 指定的学习方向；直接刷新页面时回退到唯一课题
@@ -172,7 +175,7 @@ async function startGeneration() {
   if (topicStore.topic?.id !== topicId || !topicStore.graph) await topicStore.loadTopic(topicId)
   const nodeId = typeof route.query.node === 'string' ? route.query.node : undefined
   const lessonId = await lessonStore.generate(topicId, nodeId)
-  if (lessonId) await router.replace(`/lesson/${lessonId}`)
+  if (lessonId && !disposed) await router.replace(`/lesson/${lessonId}`)
 }
 
 onMounted(async () => {
@@ -204,7 +207,7 @@ async function retry() {
   const lesson = lessonStore.lesson
   if (lesson) {
     const lessonId = await lessonStore.generate(lesson.topicId, lesson.nodeIds[0])
-    if (lessonId && lessonId !== lesson.id) await router.replace(`/lesson/${lessonId}`)
+    if (lessonId && lessonId !== lesson.id && !disposed) await router.replace(`/lesson/${lessonId}`)
     return
   }
   await startGeneration()
@@ -221,6 +224,7 @@ async function startRevise() {
 
 // 离开备课页时断开进度流；备课任务在后台继续，可从图谱页再次进入回放
 onUnmounted(() => {
+  disposed = true
   window.clearInterval(tickTimer)
   lessonStore.detach()
 })
