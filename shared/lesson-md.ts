@@ -58,6 +58,36 @@ export function listHeadings(md: string): string[] {
     .filter((h): h is string => Boolean(h))
 }
 
+const SOURCE_LABEL = /^(参考来源|参考文献|参考资料|引用来源|延伸阅读|sources?|references?)$/i
+
+// 判断一行是否是「来源清单」小标题（支持 ## 标题或 **加粗** 两种写法）
+function isSourceLabelLine(line: string): boolean {
+  const t = line
+    .trim()
+    .replace(/^#{1,6}\s*/, '')
+    .replace(/^\*\*|\*\*$/g, '')
+    .trim()
+  return SOURCE_LABEL.test(t)
+}
+
+// 去掉正文末尾模型自行追加的「参考来源」小节：页面统一从 lesson.sources 渲染来源清单，
+// 正文再写一份就会重复显示。仅裁掉最后一段来源块，找不到返回原文。
+export function stripTrailingSourceBlock(md: string): string {
+  const lines = md.split('\n')
+  let cut = -1
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (isSourceLabelLine(lines[i])) {
+      cut = i
+      break
+    }
+  }
+  if (cut <= 0) return md
+  // 连同来源标题前紧邻的分隔线/空行一起裁掉
+  let end = cut
+  while (end > 0 && /^\s*((---+|\*\*\*+|___+)|)$/.test(lines[end - 1])) end--
+  return lines.slice(0, end).join('\n').replace(/\s+$/, '')
+}
+
 // 依标题定位章节：精确 → 忽略大小写 → 包含关系兜底
 export function findSectionByHeading(md: string, heading: string): LessonSection | null {
   const target = heading.trim()

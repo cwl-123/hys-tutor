@@ -6,6 +6,7 @@ import {
   parseSections,
   replaceMermaidBlock,
   replaceSection,
+  stripTrailingSourceBlock,
 } from '../shared/lesson-md'
 
 const md = `# 双塔召回
@@ -52,6 +53,23 @@ describe('parseSections', () => {
     const sections = parseSections(noPreamble)
     expect(sections.map((s) => s.heading)).toEqual(['开场', '第二节'])
     expect(sections.map((s) => s.raw).join('\n')).toBe(noPreamble)
+  })
+})
+
+describe('stripTrailingSourceBlock', () => {
+  it('裁掉末尾 **参考来源** 块（含前置分隔线）', () => {
+    const md = '## 正文\n内容。\n\n---\n\n**参考来源**\n\n[1] A https://a\n[2] B https://b'
+    expect(stripTrailingSourceBlock(md)).toBe('## 正文\n内容。')
+  })
+
+  it('裁掉末尾 ## 参考来源 小节', () => {
+    const md = '## 正文\n内容。\n\n## 参考来源\n[1] A'
+    expect(stripTrailingSourceBlock(md)).toBe('## 正文\n内容。')
+  })
+
+  it('没有来源块时原样返回', () => {
+    const md = '## 正文\n内容中提到参考来源一词，但不是小标题。'
+    expect(stripTrailingSourceBlock(md)).toBe(md)
   })
 })
 

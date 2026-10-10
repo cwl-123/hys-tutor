@@ -28,6 +28,7 @@ import { getGraph, getTopic } from './graph-service'
 import { findLesson } from './lesson-service'
 import { listAttempts } from './attempt-service'
 import { MASTERY_UNLOCK_THRESHOLD } from '../../shared/types'
+import { stripTrailingSourceBlock } from '../../shared/lesson-md'
 import type {
   ErrorReport,
   KnowledgeNode,
@@ -357,7 +358,9 @@ export async function prepareLesson(
   })
 
   // 落图：外链配图下载到课题素材库并改写为本地引用（下载失败的编造 URL 直接剔除）
-  const localized = await localizeImages(topicId, contentMd, { dropFailed: true })
+  const localized = await localizeImages(topicId, stripTrailingSourceBlock(contentMd), {
+    dropFailed: true,
+  })
 
   // 落盘
   const lessonId = opts.lessonId ?? newId('l')
@@ -467,7 +470,9 @@ export async function reviseLesson(
   }
 
   // 落图（与备课产线一致：外链落地、失败剔除）
-  const localized = await localizeImages(topic.id, contentMd, { dropFailed: true })
+  const localized = await localizeImages(topic.id, stripTrailingSourceBlock(contentMd), {
+    dropFailed: true,
+  })
   lesson.contentMd = localized.contentMd
   lesson.images = localized.images
   lesson.status = 'generated'
