@@ -10,8 +10,27 @@ export interface LessonDetail {
   questions: QuestionSet | null
 }
 
-function lessonTitle(lesson: Lesson, nodeNames: Record<string, string>): string {
-  const heading = lesson.contentMd.match(/^#\s+(.+)$/m)?.[1]?.trim()
+// 取正文里第一个「代码块之外」的 markdown 一级标题（# 标题），作为课程名；
+// 必须跳过围栏代码块，否则 Python/C 注释里的 `# ...`（甚至是打印出来的 `# [[0. 0. ...]]`）会被误当成标题
+export function firstHeadingOutsideCode(contentMd: string): string | null {
+  let fence: string | null = null
+  for (const line of contentMd.split(/\r?\n/)) {
+    const fenceMatch = line.match(/^\s*(`{3,}|~{3,})/)
+    if (fenceMatch) {
+      const marker = fenceMatch[1][0]
+      if (!fence) fence = marker
+      else if (marker === fence) fence = null
+      continue
+    }
+    if (fence) continue
+    const heading = line.match(/^\s{0,3}#\s+(.+?)\s*#*\s*$/)
+    if (heading) return heading[1].trim()
+  }
+  return null
+}
+
+export function lessonTitle(lesson: Lesson, nodeNames: Record<string, string>): string {
+  const heading = firstHeadingOutsideCode(lesson.contentMd)
   if (heading) return heading
   return lesson.nodeIds.map((id) => nodeNames[id] ?? id).join(' + ')
 }
