@@ -180,7 +180,8 @@ onMounted(async () => {
     if (isNew.value) {
       await startGeneration()
     } else {
-      // 直接进入已有课程时不带「刚刚生成完成」的提示（仅实时挂接完成才提示）
+      // 直接进入已有课程：先清空上一课的残留状态（尤其是 error），否则旧错误会盖住新课页面
+      lessonStore.reset()
       lessonStore.justCompleted = false
       await lessonStore.load(String(route.params.id))
       const lessonTopicId = lessonStore.lesson?.topicId

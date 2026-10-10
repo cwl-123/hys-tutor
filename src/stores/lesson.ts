@@ -231,6 +231,8 @@ export const useLessonStore = defineStore('lesson', () => {
       error.value = data.error ?? `加载课程失败：${res.status}`
       return
     }
+    // 成功加载即清空上一次残留的错误，避免旧错误把新课页面误判为「失败/不存在」
+    error.value = null
     topic.value = data.topic ?? null
     lesson.value = data.lesson
     questions.value = data.questions?.questions ?? []

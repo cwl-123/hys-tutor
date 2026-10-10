@@ -52,10 +52,10 @@ function emit(job: Job, ev: Parameters<JobListener>[0]) {
 }
 
 // 发起备课任务；同课题已有在途任务则复用
-export function startLessonJob(
+export async function startLessonJob(
   topicId: string,
   opts: { nodeId?: string; lessonId?: string } = {},
-): { lessonId: string; reused: boolean } {
+): Promise<{ lessonId: string; reused: boolean }> {
   const existing = runningByTopic.get(topicId)
   if (existing) return { lessonId: existing.lessonId, reused: true }
 
@@ -78,7 +78,8 @@ export function startLessonJob(
     status: 'researching',
     createdAt: nowIso(),
   }
-  void writeJson(lessonFile(topicId, lessonId), initial)
+  // 必须落盘完成再返回：否则客户端拿到 lessonId 后立刻跳转/读取，会因文件尚未存在而报「课程不存在」
+  await writeJson(lessonFile(topicId, lessonId), initial)
 
   void (async () => {
     try {
