@@ -9,6 +9,7 @@ import { gradeObjective, gradeShort } from '../services/grading-service'
 import { applyMasteryChanges, type ApplyEntry } from '../services/mastery-service'
 import { appendAttempt, listAttempts } from '../services/attempt-service'
 import { regenerateQuestions } from '../services/lesson-agent'
+import { safeExtractPreferences } from '../services/preference-service'
 import {
   applyLessonChat,
   getLessonChat,
@@ -298,7 +299,17 @@ export async function handleReviseLesson(
   }
   try {
     const result = await startReviseJob(lessonId, body.data.instruction ?? '')
-    sendJson(res, 200, result)
+    // 优化意见里可能含长期偏好（如「以后都通俗点」），顺手提取入库
+    const instruction = body.data.instruction?.trim()
+    let newPreferences: unknown[] = []
+    if (instruction) {
+      const detail = await findLesson(lessonId)
+      newPreferences = await safeExtractPreferences(instruction, {
+        kind: 'lesson-revise',
+        label: `课件优化意见（${detail?.topic.name ?? ''}）`,
+      })
+    }
+    sendJson(res, 200, { ...result, newPreferences })
   } catch (err) {
     sendJson(res, 409, { error: err instanceof Error ? err.message : String(err) })
   }

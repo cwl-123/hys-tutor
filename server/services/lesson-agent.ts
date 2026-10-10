@@ -26,6 +26,7 @@ import { QUIZ_SYSTEM_PROMPT, llmQuizSchema, quizPrompt } from '../llm/prompts/qu
 import { scheduleNext } from './scheduler'
 import { getGraph, getTopic } from './graph-service'
 import { findLesson } from './lesson-service'
+import { preferenceContextText } from './preference-service'
 import { listAttempts } from './attempt-service'
 import { MASTERY_UNLOCK_THRESHOLD } from '../../shared/types'
 import { stripTrailingSourceBlock } from '../../shared/lesson-md'
@@ -307,12 +308,14 @@ export async function prepareLesson(
 
   const ctx = await buildLearnerContext(topicId, graph.nodes)
   ctx.profileText = profileTextOf(topic.profile)
+  const preferenceText = await preferenceContextText()
   const learnerCtx = learnerContextText({
     masterySnapshot: ctx.masterySnapshot,
     wrongAnswers: ctx.wrongAnswers,
     reports: ctx.reports.filter((r) => r.nodeId === node.id || node.deps.includes(r.nodeId)),
     nodeNames: ctx.nodeNames,
     profileText: ctx.profileText,
+    preferenceText,
   })
 
   // 2. 研究（Agent 工具循环，笔记缓存命中则跳过）
@@ -417,6 +420,7 @@ export async function reviseLesson(
   const note = node ? await readResearchNote(topic.id, node.id) : null
 
   onStage({ stage: 'revise', detail: { instruction } })
+  const preferenceText = await preferenceContextText()
   const revised = await streamWriteLesson(
     REVISE_SYSTEM_PROMPT,
     reviseLessonPrompt({
@@ -424,6 +428,7 @@ export async function reviseLesson(
       instruction,
       noteJson: note ? JSON.stringify(note, null, 2) : '（无研究笔记）',
       sources: lesson.sources.map((s) => `[${s.idx}] ${s.title} ${s.url}`).join('\n') || '（无来源）',
+      preferenceText,
     }),
     onStage,
   )

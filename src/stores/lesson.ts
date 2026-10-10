@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { Attempt, Lesson, LessonImage, Question, Topic } from '@shared/types'
 import { getSse } from '@/utils/sse'
+import { showNewPreferences } from '@/utils/toast'
 
 export interface StageEntry {
   key: string
@@ -273,11 +274,16 @@ export const useLessonStore = defineStore('lesson', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ instruction }),
     })
-    const data = (await res.json()) as { lessonId?: string; error?: string }
+    const data = (await res.json()) as {
+      lessonId?: string
+      newPreferences?: { text: string }[]
+      error?: string
+    }
     if (!res.ok || !data.lessonId) {
       error.value = data.error ?? `发起优化失败：${res.status}`
       return
     }
+    showNewPreferences(data.newPreferences)
     await attach(data.lessonId)
   }
 

@@ -25,6 +25,7 @@ export function learnerContextText(ctx: {
   reports: { quote: string; note?: string }[]
   nodeNames: Record<string, string>
   profileText?: string
+  preferenceText?: string
 }): string {
   const snapshot = Object.entries(ctx.masterySnapshot)
     .map(([id, m]) => `${ctx.nodeNames[id] ?? id}=${m}`)
@@ -34,13 +35,14 @@ export function learnerContextText(ctx: {
     ? ctx.reports.map((r) => `- 「${r.quote.slice(0, 80)}」${r.note ? `（用户备注：${r.note}）` : ''}`).join('\n')
     : '（暂无报错记录）'
   const profile = ctx.profileText ? `\n\n${ctx.profileText}` : ''
+  const preferences = ctx.preferenceText ? `\n\n${ctx.preferenceText}` : ''
   return `学习者掌握度快照：${snapshot}
 
 历史错题摘要：
 ${wrong}
 
 用户标记的内容报错（务必避坑，不要重复同样的错误讲法）：
-${reports}${profile}`
+${reports}${profile}${preferences}`
 }
 
 export function outlineUserPrompt(

@@ -4,6 +4,7 @@ import { Check, Maximize2, Undo2, X } from 'lucide-vue-next'
 import { findSectionByHeading } from '@shared/lesson-md'
 import type { LessonChatMessage, LessonQuote, LessonVersion } from '@shared/lesson-chat'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
+import { showNewPreferences } from '@/utils/toast'
 
 const props = defineProps<{
   lessonId: string
@@ -114,11 +115,13 @@ async function send() {
     const data = (await res.json()) as {
       messages?: LessonChatMessage[]
       versions?: LessonVersion[]
+      newPreferences?: { text: string }[]
       error?: string
     }
     if (!res.ok) throw new Error(data.error ?? `请求失败：${res.status}`)
     messages.value = data.messages ?? messages.value
     versions.value = data.versions ?? versions.value
+    showNewPreferences(data.newPreferences)
   } catch (err) {
     // 回滚乐观消息，恢复输入内容便于重试
     messages.value = messages.value.filter((m) => m.id !== tempId)

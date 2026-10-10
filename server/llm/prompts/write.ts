@@ -13,12 +13,13 @@ export function reviseLessonPrompt(opts: {
   instruction: string
   noteJson: string
   sources: string
+  preferenceText?: string
 }): string {
   return `请根据用户意见修订以下课程。
 
 用户意见：
 ${opts.instruction.trim() || '（未填写具体意见：请自行检查并改进讲解清晰度、例子贴合度与篇幅节奏）'}
-
+${opts.preferenceText ? `\n${opts.preferenceText}\n` : ''}
 研究笔记（事实依据）：
 ${opts.noteJson}
 

@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, TriangleAlert } from 'lucide-vue-next'
 import { useLessonStore } from '@/stores/lesson'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import { submitReport } from '@/utils/report'
+import { showNewPreferences } from '@/utils/toast'
 import { MASTERY_UNLOCK_THRESHOLD } from '@shared/types'
 import type { AnswerRecord, Attempt, Question } from '@shared/types'
 
@@ -164,7 +165,7 @@ function toggleReport(qid: string) {
 
 async function submitQuestionReport(q: Question) {
   try {
-    await submitReport({
+    const newPreferences = await submitReport({
       lessonId: lessonId.value,
       questionId: q.id,
       nodeId: q.nodeId,
@@ -175,6 +176,7 @@ async function submitQuestionReport(q: Question) {
     reportNote.value = ''
     reportToast.value = '已记录，同知识点后续出题会避开这个坑'
     setTimeout(() => (reportToast.value = null), 3000)
+    showNewPreferences(newPreferences)
   } catch (err) {
     reportToast.value = err instanceof Error ? err.message : String(err)
     setTimeout(() => (reportToast.value = null), 4000)

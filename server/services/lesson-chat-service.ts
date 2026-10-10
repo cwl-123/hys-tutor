@@ -13,13 +13,14 @@ import { readResearchNote } from '../agent/tools/notes'
 import { localizeImages } from './asset-store'
 import { getGraph } from './graph-service'
 import { findLesson, type LessonDetail } from './lesson-service'
+import { safeExtractPreferences } from './preference-service'
 import { findSectionByHeading, listHeadings, replaceSection } from '../../shared/lesson-md'
 import type {
   LessonChatMessage,
   LessonQuote,
   LessonVersion,
 } from '../../shared/lesson-chat'
-import type { LessonImage } from '../../shared/types'
+import type { LessonImage, Preference } from '../../shared/types'
 
 export interface LessonChatProposal {
   contentMd: string
@@ -182,7 +183,13 @@ export async function getLessonChat(lessonId: string): Promise<LessonChatState> 
 export async function postLessonChat(
   lessonId: string,
   input: { message: string; quote?: LessonQuote },
-): Promise<LessonChatState & { userMessage: LessonChatMessage; assistantMessage: LessonChatMessage }> {
+): Promise<
+  LessonChatState & {
+    userMessage: LessonChatMessage
+    assistantMessage: LessonChatMessage
+    newPreferences: Preference[]
+  }
+> {
   const detail = await requireGenerated(lessonId)
   const messages = await loadMessages(detail.topic.id, lessonId)
   const history = messages.slice(-6).map((m) => ({
@@ -198,7 +205,14 @@ export async function postLessonChat(
     applied: false,
     createdAt: nowIso(),
   }
-  const result = await computeEdit(detail, { ...input, history })
+  // 偏好提取与课件改写并行：不增加对话响应延迟
+  const [result, newPreferences] = await Promise.all([
+    computeEdit(detail, { ...input, history }),
+    safeExtractPreferences(input.message, {
+      kind: 'lesson-chat',
+      label: `课件对话（${detail.topic.name}）`,
+    }),
+  ])
   const assistantMessage: LessonChatMessage = {
     id: newId('cm'),
     role: 'assistant',
@@ -211,7 +225,7 @@ export async function postLessonChat(
   const next = [...messages, userMessage, assistantMessage].slice(-MAX_MESSAGES)
   await writeJson(chatFile(detail.topic.id, lessonId), { messages: next })
   const versions = await loadVersions(detail.topic.id, lessonId)
-  return { messages: next, versions, userMessage, assistantMessage }
+  return { messages: next, versions, userMessage, assistantMessage, newPreferences }
 }
 
 // POST apply：把某条建议写入课件，并留下版本快照

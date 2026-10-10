@@ -19,6 +19,12 @@ import {
   handleUpdateLessonContent,
 } from './routes/lessons'
 import { handleCreateReport, handleListReports } from './routes/reports'
+import {
+  handleCreatePreference,
+  handleDeletePreference,
+  handleListPreferences,
+  handleUpdatePreference,
+} from './routes/preferences'
 import { handleGetAsset } from './routes/assets'
 import {
   handleGetSettings,
@@ -154,6 +160,23 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, next:
     }
     if (url === '/settings/import' && req.method === 'POST') {
       await handleImportCandidate(req, res)
+      return
+    }
+
+    // GET/POST /api/preferences — 偏好清单 / 手写新增
+    if (url === '/preferences') {
+      if (req.method === 'GET') await handleListPreferences(req, res)
+      else if (req.method === 'POST') await handleCreatePreference(req, res)
+      else sendJson(res, 405, { error: 'Method Not Allowed' })
+      return
+    }
+
+    // PATCH/DELETE /api/preferences/:id — 编辑 / 删除
+    const prefMatch = url.match(/^\/preferences\/([^/]+)$/)
+    if (prefMatch) {
+      if (req.method === 'PATCH') await handleUpdatePreference(req, res, prefMatch[1])
+      else if (req.method === 'DELETE') await handleDeletePreference(req, res, prefMatch[1])
+      else sendJson(res, 405, { error: 'Method Not Allowed' })
       return
     }
 

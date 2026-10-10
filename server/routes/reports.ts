@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { sendJson } from '../index'
 import { addReport, listReports } from '../services/report-service'
 import { findLesson } from '../services/lesson-service'
+import { safeExtractPreferences } from '../services/preference-service'
 import { reportInputSchema } from '../../shared/types'
 import { readBody } from './topics'
 
@@ -18,7 +19,14 @@ export async function handleCreateReport(req: IncomingMessage, res: ServerRespon
     return
   }
   const report = await addReport(detail.topic.id, body.data)
-  sendJson(res, 200, { report })
+  // 报错备注里可能含长期偏好（如「以后公式别堆一起」），顺手提取入库
+  const newPreferences = report.note
+    ? await safeExtractPreferences(report.note, {
+        kind: 'report',
+        label: `报错备注（${detail.topic.name}）`,
+      })
+    : []
+  sendJson(res, 200, { report, newPreferences })
 }
 
 // GET /api/topics/:id/reports — 报错记录列表（页面展示用）

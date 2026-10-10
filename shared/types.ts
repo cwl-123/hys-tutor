@@ -210,6 +210,21 @@ export const researchNoteSchema = z.object({
 })
 export type ResearchNote = z.infer<typeof researchNoteSchema>
 
+// ---------- 学习者偏好档案 ----------
+export const preferenceSourceSchema = z.object({
+  kind: z.enum(['manual', 'lesson-chat', 'lesson-revise', 'report']),
+  label: z.string().optional(), // 来源描述，如「双塔召回」课件对话
+})
+export type PreferenceSource = z.infer<typeof preferenceSourceSchema>
+
+export const preferenceSchema = z.object({
+  id: z.string(),
+  text: z.string().min(1).max(200),
+  source: preferenceSourceSchema,
+  createdAt: z.string(),
+})
+export type Preference = z.infer<typeof preferenceSchema>
+
 // ---------- 通用工具 ----------
 // 掌握分颜色：红 <40 / 黄 40-79 / 绿 ≥80（PRD 领域规则）
 export function masteryLevel(mastery: number): 'red' | 'yellow' | 'green' {

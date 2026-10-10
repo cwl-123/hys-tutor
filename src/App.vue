@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Settings } from 'lucide-vue-next'
+import { Heart, Settings } from 'lucide-vue-next'
 import SettingsModal from '@/components/SettingsModal.vue'
+import ToastHost from '@/components/ToastHost.vue'
 
 const showSettings = ref(false)
 </script>
@@ -16,6 +17,14 @@ const showSettings = ref(false)
         hys-tutor
       </RouterLink>
       <span class="app-subtitle">AI 自适应私教</span>
+      <RouterLink
+        to="/preferences"
+        class="app-settings app-settings--link"
+        title="我的偏好"
+      >
+        <Heart :size="14" />
+        偏好
+      </RouterLink>
       <button
         class="app-settings"
         title="模型设置"
@@ -32,6 +41,7 @@ const showSettings = ref(false)
       :open="showSettings"
       @close="showSettings = false"
     />
+    <ToastHost />
   </div>
 </template>
 
@@ -76,6 +86,13 @@ const showSettings = ref(false)
     color var(--dur-fast) var(--ease),
     background var(--dur-fast) var(--ease),
     border-color var(--dur-fast) var(--ease);
+}
+.app-settings--link {
+  margin-left: auto;
+  text-decoration: none;
+}
+.app-settings--link + .app-settings {
+  margin-left: 0;
 }
 .app-settings:hover {
   color: var(--text);
