@@ -6,7 +6,7 @@ import { useLessonStore } from '@/stores/lesson'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import { submitReport } from '@/utils/report'
 import { showNewPreferences } from '@/utils/toast'
-import { MASTERY_UNLOCK_THRESHOLD } from '@shared/types'
+import { MASTERY_UNLOCK_THRESHOLD, masteryLevel } from '@shared/types'
 import type { AnswerRecord, Attempt, Question } from '@shared/types'
 
 const route = useRoute()
@@ -105,6 +105,19 @@ const unlockHints = computed(() =>
     .filter((c) => c.after < MASTERY_UNLOCK_THRESHOLD)
     .map((c) => ({ nodeName: c.nodeName, gap: MASTERY_UNLOCK_THRESHOLD - c.after })),
 )
+
+// 掌握分变化原因（服务端连成一句「第1题（单选）答对；第2题…」）：拆成逐题小标签
+function splitReasons(reason: string): string[] {
+  return reason
+    .split(/[；;]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+function reasonClass(r: string): string {
+  if (r.includes('答错')) return 'mastery__reason--bad'
+  return 'mastery__reason--ok'
+}
 
 async function retake() {
   if (regenerating.value) return
@@ -395,20 +408,44 @@ async function submitQuestionReport(q: Question) {
           class="mastery"
         >
           <h2>本次掌握分变化</h2>
-          <ul>
+          <ul class="mastery__list">
             <li
               v-for="c in activeAttempt.masteryChanges"
               :key="c.nodeId"
+              class="mastery__item"
             >
-              <strong>{{ c.nodeName }}</strong>
-              {{ c.before }} → {{ c.after }}
-              <span
-                class="mastery__delta"
-                :class="c.delta >= 0 ? 'mastery__delta--up' : 'mastery__delta--down'"
-              >
-                ({{ c.delta >= 0 ? '+' : '' }}{{ c.delta }})
-              </span>
-              <span class="mastery__reason">因 {{ c.reason }}</span>
+              <div class="mastery__row">
+                <strong class="mastery__name">{{ c.nodeName }}</strong>
+                <span class="mastery__score">{{ c.before }} → {{ c.after }}</span>
+                <span
+                  class="mastery__delta"
+                  :class="c.delta >= 0 ? 'mastery__delta--up' : 'mastery__delta--down'"
+                >
+                  {{ c.delta >= 0 ? '+' : '' }}{{ c.delta }}
+                </span>
+              </div>
+              <div class="mastery__bar">
+                <div
+                  class="mastery__bar-fill"
+                  :class="`mastery__bar-fill--${masteryLevel(c.after)}`"
+                  :style="{ width: `${c.after}%` }"
+                />
+                <span
+                  class="mastery__bar-tick"
+                  :style="{ left: `${MASTERY_UNLOCK_THRESHOLD}%` }"
+                  :title="`${MASTERY_UNLOCK_THRESHOLD} 分解锁线`"
+                />
+              </div>
+              <ul class="mastery__reasons">
+                <li
+                  v-for="(r, ri) in splitReasons(c.reason)"
+                  :key="ri"
+                  class="mastery__reason"
+                  :class="reasonClass(r)"
+                >
+                  {{ r }}
+                </li>
+              </ul>
             </li>
           </ul>
           <p
@@ -436,7 +473,7 @@ async function submitQuestionReport(q: Question) {
               {{ regenerating ? 'AI 出题中…' : '再次测验（生成新题）' }}
             </button>
             <RouterLink
-              to="/"
+              :to="lessonStore.lesson?.topicId ? `/topic/${lessonStore.lesson.topicId}` : '/'"
               class="btn"
             >
               查看图谱变化
@@ -742,7 +779,7 @@ async function submitQuestionReport(q: Question) {
 }
 .option {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
@@ -752,6 +789,23 @@ async function submitQuestionReport(q: Question) {
   transition:
     border-color var(--dur-fast) var(--ease),
     background var(--dur-fast) var(--ease);
+}
+.option input[type='radio'] {
+  flex: none;
+  margin: 0;
+}
+/* 选项正文走 MarkdownRenderer（含 <p> 默认边距），这里清零保证与字母/圆圈同行对齐 */
+.option :deep(.md-body) {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.option :deep(.md-body) > p {
+  margin: 0;
+}
+.option :deep(.md-body) > p + p {
+  margin-top: 6px;
 }
 .option:hover:not(:has(input:disabled)) {
   border-color: var(--primary-soft);
@@ -778,6 +832,7 @@ async function submitQuestionReport(q: Question) {
   color: var(--text-dim);
 }
 .option__letter {
+  flex: none;
   font-weight: 600;
 }
 .short-input {
@@ -812,22 +867,103 @@ async function submitQuestionReport(q: Question) {
   box-shadow: var(--shadow-sm);
 }
 .mastery h2 {
+  margin: 0 0 4px;
   font-size: 16px;
 }
-.mastery li {
-  margin: 6px 0;
+.mastery__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mastery__item {
+  padding: 12px 0;
   font-size: 14px;
 }
+.mastery__item + .mastery__item {
+  border-top: 1px dashed var(--border);
+}
+.mastery__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mastery__name {
+  flex: 1;
+  min-width: 0;
+}
+.mastery__score {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.mastery__delta {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 1px 9px;
+  border-radius: var(--r-pill);
+}
 .mastery__delta--up {
-  color: var(--mastery-green);
+  color: var(--green-strong);
+  background: var(--green-bg);
+  border: 1px solid var(--green-border);
 }
 .mastery__delta--down {
   color: var(--mastery-red);
+  background: var(--red-bg);
+  border: 1px solid var(--border);
+}
+.mastery__bar {
+  position: relative;
+  margin-top: 8px;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--bg-muted);
+}
+.mastery__bar-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: var(--r-pill);
+  transition: width var(--dur) var(--ease);
+}
+.mastery__bar-fill--green {
+  background: var(--mastery-green);
+}
+.mastery__bar-fill--yellow {
+  background: var(--mastery-yellow);
+}
+.mastery__bar-fill--red {
+  background: var(--mastery-red);
+}
+.mastery__bar-tick {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 1.5px;
+  background: var(--border-strong);
+}
+.mastery__reasons {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 .mastery__reason {
-  color: var(--text-dim);
-  font-size: 13px;
-  margin-left: 6px;
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: var(--r-pill);
+}
+.mastery__reason--ok {
+  background: var(--green-bg);
+  color: var(--green-strong);
+}
+.mastery__reason--bad {
+  background: var(--red-bg);
+  color: var(--mastery-red);
 }
 .mastery__hint {
   margin: 10px 0 0;
