@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { GraduationCap, Heart, Settings } from 'lucide-vue-next'
+import { Heart, Settings } from 'lucide-vue-next'
 import SettingsModal from '@/components/SettingsModal.vue'
 import ToastHost from '@/components/ToastHost.vue'
 
@@ -15,7 +15,45 @@ const showSettings = ref(false)
           to="/"
           class="app-brand"
         >
-          <span class="app-brand__mark"><GraduationCap :size="15" /></span>
+          <!-- 品牌标：三个节点 + 依赖边，呼应「知识图谱」 -->
+          <svg
+            class="app-brand__mark"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <rect
+              width="24"
+              height="24"
+              rx="6"
+              fill="currentColor"
+            />
+            <path
+              d="M7.5 16.5 12 7.5l4.5 9"
+              fill="none"
+              stroke="var(--bg)"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <circle
+              cx="12"
+              cy="7.5"
+              r="2.1"
+              fill="var(--bg)"
+            />
+            <circle
+              cx="7.5"
+              cy="16.5"
+              r="2.1"
+              fill="var(--bg)"
+            />
+            <circle
+              cx="16.5"
+              cy="16.5"
+              r="2.1"
+              fill="var(--bg)"
+            />
+          </svg>
           <span class="app-title">hys-tutor</span>
           <span class="app-subtitle">AI 自适应私教</span>
         </RouterLink>
@@ -66,13 +104,13 @@ const showSettings = ref(false)
   border-bottom: 1px solid var(--border);
 }
 .app-header__inner {
-  max-width: 1240px;
+  max-width: var(--page-max);
   margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
   height: var(--header-h);
-  padding: 0 24px;
+  padding: 0 var(--page-pad);
 }
 .app-brand {
   display: inline-flex;
@@ -81,19 +119,15 @@ const showSettings = ref(false)
   text-decoration: none;
 }
 .app-brand__mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 7px;
-  color: var(--bg);
-  background: var(--text);
+  flex: none;
+  width: 22px;
+  height: 22px;
+  color: var(--text);
 }
 .app-title {
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.1px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
   color: var(--text);
 }
 .app-subtitle {
@@ -105,7 +139,9 @@ const showSettings = ref(false)
 .app-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+  /* 抵消按钮内边距，让文字右缘与内容区右缘对齐 */
+  margin-right: -10px;
 }
 .app-settings {
   display: inline-flex;
@@ -116,8 +152,8 @@ const showSettings = ref(false)
   color: var(--text-dim);
   background: none;
   border: 1px solid transparent;
-  border-radius: var(--r-sm);
-  padding: 6px 12px;
+  border-radius: 6px;
+  padding: 5px 10px;
   cursor: pointer;
   text-decoration: none;
   transition:

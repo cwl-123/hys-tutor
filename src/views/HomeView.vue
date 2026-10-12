@@ -1,18 +1,25 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowRight, ArrowUpRight, LoaderCircle, Sparkles, Zap } from 'lucide-vue-next'
+import { CornerDownLeft, LoaderCircle, Sparkles, Zap } from 'lucide-vue-next'
 import { useTopicStore } from '@/stores/topic'
-import { masteryLevel, type Topic, type TopicProfile } from '@shared/types'
-import { fmtDate } from '@/utils/format'
+import type { Topic, TopicProfile } from '@shared/types'
 import { PROFILE_LEVELS, PROFILE_STYLES, pickOption } from '@/utils/topic-profile'
 import OnboardingChat from '@/components/OnboardingChat.vue'
+import TopicCard from '@/components/TopicCard.vue'
 
 const store = useTopicStore()
 const router = useRouter()
 
 const STYLES = PROFILE_STYLES
 const LEVELS = PROFILE_LEVELS
+
+// Hero 左栏的工作流说明（与 AGENTS.md 闭环一致：调研 → 图谱 → 微课）
+const STEPS = [
+  { no: '01', title: '联网调研', desc: '检索并研读一手资料，整理研究笔记' },
+  { no: '02', title: '知识图谱', desc: '拆解概念与前置依赖，生成学习路径' },
+  { no: '03', title: '自适应微课', desc: '按掌握度排课，随堂练习实时反馈' },
+] as const
 
 const topicName = ref('')
 const style = ref<string | null>(null)
@@ -65,108 +72,134 @@ async function onChatCreate(payload: { name: string; profile: TopicProfile }) {
   await doCreate(payload.name, payload.profile)
 }
 
-function fmtRelative(iso: string): string {
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)
-  if (days <= 0) return '今天'
-  if (days === 1) return '昨天'
-  if (days < 30) return `${days} 天前`
-  return ''
-}
 </script>
 
 <template>
   <div class="home">
-    <!-- 顶部：品牌主张 + 创建新方向 -->
-    <section class="hero">
+    <!-- 顶部：左栏品牌主张 + 工作流，右栏创建面板；与下方卡片共用三列网格 -->
+    <section class="hero page-grid">
       <div class="hero__copy">
-        <h1>把任何方向，<br>学成自己的体系</h1>
-        <p class="hero__sub">
-          AI 联网调研构建知识图谱，按你的掌握度持续生成个性化微课。
-        </p>
+        <div>
+          <h1>把任何方向，<br>学成自己的体系</h1>
+          <p class="hero__sub">
+            AI 联网调研构建知识图谱，按你的掌握度持续生成个性化微课。
+          </p>
+        </div>
+        <ol class="steps">
+          <li
+            v-for="st in STEPS"
+            :key="st.no"
+            class="step"
+          >
+            <span class="step__no">{{ st.no }}</span>
+            <span class="step__title">{{ st.title }}</span>
+            <span class="step__desc">{{ st.desc }}</span>
+          </li>
+        </ol>
       </div>
 
-      <div class="create">
-        <div class="create__tabs">
-          <button
-            type="button"
-            class="create__tab"
-            :class="{ 'create__tab--on': mode === 'quick' }"
-            :disabled="creating"
-            @click="mode = 'quick'"
+      <div class="composer">
+        <div class="composer__head">
+          <div
+            class="seg"
+            role="tablist"
           >
-            <Zap :size="13" />
-            快速创建
-          </button>
-          <button
-            type="button"
-            class="create__tab"
-            :class="{ 'create__tab--on': mode === 'chat' }"
-            :disabled="creating"
-            @click="mode = 'chat'"
-          >
-            <Sparkles :size="13" />
-            AI 帮我理清
-          </button>
+            <button
+              type="button"
+              role="tab"
+              class="seg__item"
+              :class="{ 'seg__item--on': mode === 'quick' }"
+              :aria-selected="mode === 'quick'"
+              :disabled="creating"
+              @click="mode = 'quick'"
+            >
+              <Zap :size="13" />
+              快速创建
+            </button>
+            <button
+              type="button"
+              role="tab"
+              class="seg__item"
+              :class="{ 'seg__item--on': mode === 'chat' }"
+              :aria-selected="mode === 'chat'"
+              :disabled="creating"
+              @click="mode = 'chat'"
+            >
+              <Sparkles :size="13" />
+              AI 帮我理清
+            </button>
+          </div>
+          <span class="composer__head-hint">新建学习方向</span>
         </div>
 
         <form
           v-show="mode === 'quick'"
+          class="composer__form"
           @submit.prevent="createTopic"
         >
-          <input
-            v-model="topicName"
-            class="create__name"
-            type="text"
-            placeholder="想学什么？如：CTR/CVR 预估模型、Kubernetes 网络、期权定价…"
-            :disabled="creating"
-          >
+          <div class="composer__body">
+            <input
+              v-model="topicName"
+              class="composer__title"
+              type="text"
+              placeholder="想学什么？如：CTR/CVR 预估模型、Kubernetes 网络、期权定价"
+              :disabled="creating"
+            >
 
-          <div class="guide-row">
-            <span class="guide-row__label">讲解风格</span>
-            <div class="chips">
-              <button
-                v-for="s in STYLES"
-                :key="s"
-                type="button"
-                class="chip"
-                :class="{ 'chip--on': style === s }"
-                :disabled="creating"
-                @click="style = pickOption(style, s)"
-              >
-                {{ s }}
-              </button>
+            <div class="fields">
+              <div class="field">
+                <span class="field__label">讲解风格</span>
+                <div class="chips">
+                  <button
+                    v-for="s in STYLES"
+                    :key="s"
+                    type="button"
+                    class="chip"
+                    :class="{ 'chip--on': style === s }"
+                    :aria-pressed="style === s"
+                    :disabled="creating"
+                    @click="style = pickOption(style, s)"
+                  >
+                    {{ s }}
+                  </button>
+                </div>
+              </div>
+              <div class="field">
+                <span class="field__label">当前程度</span>
+                <div class="chips">
+                  <button
+                    v-for="l in LEVELS"
+                    :key="l"
+                    type="button"
+                    class="chip"
+                    :class="{ 'chip--on': level === l }"
+                    :aria-pressed="level === l"
+                    :disabled="creating"
+                    @click="level = pickOption(level, l)"
+                  >
+                    {{ l }}
+                  </button>
+                </div>
+              </div>
+              <div class="field">
+                <span class="field__label">补充要求</span>
+                <input
+                  v-model="extra"
+                  class="field__input"
+                  type="text"
+                  placeholder="可选，如「多结合广告业务案例」「少讲数学多讲工程实现」"
+                  :disabled="creating"
+                >
+              </div>
             </div>
           </div>
-          <div class="guide-row">
-            <span class="guide-row__label">当前程度</span>
-            <div class="chips">
-              <button
-                v-for="l in LEVELS"
-                :key="l"
-                type="button"
-                class="chip"
-                :class="{ 'chip--on': level === l }"
-                :disabled="creating"
-                @click="level = pickOption(level, l)"
-              >
-                {{ l }}
-              </button>
-            </div>
-          </div>
-          <input
-            v-model="extra"
-            class="create__extra"
-            type="text"
-            placeholder="其他要求（可选）：如「多结合广告业务案例」「少讲数学多讲工程实现」…"
-            :disabled="creating"
-          >
 
-          <div class="create__footer">
-            <p class="create__hint">
-              这些选择会注入调研、图谱与每节课的生成，之后可在「学习设置」中调整
+          <div class="composer__foot">
+            <p class="composer__hint">
+              以上偏好会注入调研、图谱与每节课的生成，之后可随时调整
             </p>
             <button
-              class="create__submit"
+              class="submit"
               type="submit"
               :disabled="creating || !topicName.trim()"
             >
@@ -176,126 +209,62 @@ function fmtRelative(iso: string): string {
                 class="spin"
               />
               {{ creating ? 'AI 调研生成中…' : '开启学习方向' }}
-              <ArrowRight
+              <kbd
                 v-if="!creating"
-                :size="14"
-              />
+                class="submit__kbd"
+              ><CornerDownLeft :size="11" /></kbd>
             </button>
           </div>
         </form>
 
-        <OnboardingChat
+        <div
           v-show="mode === 'chat'"
-          :creating="creating"
-          @create="onChatCreate"
-        />
+          class="composer__body composer__body--chat"
+        >
+          <OnboardingChat
+            :creating="creating"
+            @create="onChatCreate"
+          />
+        </div>
 
         <div
-          v-if="store.stageText"
-          class="create__progress"
+          v-if="store.stageText || store.error"
+          class="composer__status"
         >
-          <span class="create__spinner" />
-          <div>
-            <div class="create__stage">
-              {{ store.stageText }}
-            </div>
-            <div class="create__stage-sub">
-              联网调研 → 生成知识图谱，约 1~3 分钟
-            </div>
+          <div
+            v-if="store.stageText"
+            class="progress"
+          >
+            <LoaderCircle
+              :size="14"
+              class="spin progress__icon"
+            />
+            <span class="progress__stage">{{ store.stageText }}</span>
+            <span class="progress__sub">联网调研并生成知识图谱，约 1~3 分钟</span>
           </div>
+          <p
+            v-if="store.error"
+            class="composer__error"
+          >
+            {{ store.error }}
+          </p>
         </div>
-        <p
-          v-if="store.error"
-          class="create__error"
-        >
-          {{ store.error }}
-        </p>
       </div>
     </section>
 
     <!-- 我的学习方向 -->
     <section class="topics">
-      <div class="topics__head">
+      <header class="topics__head">
         <h2>我的学习方向</h2>
         <span class="topics__count">{{ store.topics.length }}</span>
-      </div>
+      </header>
 
-      <div class="topics__grid">
-        <RouterLink
+      <div class="page-grid">
+        <TopicCard
           v-for="t in store.topics"
           :key="t.id"
-          class="card"
-          :to="`/topic/${t.id}`"
-        >
-          <div class="card__top">
-            <span class="card__name">{{ t.name }}</span>
-            <ArrowUpRight
-              :size="15"
-              class="card__arrow"
-            />
-          </div>
-
-          <div
-            v-if="t.profile?.style || t.profile?.level"
-            class="card__tags"
-          >
-            <span
-              v-if="t.profile?.level"
-              class="tag"
-            >{{ t.profile.level }}</span>
-            <span
-              v-if="t.profile?.style"
-              class="tag"
-            >{{ t.profile.style }}</span>
-          </div>
-
-          <div class="card__meta">
-            <span>{{ t.stats.nodeCount }} 知识点</span>
-            <span>·</span>
-            <span>{{ t.stats.lessonCount }} 节课</span>
-            <template v-if="t.stats.lastLessonAt && fmtRelative(t.stats.lastLessonAt)">
-              <span>·</span>
-              <span>最近学习 {{ fmtRelative(t.stats.lastLessonAt) }}</span>
-            </template>
-          </div>
-
-          <div
-            v-if="t.stats.nodeCount > 0"
-            class="card__progress"
-          >
-            <div class="card__progress-row">
-              <span>平均掌握 <strong>{{ t.stats.avgMastery }}</strong></span>
-              <span class="card__progress-sub">{{ t.stats.masteredCount }}/{{ t.stats.nodeCount }} 已掌握</span>
-            </div>
-            <div class="card__bar">
-              <i
-                :class="`card__bar-fill--${masteryLevel(t.stats.avgMastery)}`"
-                :style="{ width: `${t.stats.avgMastery}%` }"
-              />
-            </div>
-          </div>
-
-          <div class="card__foot">
-            <span class="card__created">创建于 {{ fmtDate(t.createdAt) }}</span>
-            <span
-              v-if="t.stats.generatingLesson"
-              class="card__waiting"
-            ><LoaderCircle
-              :size="12"
-              class="spin"
-            /> 课件生成中</span>
-            <RouterLink
-              v-else
-              class="btn btn--primary btn--sm"
-              :to="`/lesson/new?topic=${t.id}`"
-              :title="t.stats.lessonCount ? '由排课引擎自动选下一课' : '开始第一课'"
-              @click.stop
-            >
-              {{ t.stats.lessonCount ? '继续学习' : '开始学习' }}
-              <ArrowRight :size="13" />
-            </RouterLink>
-          </div>
-        </RouterLink>
+          :topic="t"
+        />
 
         <!-- 加载骨架 -->
         <template v-if="store.loading && store.topics.length === 0">
@@ -304,9 +273,10 @@ function fmtRelative(iso: string): string {
             :key="`sk-${i}`"
             class="card card--skeleton"
           >
-            <div class="skeleton card__sk-title" />
-            <div class="skeleton card__sk-line" />
-            <div class="skeleton card__sk-line card__sk-line--short" />
+            <div class="skeleton card__sk card__sk--title" />
+            <div class="skeleton card__sk card__sk--short" />
+            <div class="skeleton card__sk card__sk--block" />
+            <div class="skeleton card__sk" />
           </div>
         </template>
 
@@ -314,7 +284,12 @@ function fmtRelative(iso: string): string {
           v-if="!store.loading && store.topics.length === 0"
           class="topics__empty"
         >
-          还没有学习方向，从上面开启第一个吧
+          <p class="topics__empty-title">
+            还没有学习方向
+          </p>
+          <p class="topics__empty-sub">
+            在上方输入一个想学的方向，AI 会先联网调研再为你生成知识图谱
+          </p>
         </div>
       </div>
     </section>
@@ -322,99 +297,205 @@ function fmtRelative(iso: string): string {
 </template>
 
 <style scoped>
+/* ============================================================
+ * 布局：顶栏、Hero、卡片共用 --page-max 容器与同一套三列网格，
+ * 创建面板左缘与第二列卡片左缘严格对齐
+ * ============================================================ */
 .home {
+  --gap: 16px;
+  --card-pad: 20px;
+
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 0 var(--page-pad) 120px;
   min-height: calc(100vh - var(--header-h));
 }
-
-/* ---------- Hero + 创建 ---------- */
-.hero {
-  max-width: 1080px;
-  margin: 0 auto;
-  padding: 96px 32px 72px;
+.page-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 80px;
-  align-items: center;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--gap);
+}
+
+/* ---------- Hero ---------- */
+.hero {
+  padding: 88px 0 96px;
+  align-items: stretch;
+}
+.hero__copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 32px;
+  padding-right: 24px;
 }
 .hero__copy h1 {
-  margin: 0;
+  /* 抵消行高留白，让首行字顶与右侧面板上缘对齐 */
+  margin: -6px 0 0;
   font-size: 40px;
-  line-height: 1.3;
-  letter-spacing: -1px;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
   font-weight: 650;
+  color: var(--text);
 }
 .hero__sub {
-  margin: 18px 0 0;
+  margin: 20px 0 0;
+  max-width: 300px;
   font-size: 15px;
-  line-height: 1.8;
+  line-height: 1.75;
   color: var(--text-dim);
 }
-.create {
+
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border);
+}
+.step {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  height: 44px;
+  line-height: 44px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.step__no {
+  flex: none;
+  width: 16px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.step__title {
+  flex: none;
+  width: 72px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.step__desc {
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- 创建面板 ---------- */
+.composer {
+  grid-column: 2 / -1;
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  padding: 20px 22px;
+  background: var(--bg);
+  box-shadow: var(--shadow-xs);
+  overflow: hidden;
 }
-.create__tabs {
+.composer__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 52px;
+  padding: 0 var(--card-pad) 0 12px;
+  border-bottom: 1px solid var(--border);
+}
+.composer__head-hint {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.seg {
   display: inline-flex;
   gap: 2px;
-  padding: 3px;
-  border-radius: var(--r-pill);
+  padding: 2px;
+  border-radius: 8px;
   background: var(--bg-muted);
 }
-.create__tab {
+.seg__item {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
   font: inherit;
   font-size: 12px;
   font-weight: 500;
-  padding: 5px 14px;
   border: none;
-  border-radius: var(--r-pill);
+  border-radius: 6px;
   background: transparent;
   color: var(--text-dim);
   cursor: pointer;
-  transition: color var(--dur-fast) var(--ease);
+  transition:
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
 }
-.create__tab:hover:not(:disabled):not(.create__tab--on) {
+.seg__item:hover:not(:disabled):not(.seg__item--on) {
   color: var(--text);
 }
-.create__tab--on {
+.seg__item--on {
   background: var(--bg);
   color: var(--text);
-  box-shadow: var(--shadow-sm);
+  box-shadow:
+    0 0 0 1px var(--border),
+    var(--shadow-xs);
 }
-.create__tab:disabled {
+.seg__item:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
-.create__name {
-  margin-top: 16px;
-  width: 100%;
-  font: inherit;
-  font-size: 14px;
-  padding: 10px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  background: var(--bg);
-  transition:
-    border-color var(--dur-fast) var(--ease),
-    box-shadow var(--dur-fast) var(--ease);
-}
-.create__name:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: var(--ring-primary);
-}
-.guide-row {
-  margin-top: 14px;
+
+.composer__form {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex: 1;
+  flex-direction: column;
 }
-.guide-row__label {
-  flex: none;
-  width: 52px;
+.composer__body {
+  flex: 1;
+  padding: 20px var(--card-pad) 24px;
+}
+.composer__body--chat :deep(.ob) {
+  margin-top: 0;
+}
+.composer__title {
+  display: block;
+  width: 100%;
+  height: 32px;
+  padding: 0;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  border: none;
+  background: transparent;
+}
+.composer__title::placeholder {
+  color: var(--text-faint);
+  font-weight: 400;
+}
+.composer__title:focus,
+.composer__title:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px dashed var(--border);
+}
+.field {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  min-height: 30px;
+}
+.field__label {
   font-size: 12px;
   color: var(--text-dim);
 }
@@ -424,15 +505,21 @@ function fmtRelative(iso: string): string {
   gap: 6px;
 }
 .chip {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
   font: inherit;
   font-size: 12px;
-  padding: 4px 12px;
-  border-radius: var(--r-pill);
+  border-radius: 6px;
   border: 1px solid var(--border);
-  background: transparent;
+  background: var(--bg);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all var(--dur-fast) var(--ease);
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 .chip:hover:not(:disabled) {
   border-color: var(--border-strong);
@@ -441,49 +528,66 @@ function fmtRelative(iso: string): string {
 .chip--on,
 .chip--on:hover:not(:disabled) {
   border-color: var(--text);
-  color: var(--text);
-  font-weight: 500;
+  background: var(--text);
+  color: var(--bg);
 }
-.create__extra {
-  margin-top: 12px;
+.chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.field__input {
   width: 100%;
+  height: 30px;
+  padding: 0 10px;
   font: inherit;
   font-size: 12px;
-  padding: 8px 12px;
-  border: 1px dashed var(--border);
-  border-radius: var(--r-sm);
-  background: transparent;
   color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
-.create__extra:focus {
-  outline: none;
-  border-color: var(--primary);
-  border-style: solid;
-  box-shadow: var(--ring-primary);
+.field__input::placeholder {
+  color: var(--text-faint);
 }
-.create__footer {
-  margin-top: 18px;
+.field__input:hover:not(:disabled) {
+  border-color: var(--border-strong);
+}
+
+.composer__foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 24px;
+  height: 56px;
+  padding: 0 12px 0 var(--card-pad);
+  border-top: 1px solid var(--border);
+  background: var(--bg-subtle);
 }
-.create__hint {
+.composer__hint {
   margin: 0;
+  min-width: 0;
   font-size: 12px;
   color: var(--text-faint);
-  line-height: 1.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.create__submit {
+.submit {
+  flex: none;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  height: 32px;
+  padding: 0 8px 0 14px;
   font: inherit;
   font-size: 13px;
   font-weight: 500;
-  padding: 8px 18px;
+  white-space: nowrap;
   border: none;
-  border-radius: var(--r-sm);
+  border-radius: 7px;
   background: var(--primary-btn);
   color: #fff;
   cursor: pointer;
@@ -491,237 +595,152 @@ function fmtRelative(iso: string): string {
     background var(--dur-fast) var(--ease),
     opacity var(--dur-fast) var(--ease);
 }
-.create__submit:hover:not(:disabled) {
+.submit:hover:not(:disabled) {
   background: var(--primary-btn-hover);
 }
-.create__submit:disabled {
-  opacity: 0.45;
+.submit:disabled {
+  background: var(--bg-muted);
+  color: var(--text-faint);
+  box-shadow: inset 0 0 0 1px var(--border);
   cursor: not-allowed;
 }
-.create__progress {
-  margin-top: 14px;
+.submit:disabled .submit__kbd {
+  background: var(--border);
+}
+.submit__kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 18px;
+  border-radius: 4px;
+  background: rgb(255 255 255 / 18%);
+  font: inherit;
+}
+.submit__kbd .lucide {
+  vertical-align: 0;
+}
+
+.composer__status {
+  padding: 12px var(--card-pad);
+  border-top: 1px solid var(--border);
+}
+.progress {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: var(--r-sm);
-  background: var(--bg-subtle);
-  border: 1px solid var(--border);
+  gap: 8px;
+  font-size: 12px;
 }
-.create__spinner {
+.progress__icon {
   flex: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid var(--border-strong);
-  border-top-color: var(--text-dim);
-  animation: create-spin 0.7s linear infinite;
+  color: var(--text-dim);
 }
-@keyframes create-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.create__stage {
-  font-size: 13px;
+.progress__stage {
   font-weight: 500;
   color: var(--text);
 }
-.create__stage-sub {
-  margin-top: 1px;
-  font-size: 12px;
-  color: var(--text-dim);
+.progress__sub {
+  margin-left: auto;
+  color: var(--text-faint);
 }
-.create__error {
-  margin: 10px 0 0;
-  font-size: 13px;
+.composer__error {
+  margin: 0;
+  font-size: 12px;
   color: var(--mastery-red);
+}
+.progress + .composer__error {
+  margin-top: 8px;
 }
 
 /* ---------- 方向列表 ---------- */
-.topics {
-  max-width: 1080px;
-  margin: 0 auto;
-  padding: 0 32px 96px;
-}
 .topics__head {
   display: flex;
   align-items: center;
   gap: 8px;
+  height: 24px;
   margin-bottom: 16px;
 }
 .topics__head h2 {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
+  color: var(--text);
 }
 .topics__count {
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-dim);
-  background: var(--bg-muted);
-  border-radius: var(--r-pill);
-  padding: 1px 8px;
-}
-.topics__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 12px;
-}
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 16px 18px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  text-decoration: none;
-  color: inherit;
-  transition:
-    border-color var(--dur-fast) var(--ease),
-    background var(--dur-fast) var(--ease);
-}
-.card:hover {
-  border-color: var(--border-strong);
-}
-.card__top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.card__name {
-  font-size: 14px;
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.card__arrow {
-  flex: none;
-  margin-left: auto;
-  color: var(--text-faint);
-  opacity: 0;
-  transition: opacity var(--dur-fast) var(--ease);
-}
-.card:hover .card__arrow {
-  opacity: 1;
-}
-.card__tags {
-  display: flex;
-  gap: 6px;
-}
-.tag {
-  font-size: 11px;
-  padding: 1px 8px;
-  border-radius: var(--r-pill);
-  background: var(--bg-muted);
-  color: var(--text-dim);
-}
-.card__meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
-}
-.card__progress {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.card__progress-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--text-dim);
-}
-.card__progress-row strong {
-  color: var(--text);
-  font-weight: 650;
-  font-variant-numeric: tabular-nums;
-}
-.card__progress-sub {
-  color: var(--text-faint);
-  font-variant-numeric: tabular-nums;
-}
-.card__bar {
-  position: relative;
-  height: 3px;
-  border-radius: var(--r-pill);
-  background: var(--bg-muted);
-  overflow: hidden;
-}
-.card__bar i {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  border-radius: var(--r-pill);
-  transition: width var(--dur) var(--ease);
-}
-.card__bar-fill--red {
-  background: var(--mastery-red);
-}
-.card__bar-fill--yellow {
-  background: var(--mastery-yellow);
-}
-.card__bar-fill--green {
-  background: var(--mastery-green);
-}
-.card__foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
-}
-.card__created {
-  font-size: 12px;
-  color: var(--text-faint);
-}
-.card__waiting {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  color: var(--amber-text);
+  height: 18px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 5px;
 }
+
 .card--skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: var(--card-pad);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
   pointer-events: none;
 }
-.card__sk-title {
+.card__sk {
+  height: 12px;
+  border-radius: 4px;
+}
+.card__sk--title {
   height: 16px;
   width: 55%;
 }
-.card__sk-line {
-  height: 12px;
-  width: 100%;
+.card__sk--short {
+  width: 35%;
 }
-.card__sk-line--short {
-  width: 45%;
+.card__sk--block {
+  height: 44px;
 }
+
 .topics__empty {
   grid-column: 1 / -1;
-  padding: 44px;
+  padding: 56px 24px;
   text-align: center;
-  color: var(--text-dim);
-  font-size: 13px;
   border: 1px dashed var(--border);
   border-radius: var(--r-md);
 }
+.topics__empty-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.topics__empty-sub {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--text-dim);
+}
 
-@media (max-width: 900px) {
+/* ---------- 窄屏回退（仅桌面端，覆盖小窗口） ---------- */
+@media (max-width: 1080px) {
+  .page-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .hero {
     grid-template-columns: 1fr;
     gap: 40px;
-    padding-top: 56px;
+    padding-top: 64px;
   }
-  .hero__copy h1 {
-    font-size: 32px;
+  .hero__copy {
+    padding-right: 0;
+  }
+  .composer {
+    grid-column: auto;
+  }
+}
+@media (max-width: 720px) {
+  .page-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

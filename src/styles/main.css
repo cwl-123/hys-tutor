@@ -1,14 +1,15 @@
 :root {
   /* 基础色板 */
+  /* 统一中性灰阶（此前 gray/slate 两套混用，色相不一致） */
   --bg: #ffffff;
-  --bg-subtle: #f8fafc;
-  --bg-muted: #f1f5f9;
-  --text: #1f2328;
-  --text-secondary: #475569;
-  --text-dim: #6b7280;
-  --text-faint: #94a3b8;
-  --border: #e5e7eb;
-  --border-strong: #cbd5e1;
+  --bg-subtle: #fafafa;
+  --bg-muted: #f4f4f5;
+  --text: #18181b;
+  --text-secondary: #3f3f46;
+  --text-dim: #71717a;
+  --text-faint: #a1a1aa;
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
 
   /* 主色（蓝） */
   --primary: #3b82f6;
@@ -46,6 +47,7 @@
   --r-pill: 999px;
 
   /* 阴影 */
+  --shadow-xs: 0 1px 1px rgb(15 23 42 / 4%);
   --shadow-sm: 0 1px 2px rgb(15 23 42 / 6%);
   --shadow-md: 0 1px 2px rgb(15 23 42 / 4%), 0 4px 12px rgb(15 23 42 / 8%);
   --shadow-lg: 0 4px 8px rgb(15 23 42 / 6%), 0 12px 32px rgb(15 23 42 / 12%);
@@ -68,8 +70,10 @@
   --z-modal: 300;
   --z-toast: 400;
 
-  /* 布局 */
+  /* 布局：顶栏与首页内容共用同一容器，保证左右边缘对齐 */
   --header-h: 57px;
+  --page-max: 1200px;
+  --page-pad: 32px;
 
   /* 动效 */
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
@@ -289,6 +293,7 @@ html[data-theme='dark'] {
   --green-tint: #102017;
   --green-border: #1f4a2f;
 
+  --shadow-xs: 0 1px 1px rgb(0 0 0 / 30%);
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
   --shadow-md: 0 1px 2px rgb(0 0 0 / 35%), 0 4px 12px rgb(0 0 0 / 45%);
   --shadow-lg: 0 4px 8px rgb(0 0 0 / 40%), 0 12px 32px rgb(0 0 0 / 55%);
