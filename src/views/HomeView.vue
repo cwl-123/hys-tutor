@@ -82,20 +82,6 @@ function fmtRelative(iso: string): string {
   return fmtDate(iso)
 }
 
-// 卡片头像：按 topic id 哈希取渐变，稳定不闪烁
-const AVATAR_GRADIENTS = [
-  'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-  'linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%)',
-  'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)',
-  'linear-gradient(135deg, #10b981 0%, #0d9488 100%)',
-  'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)',
-  'linear-gradient(135deg, #f97316 0%, #eab308 100%)',
-]
-function avatarOf(t: Topic): string {
-  let h = 0
-  for (const ch of t.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0
-  return AVATAR_GRADIENTS[h % AVATAR_GRADIENTS.length]
-}
 function initialOf(name: string): string {
   return [...name.trim()][0]?.toUpperCase() ?? '学'
 }
@@ -106,20 +92,14 @@ function initialOf(name: string): string {
     <!-- 顶部：品牌主张 + 创建新方向 -->
     <section class="hero">
       <div class="hero__copy">
-        <span class="hero__badge">
-          <Sparkles :size="13" />
-          AI 自适应私教
-        </span>
-        <h1>
-          把任何方向，<br>学成<span class="hero__accent">自己的体系</span>
-        </h1>
+        <h1>把任何方向，<br>学成自己的体系</h1>
         <p class="hero__sub">
           AI 联网调研知识体系，每轮微课按你的掌握度定制，练习反馈实时驱动下一课。
         </p>
         <ul class="hero__feats">
-          <li><Globe :size="14" /><span>联网调研<br>构建知识图谱</span></li>
-          <li><Gauge :size="14" /><span>掌握度驱动<br>个性排课</span></li>
-          <li><Repeat :size="14" /><span>练习反馈<br>闭环迭代</span></li>
+          <li><Globe :size="13" />联网调研构建图谱</li>
+          <li><Gauge :size="13" />掌握度个性排课</li>
+          <li><Repeat :size="13" />练习反馈闭环</li>
         </ul>
       </div>
 
@@ -272,10 +252,7 @@ function initialOf(name: string): string {
             class="card__main"
           >
             <div class="card__top">
-              <span
-                class="card__avatar"
-                :style="{ background: avatarOf(t) }"
-              >{{ initialOf(t.name) }}</span>
+              <span class="card__avatar">{{ initialOf(t.name) }}</span>
               <div class="card__heading">
                 <div class="card__title">
                   <span class="card__name">{{ t.name }}</span>
@@ -297,7 +274,7 @@ function initialOf(name: string): string {
                   >{{ t.profile.level }}</span>
                   <span
                     v-if="t.profile?.style"
-                    class="tag tag--style"
+                    class="tag"
                   >{{ t.profile.style }}</span>
                 </div>
               </div>
@@ -321,16 +298,13 @@ function initialOf(name: string): string {
           >
             <div class="card__progress-row">
               <span class="card__progress-label">平均掌握</span>
-              <strong
-                class="card__progress-score"
-                :class="`card__progress-score--${masteryLevel(t.stats.avgMastery)}`"
-              >{{ t.stats.avgMastery }}</strong>
+              <strong class="card__progress-score">{{ t.stats.avgMastery }}</strong>
               <span class="card__progress-sub">{{ t.stats.masteredCount }}/{{ t.stats.nodeCount }} 已掌握</span>
             </div>
             <div class="card__bar">
               <i
                 :class="`card__bar-fill--${masteryLevel(t.stats.avgMastery)}`"
-                :style="{ width: `${Math.max(t.stats.avgMastery, 2)}%` }"
+                :style="{ width: `${t.stats.avgMastery}%` }"
               />
             </div>
           </div>
@@ -390,99 +364,56 @@ function initialOf(name: string): string {
 <style scoped>
 .home {
   min-height: calc(100vh - var(--header-h));
-  background:
-    radial-gradient(900px 320px at 20% -60px, rgb(var(--primary-rgb) / 8%), transparent),
-    radial-gradient(700px 300px at 85% 0%, rgb(139 92 246 / 6%), transparent),
-    var(--bg);
+  background: var(--bg);
 }
 
 /* ---------- Hero + 创建 ---------- */
 .hero {
-  max-width: 1160px;
+  max-width: 1120px;
   margin: 0 auto;
-  padding: 80px 40px 56px;
+  padding: 88px 40px 64px;
   display: grid;
   grid-template-columns: 1fr 1.05fr;
-  gap: 64px;
+  gap: 72px;
   align-items: center;
-}
-.hero__badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.2px;
-  color: var(--primary-hover);
-  background: var(--primary-bg);
-  border: 1px solid var(--primary-border);
-  border-radius: var(--r-pill);
-  padding: 5px 13px;
 }
 .hero__copy h1 {
-  margin: 22px 0 0;
-  font-size: 44px;
-  line-height: 1.28;
-  letter-spacing: -0.8px;
-  font-weight: 700;
-}
-.hero__accent {
-  background: linear-gradient(115deg, var(--primary-strong) 10%, #8b5cf6 90%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  margin: 0;
+  font-size: 40px;
+  line-height: 1.3;
+  letter-spacing: -0.5px;
+  font-weight: 650;
 }
 .hero__sub {
   margin: 20px 0 0;
   font-size: 15px;
   line-height: 1.9;
   color: var(--text-dim);
-  max-width: 420px;
+  max-width: 400px;
 }
 .hero__feats {
   list-style: none;
-  margin: 34px 0 0;
+  margin: 32px 0 0;
   padding: 0;
   display: flex;
-  gap: 12px;
+  gap: 24px;
 }
 .hero__feats li {
-  flex: 1;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 14px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  background: color-mix(in srgb, var(--bg) 70%, transparent);
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--text-dim);
 }
 .hero__feats .lucide {
-  flex: none;
-  margin-top: 3px;
-  color: var(--primary);
+  color: var(--text-faint);
 }
 .create {
-  position: relative;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   padding: 24px 28px 26px;
-  box-shadow: var(--shadow-lg);
-}
-/* 卡片顶部品牌渐变描线 */
-.create::before {
-  content: '';
-  position: absolute;
-  top: -1px;
-  left: 28px;
-  right: 28px;
-  height: 2px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, var(--primary) 0%, #8b5cf6 100%);
-  opacity: 0.9;
+  box-shadow: var(--shadow-md);
 }
 .create__tabs {
   display: inline-flex;
@@ -511,7 +442,7 @@ function initialOf(name: string): string {
 }
 .create__tab--on {
   background: var(--bg);
-  color: var(--primary-hover);
+  color: var(--text);
   box-shadow: var(--shadow-sm);
 }
 .create__tab:disabled {
@@ -537,7 +468,7 @@ function initialOf(name: string): string {
   box-shadow: var(--ring-primary);
 }
 .create__guide {
-  margin-top: 16px;
+  margin-top: 14px;
   padding: 16px 18px;
   border-radius: var(--r-md);
   background: var(--bg-subtle);
@@ -555,7 +486,6 @@ function initialOf(name: string): string {
   flex: none;
   width: 60px;
   font-size: 12px;
-  font-weight: 500;
   color: var(--text-dim);
 }
 .chips {
@@ -575,16 +505,14 @@ function initialOf(name: string): string {
   transition: all var(--dur-fast) var(--ease);
 }
 .chip:hover:not(:disabled) {
-  border-color: var(--primary-soft);
-  color: var(--primary-hover);
+  border-color: var(--border-strong);
+  color: var(--text);
 }
 .chip--on,
 .chip--on:hover:not(:disabled) {
-  border-color: var(--primary);
-  background: var(--primary-bg);
-  color: var(--primary-hover);
+  border-color: var(--text);
+  color: var(--text);
   font-weight: 500;
-  box-shadow: 0 0 0 3px rgb(var(--primary-rgb) / 8%);
 }
 .create__extra {
   width: 100%;
@@ -626,29 +554,20 @@ function initialOf(name: string): string {
   padding: 11px 24px;
   border: none;
   border-radius: var(--r-md);
-  background: linear-gradient(120deg, var(--primary-btn) 30%, #4f46e5 100%);
+  background: var(--primary-btn);
   color: #fff;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgb(var(--primary-rgb) / 30%);
   transition:
-    filter var(--dur-fast) var(--ease),
-    opacity var(--dur-fast) var(--ease),
-    transform var(--dur-fast) var(--ease),
-    box-shadow var(--dur-fast) var(--ease);
+    background var(--dur-fast) var(--ease),
+    opacity var(--dur-fast) var(--ease);
 }
 .create__submit:hover:not(:disabled) {
-  filter: brightness(1.06);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgb(var(--primary-rgb) / 38%);
-}
-.create__submit:active:not(:disabled) {
-  transform: translateY(0);
+  background: var(--primary-btn-hover);
 }
 /* 禁用态保留品牌色降饱和，避免「按钮坏了」的观感 */
 .create__submit:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-  box-shadow: none;
 }
 .create__progress {
   margin-top: 16px;
@@ -657,16 +576,16 @@ function initialOf(name: string): string {
   gap: 12px;
   padding: 12px 14px;
   border-radius: var(--r-md);
-  background: var(--primary-bg);
-  border: 1px solid var(--primary-border);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
 }
 .create__spinner {
   flex: none;
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  border: 2px solid var(--primary-border);
-  border-top-color: var(--primary);
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--text-dim);
   animation: create-spin 0.7s linear infinite;
 }
 @keyframes create-spin {
@@ -677,13 +596,12 @@ function initialOf(name: string): string {
 .create__stage {
   font-size: 13px;
   font-weight: 600;
-  color: var(--primary-hover);
+  color: var(--text);
 }
 .create__stage-sub {
   margin-top: 2px;
   font-size: 12px;
-  color: var(--primary);
-  opacity: 0.85;
+  color: var(--text-dim);
 }
 .create__error {
   margin: 12px 0 0;
@@ -693,9 +611,9 @@ function initialOf(name: string): string {
 
 /* ---------- 方向列表 ---------- */
 .topics {
-  max-width: 1160px;
+  max-width: 1120px;
   margin: 0 auto;
-  padding: 4px 40px 88px;
+  padding: 0 40px 88px;
 }
 .topics__head {
   display: flex;
@@ -705,23 +623,23 @@ function initialOf(name: string): string {
 }
 .topics__head h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 600;
   letter-spacing: 0.1px;
 }
 .topics__count {
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
   color: var(--text-dim);
   background: var(--bg-muted);
   border-radius: var(--r-pill);
-  padding: 2px 10px;
+  padding: 2px 9px;
 }
 .topics__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
-  gap: 18px;
+  gap: 16px;
 }
 .card {
   display: flex;
@@ -731,24 +649,21 @@ function initialOf(name: string): string {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  box-shadow: var(--shadow-sm);
-  animation: card-in 0.35s var(--ease) both;
-  animation-delay: calc(var(--i, 0) * 45ms);
+  animation: card-in 0.3s var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 40ms);
   transition:
-    transform var(--dur-fast) var(--ease),
-    box-shadow var(--dur-fast) var(--ease),
-    border-color var(--dur-fast) var(--ease);
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 @keyframes card-in {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(6px);
   }
 }
 .card:hover {
-  transform: translateY(-3px);
-  border-color: var(--primary-border);
-  box-shadow: 0 12px 32px rgb(var(--primary-rgb) / 12%);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
 }
 .card__main {
   display: flex;
@@ -765,24 +680,23 @@ function initialOf(name: string): string {
 }
 .card__avatar {
   flex: none;
-  width: 40px;
-  height: 40px;
-  border-radius: 11px;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 600;
-  color: #fff;
-  text-shadow: 0 1px 2px rgb(0 0 0 / 18%);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 18%);
+  color: var(--bg);
+  background: var(--text);
 }
 .card__heading {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 .card__title {
   display: flex;
@@ -814,15 +728,12 @@ function initialOf(name: string): string {
 .card__arrow {
   flex: none;
   display: inline-flex;
-  color: var(--text-faint);
+  color: var(--text-dim);
   opacity: 0;
-  transform: translate(-3px, 3px);
-  transition: all var(--dur-fast) var(--ease);
+  transition: opacity var(--dur-fast) var(--ease);
 }
 .card:hover .card__arrow {
   opacity: 1;
-  transform: translate(0, 0);
-  color: var(--primary-strong);
 }
 .card__tags {
   display: flex;
@@ -834,10 +745,6 @@ function initialOf(name: string): string {
   border-radius: var(--r-pill);
   background: var(--bg-muted);
   color: var(--text-secondary);
-}
-.tag--style {
-  background: var(--primary-bg);
-  color: var(--primary-hover);
 }
 .card__stats {
   display: flex;
@@ -870,18 +777,10 @@ function initialOf(name: string): string {
   color: var(--text-dim);
 }
 .card__progress-score {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--text);
   font-variant-numeric: tabular-nums;
-}
-.card__progress-score--red {
-  color: var(--mastery-red);
-}
-.card__progress-score--yellow {
-  color: var(--mastery-yellow);
-}
-.card__progress-score--green {
-  color: var(--mastery-green);
 }
 .card__progress-sub {
   margin-left: auto;
@@ -889,7 +788,7 @@ function initialOf(name: string): string {
 }
 .card__bar {
   position: relative;
-  height: 6px;
+  height: 4px;
   border-radius: var(--r-pill);
   background: var(--bg-muted);
   overflow: hidden;
@@ -903,13 +802,13 @@ function initialOf(name: string): string {
   transition: width var(--dur) var(--ease);
 }
 .card__bar-fill--red {
-  background: linear-gradient(90deg, #f87171, var(--mastery-red));
+  background: var(--mastery-red);
 }
 .card__bar-fill--yellow {
-  background: linear-gradient(90deg, #fbbf24, var(--mastery-yellow));
+  background: var(--mastery-yellow);
 }
 .card__bar-fill--green {
-  background: linear-gradient(90deg, #4ade80, var(--mastery-green));
+  background: var(--mastery-green);
 }
 .card__foot {
   display: flex;
@@ -943,9 +842,9 @@ function initialOf(name: string): string {
 }
 .card__sk-avatar {
   flex: none;
-  width: 40px;
-  height: 40px;
-  border-radius: 11px;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
 }
 .card__sk-head {
   flex: 1;
@@ -977,11 +876,11 @@ function initialOf(name: string): string {
 @media (max-width: 900px) {
   .hero {
     grid-template-columns: 1fr;
-    gap: 36px;
-    padding-top: 52px;
+    gap: 40px;
+    padding-top: 56px;
   }
   .hero__copy h1 {
-    font-size: 34px;
+    font-size: 32px;
   }
 }
 </style>

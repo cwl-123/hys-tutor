@@ -84,14 +84,11 @@ const showSettings = ref(false)
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  color: #fff;
-  background: linear-gradient(135deg, var(--primary-btn) 20%, #4f46e5 100%);
-  box-shadow:
-    0 1px 4px rgb(var(--primary-rgb) / 35%),
-    inset 0 0 0 1px rgb(255 255 255 / 15%);
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  color: var(--bg);
+  background: var(--text);
 }
 .app-title {
   font-size: 15px;
