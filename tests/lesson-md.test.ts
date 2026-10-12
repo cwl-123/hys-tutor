@@ -6,6 +6,7 @@ import {
   parseSections,
   replaceMermaidBlock,
   replaceSection,
+  sanitizeCitations,
   stripTrailingSourceBlock,
 } from '../shared/lesson-md'
 
@@ -70,6 +71,33 @@ describe('stripTrailingSourceBlock', () => {
   it('没有来源块时原样返回', () => {
     const md = '## 正文\n内容中提到参考来源一词，但不是小标题。'
     expect(stripTrailingSourceBlock(md)).toBe(md)
+  })
+})
+
+describe('sanitizeCitations', () => {
+  it('越界引用被删除，合法引用保留', () => {
+    const { md: out, removed } = sanitizeCitations('结论 A [1]，结论 B [2]，越界 [5]。', 2)
+    expect(out).toBe('结论 A [1]，结论 B [2]，越界 。')
+    expect(removed).toEqual([5])
+  })
+
+  it('sourceCount 为 0 时删除所有数字引用', () => {
+    const { md: out, removed } = sanitizeCitations('引用 [1] 和 [3]', 0)
+    expect(out).toBe('引用  和 ')
+    expect(removed).toEqual([1, 3])
+  })
+
+  it('不误伤 markdown 链接 [文字](url) 与 [1](url)', () => {
+    const md = '见 [文档](https://a.com)，还有 [1](https://b.com)'
+    const { md: out, removed } = sanitizeCitations(md, 0)
+    expect(out).toBe(md)
+    expect(removed).toEqual([])
+  })
+
+  it('连续引用 [2][9] 只删越界那个', () => {
+    const { md: out, removed } = sanitizeCitations('见 [2][9] 处', 3)
+    expect(out).toBe('见 [2] 处')
+    expect(removed).toEqual([9])
   })
 })
 

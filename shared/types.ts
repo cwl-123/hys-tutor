@@ -72,6 +72,8 @@ export const lessonSchema = z.object({
   researchNoteIds: z.array(z.string()),
   sources: z.array(lessonSourceSchema),
   images: z.array(lessonImageSchema).optional(), // 旧课件无此字段
+  objectives: z.array(z.string()).optional(), // 本课可检验的学习目标（旧课件无此字段）
+  difficulty: z.enum(['入门', '进阶', '高级']).optional(), // 难度档位（旧课件无此字段）
   contentMd: z.string(),
   status: lessonStatusSchema,
   createdAt: z.string(),

@@ -6,6 +6,8 @@ import { searchWeb } from '../agent/tools/web-search'
 import { searchImages } from '../agent/tools/image-search'
 import { fetchPage } from '../agent/tools/web-fetch'
 import { notePatchSchema, readResearchNote, saveResearchNote } from '../agent/tools/notes'
+import { appendTrace } from '../agent/tools/research-trace'
+import { filterSearchResults } from './search-filter'
 import { downloadImage, localizeImages } from './asset-store'
 import { RESEARCH_SYSTEM_PROMPT, researchUserPrompt } from '../llm/prompts/research'
 import {
@@ -23,13 +25,15 @@ import {
   correctContentPrompt,
 } from '../llm/prompts/selfcheck'
 import { QUIZ_SYSTEM_PROMPT, llmQuizSchema, quizPrompt } from '../llm/prompts/quiz'
+import { TAUGHT_SYSTEM_PROMPT, llmTaughtSchema, taughtExtractPrompt } from '../llm/prompts/taught'
 import { scheduleNext } from './scheduler'
 import { getGraph, getTopic } from './graph-service'
 import { findLesson } from './lesson-service'
 import { preferenceContextText } from './preference-service'
+import { listTaught, recordTaught, taughtContextText } from './taught-service'
 import { listAttempts } from './attempt-service'
 import { MASTERY_UNLOCK_THRESHOLD } from '../../shared/types'
-import { stripTrailingSourceBlock } from '../../shared/lesson-md'
+import { sanitizeCitations, stripTrailingSourceBlock } from '../../shared/lesson-md'
 import type {
   ErrorReport,
   KnowledgeNode,
@@ -130,9 +134,32 @@ async function runResearch(
       execute: async (args) => {
         const query = String(args.query ?? '').trim()
         if (!query) return '搜索词为空'
-        const results = await searchWeb(query)
+        const raw = await searchWeb(query)
+        const { kept, drops } = await filterSearchResults({
+          query,
+          nodeName: node.name,
+          nodeDescription: node.description,
+          results: raw,
+        })
+        const dropByUrl = new Map(drops.map((d) => [d.url, d.reason]))
+        await appendTrace(topicId, node.id, {
+          kind: 'search',
+          query,
+          results: raw.map((r) => ({
+            title: r.title,
+            url: r.url,
+            provider: r.provider,
+            snippet: r.snippet,
+            kept: !dropByUrl.has(r.url),
+            dropReason: dropByUrl.get(r.url),
+          })),
+        })
+        onStage({
+          stage: 'research-filtered',
+          detail: { query, total: raw.length, kept: kept.length, dropped: drops.length },
+        })
         searchedQueries.push(query)
-        return results
+        return kept
           .slice(0, 8)
           .map((r, i) => `[${i + 1}] (${r.provider}) ${r.title}\n${r.url}\n${r.snippet}`)
           .join('\n\n')
@@ -147,7 +174,14 @@ async function runResearch(
         required: ['url'],
       },
       execute: async (args) => {
-        const page = await fetchPage(String(args.url ?? ''))
+        const url = String(args.url ?? '')
+        const page = await fetchPage(url)
+        await appendTrace(topicId, node.id, {
+          kind: 'fetch',
+          url: page.url,
+          title: page.title,
+          textLength: page.text.length,
+        })
         const images = page.images.length
           ? `\n\n本页配图候选（可用 save_research_note 的 images 收藏）：\n${page.images
               .map((img) => `- ${img.url}${img.title ? `（${img.title}）` : ''}`)
@@ -271,6 +305,35 @@ async function streamWriteLesson(system: string, prompt: string, onStage: StageF
   return content
 }
 
+// 归档本课用过的案例（供后续课程避免重复）；失败不影响备课
+async function recordTaughtForLesson(
+  topicId: string,
+  lessonId: string,
+  node: KnowledgeNode,
+  objectives: string[],
+  contentMd: string,
+  onStage: StageFn,
+): Promise<void> {
+  try {
+    const out = await completeJson({
+      system: TAUGHT_SYSTEM_PROMPT,
+      prompt: taughtExtractPrompt(node.name, contentMd),
+      schema: llmTaughtSchema,
+      temperature: 0.2,
+    })
+    await recordTaught(topicId, {
+      lessonId,
+      nodeId: node.id,
+      nodeName: node.name,
+      objectives,
+      examples: out.examples,
+    })
+    onStage({ stage: 'taught-recorded', detail: { nodeId: node.id, examples: out.examples.length } })
+  } catch (err) {
+    onStage({ stage: 'taught-skip', detail: { message: err instanceof Error ? err.message : String(err) } })
+  }
+}
+
 // 备课主流程：schedule → research → outline → write → self-check（Design.md §1.1）
 // opts.nodeId：用户指定知识点；opts.lessonId：后台任务预分配的课程 id
 export async function prepareLesson(
@@ -309,6 +372,7 @@ export async function prepareLesson(
   const ctx = await buildLearnerContext(topicId, graph.nodes)
   ctx.profileText = profileTextOf(topic.profile)
   const preferenceText = await preferenceContextText()
+  const taughtText = taughtContextText(await listTaught(topicId))
   const learnerCtx = learnerContextText({
     masterySnapshot: ctx.masterySnapshot,
     wrongAnswers: ctx.wrongAnswers,
@@ -316,6 +380,7 @@ export async function prepareLesson(
     nodeNames: ctx.nodeNames,
     profileText: ctx.profileText,
     preferenceText,
+    taughtText,
   })
 
   // 2. 研究（Agent 工具循环，笔记缓存命中则跳过）
@@ -328,7 +393,10 @@ export async function prepareLesson(
     prompt: outlineUserPrompt(node, note, learnerCtx),
     schema: llmOutlineSchema,
   })
-  onStage({ stage: 'outline-done', detail: { focus: outline.focus, sections: outline.sections.length } })
+  onStage({
+    stage: 'outline-done',
+    detail: { focus: outline.focus, sections: outline.sections.length, difficulty: outline.difficulty, objectives: outline.objectives.length },
+  })
 
   // 4. 写作（流式）
   onStage({ stage: 'write' })
@@ -342,7 +410,7 @@ export async function prepareLesson(
   onStage({ stage: 'self-check' })
   const check = await completeJson({
     system: SELFCHECK_SYSTEM_PROMPT,
-    prompt: selfCheckPrompt(node, note, draft),
+    prompt: selfCheckPrompt(node, note, draft, outline.objectives),
     schema: llmSelfCheckSchema,
     temperature: 0.2,
   })
@@ -360,8 +428,12 @@ export async function prepareLesson(
     detail: { issues: check.issues, corrected },
   })
 
-  // 落图：外链配图下载到课题素材库并改写为本地引用（下载失败的编造 URL 直接剔除）
-  const localized = await localizeImages(topicId, stripTrailingSourceBlock(contentMd), {
+  // 引用落地校验：剔除越界来源引用 [n]，再落图（外链落地、失败剔除）
+  const cited = sanitizeCitations(stripTrailingSourceBlock(contentMd), note.sources.length)
+  if (cited.removed.length) {
+    onStage({ stage: 'citations-sanitized', detail: { removed: cited.removed.length } })
+  }
+  const localized = await localizeImages(topicId, cited.md, {
     dropFailed: true,
   })
 
@@ -377,6 +449,8 @@ export async function prepareLesson(
     researchNoteIds: [note.id],
     sources: note.sources.map((s, i) => ({ idx: i + 1, title: s.title, url: s.url })),
     images: localized.images,
+    objectives: outline.objectives,
+    difficulty: outline.difficulty,
     contentMd: localized.contentMd,
     status: 'generated',
     createdAt: nowIso(),
@@ -396,6 +470,9 @@ export async function prepareLesson(
   }
   await writeJson(dataPath('topics', topicId, 'lessons', `${lessonId}.json`), lesson)
   await writeJson(dataPath('topics', topicId, 'lessons', `${lessonId}.questions.json`), questions)
+
+  // 归档本课案例，供后续课程避免重复（失败不影响备课）
+  await recordTaughtForLesson(topicId, lessonId, node, outline.objectives, localized.contentMd, onStage)
 
   onStage({ stage: 'done', detail: { lessonId, nodeId: node.id, wordCount: localized.contentMd.length } })
   return { lesson, questions }
@@ -440,7 +517,7 @@ export async function reviseLesson(
     try {
       const check = await completeJson({
         system: SELFCHECK_SYSTEM_PROMPT,
-        prompt: selfCheckPrompt(node, note, revised),
+        prompt: selfCheckPrompt(node, note, revised, lesson.objectives ?? []),
         schema: llmSelfCheckSchema,
         temperature: 0.2,
       })
@@ -474,8 +551,9 @@ export async function reviseLesson(
     }
   }
 
-  // 落图（与备课产线一致：外链落地、失败剔除）
-  const localized = await localizeImages(topic.id, stripTrailingSourceBlock(contentMd), {
+  // 引用落地校验：剔除越界来源引用 [n]，再落图（外链落地、失败剔除）
+  const cited = sanitizeCitations(stripTrailingSourceBlock(contentMd), lesson.sources.length)
+  const localized = await localizeImages(topic.id, cited.md, {
     dropFailed: true,
   })
   lesson.contentMd = localized.contentMd
@@ -485,6 +563,9 @@ export async function reviseLesson(
   await writeJson(dataPath('topics', topic.id, 'lessons', `${lessonId}.json`), lesson)
   if (questions) {
     await writeJson(dataPath('topics', topic.id, 'lessons', `${lessonId}.questions.json`), questions)
+  }
+  if (node) {
+    await recordTaughtForLesson(topic.id, lessonId, node, lesson.objectives ?? [], localized.contentMd, onStage)
   }
   onStage({ stage: 'done', detail: { lessonId, wordCount: localized.contentMd.length } })
   return lesson

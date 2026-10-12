@@ -35,6 +35,10 @@ function stageLabel(stage: string, detail?: unknown): string | null {
       const imgs = d.images ? `，配图 ${d.images} 张` : ''
       return `研究笔记已保存（${d.sources} 个来源${imgs}）`
     }
+    case 'research-filtered': {
+      const d = detail as { total: number; kept: number; dropped: number }
+      return d.dropped > 0 ? `过滤无关结果：保留 ${d.kept}/${d.total} 条` : null
+    }
     case 'outline':
       return '正在设计课程大纲…'
     case 'outline-done': {
@@ -55,6 +59,14 @@ function stageLabel(stage: string, detail?: unknown): string | null {
         ? `自查发现 ${d.issues.length} 处问题${d.corrected ? '，已修正' : ''}`
         : '自查通过，未发现事实性问题'
     }
+    case 'citations-sanitized': {
+      const d = detail as { removed: number }
+      return `清理越界来源引用 ${d.removed} 处`
+    }
+    case 'taught-recorded': {
+      const d = detail as { examples: number }
+      return d.examples > 0 ? `归档本课案例 ${d.examples} 条（供后续课程避免重复）` : null
+    }
     case 'done':
       return '备课完成'
     default:
@@ -74,6 +86,7 @@ function stagePhase(stage: string): number | null {
     case 'research':
     case 'research-tool':
     case 'research-tool-failed':
+    case 'research-filtered':
     case 'research-note-saved':
       return 1
     case 'outline':
@@ -85,7 +98,10 @@ function stagePhase(stage: string): number | null {
     case 'self-check':
     case 'self-check-done':
     case 'self-check-skipped':
+    case 'citations-sanitized':
       return 4
+    case 'taught-recorded':
+      return 3
     case 'done':
       return 5
     case 'revise':

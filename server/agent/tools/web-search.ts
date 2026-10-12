@@ -7,6 +7,8 @@ export interface SearchResult {
   provider: 'tavily' | 'bocha'
 }
 
+export type SearchProvider = SearchResult['provider']
+
 const SEARCH_TIMEOUT_MS = 15_000
 
 // URL 归一化用于去重：去 hash、去 utm 参数、去尾部斜杠
@@ -76,22 +78,34 @@ async function bochaSearch(query: string, count: number, apiKey: string): Promis
   }))
 }
 
-// 双路并行搜索 + 去重合并；两家都失败/无结果才抛错（互为降级）
+// 按 query 语言选主/次搜索源：实测中文命中博查更稳、英文命中 Tavily 更准。
+// 主源结果排前、次源仅作补充与交叉验证（后续相关性过滤会剔除串台噪音）。
+export function routeProviders(query: string): { primary: SearchProvider; secondary: SearchProvider } {
+  const hasCjk = /[\u3400-\u9fff\uf900-\ufaff]/.test(query)
+  return hasCjk
+    ? { primary: 'bocha', secondary: 'tavily' }
+    : { primary: 'tavily', secondary: 'bocha' }
+}
+
+// 双路并行搜索 + 按语言路由排序 + 去重合并；两家都失败/无结果才抛错
 export async function searchWeb(query: string, maxPerProvider = 5): Promise<SearchResult[]> {
   const keys = resolveSearchKeys(getSettings())
   if (!keys.tavilyKey && !keys.bochaKey) {
     throw new Error('未配置搜索 API Key：请在「设置」中填写 Tavily / 博查 Key（或用 .env）')
   }
-  const [tavily, bocha] = await Promise.allSettled([
-    tavilySearch(query, maxPerProvider, keys.tavilyKey),
-    bochaSearch(query, maxPerProvider, keys.bochaKey),
-  ])
+  const { primary, secondary } = routeProviders(query)
+  const run = (p: SearchProvider) =>
+    p === 'tavily'
+      ? tavilySearch(query, maxPerProvider, keys.tavilyKey)
+      : bochaSearch(query, maxPerProvider, keys.bochaKey)
+
+  const [pRes, sRes] = await Promise.allSettled([run(primary), run(secondary)])
   const merged = mergeSearchResults(
-    tavily.status === 'fulfilled' ? tavily.value : [],
-    bocha.status === 'fulfilled' ? bocha.value : [],
+    pRes.status === 'fulfilled' ? pRes.value : [],
+    sRes.status === 'fulfilled' ? sRes.value : [],
   )
   if (merged.length === 0) {
-    const reasons = [tavily, bocha]
+    const reasons = [pRes, sRes]
       .map((r) => (r.status === 'rejected' ? String(r.reason) : ''))
       .filter(Boolean)
       .join('；')

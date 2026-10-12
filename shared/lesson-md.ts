@@ -88,6 +88,19 @@ export function stripTrailingSourceBlock(md: string): string {
   return lines.slice(0, end).join('\n').replace(/\s+$/, '')
 }
 
+// 引用落地校验：正文里的 [n] 必须落在来源范围内，越界引用（n<1 或 n>sourceCount）直接删除。
+// 只处理纯数字引用，不误伤 [文字](链接) 这类 markdown 链接（数字后紧跟 ( 的跳过）。
+export function sanitizeCitations(md: string, sourceCount: number): { md: string; removed: number[] } {
+  const removed: number[] = []
+  const out = md.replace(/\[(\d+)\](?!\()/g, (m, digits: string) => {
+    const n = Number(digits)
+    if (n >= 1 && n <= sourceCount) return m
+    removed.push(n)
+    return ''
+  })
+  return { md: out, removed }
+}
+
 // 依标题定位章节：精确 → 忽略大小写 → 包含关系兜底
 export function findSectionByHeading(md: string, heading: string): LessonSection | null {
   const target = heading.trim()

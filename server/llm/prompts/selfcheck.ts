@@ -56,11 +56,15 @@ export function selfCheckPrompt(
   node: KnowledgeNode,
   note: ResearchNote,
   contentMd: string,
+  objectives: string[] = [],
 ): string {
+  const objectivesBlock = objectives.length
+    ? `\n本课学习目标：\n${objectives.map((o, i) => `${i + 1}. ${o}`).join('\n')}\n`
+    : ''
   return `质检以下课程并出 5 道课末题。
 
 目标知识点：${node.name}
-
+${objectivesBlock}
 研究笔记（事实依据）：
 ${JSON.stringify(note, null, 2)}
 
@@ -73,6 +77,7 @@ CONTENT>>>
 1. 对照研究笔记逐段检查：找出与笔记矛盾、或笔记完全无法支撑的关键断言，每条写成一句话写入 issues（格式「位置：问题」），无问题则为空数组。issues 只放字符串，不要放对象
 2. 判断是否存在需要改写正文的实质问题，用 needsCorrection 布尔值表示（仅「提示类、不影响事实正确性」的问题不算实质问题）
 3. 出 5 道题考察本课核心内容，题型配比固定：2 道 single 四选一 + 2 道 judge 判断 + 1 道 short 简答
+   - 题目须覆盖上面的学习目标（每个目标都应有对应考查），整体考察本课核心内容
    - single：options 4 个选项（纯选项文本，不要带 "A." 等字母前缀），answer 为正确选项字母，explanation 讲解为什么
    - judge：answer 为 "对" 或 "错"
    - short：referenceAnswer 给参考答案要点，explanation 给评分要点

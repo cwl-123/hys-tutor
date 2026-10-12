@@ -3,6 +3,12 @@ import type { KnowledgeNode, ResearchNote } from '../../../shared/types'
 
 export const llmOutlineSchema = z.object({
   focus: z.string().describe('本课教学重点，一句话'),
+  objectives: z
+    .array(z.string())
+    .min(2)
+    .max(4)
+    .describe('本课学习目标：2~4 条，动词开头、可检验（如「能推导出交叉熵损失的梯度形式」），课程与出题都围绕它'),
+  difficulty: z.enum(['入门', '进阶', '高级']).describe('本课难度档位，由学习者当前掌握度决定'),
   sections: z
     .array(
       z.object({
@@ -26,6 +32,7 @@ export function learnerContextText(ctx: {
   nodeNames: Record<string, string>
   profileText?: string
   preferenceText?: string
+  taughtText?: string
 }): string {
   const snapshot = Object.entries(ctx.masterySnapshot)
     .map(([id, m]) => `${ctx.nodeNames[id] ?? id}=${m}`)
@@ -36,13 +43,14 @@ export function learnerContextText(ctx: {
     : '（暂无报错记录）'
   const profile = ctx.profileText ? `\n\n${ctx.profileText}` : ''
   const preferences = ctx.preferenceText ? `\n\n${ctx.preferenceText}` : ''
+  const taught = ctx.taughtText ? `\n\n${ctx.taughtText}` : ''
   return `学习者掌握度快照：${snapshot}
 
 历史错题摘要：
 ${wrong}
 
 用户标记的内容报错（务必避坑，不要重复同样的错误讲法）：
-${reports}${profile}${preferences}`
+${reports}${taught}${profile}${preferences}`
 }
 
 export function outlineUserPrompt(
@@ -65,6 +73,9 @@ ${learnerCtx}
 2. 依据学习者掌握度决定深浅：已掌握的相关点略讲，薄弱点展开讲
 3. 每个 section 的 points 是要讲的具体内容点，citations 标注依据的来源编号
 4. teachingNotes 写给"写课的老师"：提醒哪里要照顾学习者的薄弱点、哪里要避开历史报错
+5. objectives 是本课的学习目标，2~4 条，动词开头、可检验（学完这节课能做什么），后续正文与出题都围绕它
+6. difficulty 依据学习者掌握度与知识点本身给出：基础概念/低掌握分→入门，需推导理解→进阶，综合难点→高级
+7. 已讲过的内容（如有）避免重复：换新例子/新角度，不要照搬旧案例
 
-输出 JSON：{"focus": "...", "sections": [{"title": "...", "points": ["..."], "citations": [1]}], "teachingNotes": "..."}`
+输出 JSON：{"focus": "...", "objectives": ["能...", "会..."], "difficulty": "进阶", "sections": [{"title": "...", "points": ["..."], "citations": [1]}], "teachingNotes": "..."}`
 }

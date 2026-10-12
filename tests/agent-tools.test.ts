@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { JSDOM } from 'jsdom'
-import { mergeSearchResults, normalizeUrl, type SearchResult } from '../server/agent/tools/web-search'
+import { mergeSearchResults, normalizeUrl, routeProviders, type SearchResult } from '../server/agent/tools/web-search'
 import { extractMainContent, extractPageImages } from '../server/agent/tools/web-fetch'
 import { searchImages } from '../server/agent/tools/image-search'
 import { mergeResearchNotes, type NotePatch } from '../server/agent/tools/notes'
@@ -25,6 +25,23 @@ describe('web-search 合并去重', () => {
     expect(normalizeUrl('https://a.com/p/?utm_medium=x&id=1')).toBe('https://a.com/p/?id=1')
     expect(normalizeUrl('https://a.com/x/')).toBe(normalizeUrl('https://a.com/x'))
     expect(normalizeUrl('not-a-url')).toBe('not-a-url')
+  })
+})
+
+describe('routeProviders 按语言路由', () => {
+  it('中文 query 以博查为主、Tavily 为辅', () => {
+    expect(routeProviders('逻辑回归 交叉熵 推导')).toEqual({ primary: 'bocha', secondary: 'tavily' })
+  })
+
+  it('英文 query 以 Tavily 为主、博查为辅', () => {
+    expect(routeProviders('logistic regression cross-entropy derivation')).toEqual({
+      primary: 'tavily',
+      secondary: 'bocha',
+    })
+  })
+
+  it('中英混合只要含中文即以博查为主', () => {
+    expect(routeProviders('CTR 预估 logistic')).toEqual({ primary: 'bocha', secondary: 'tavily' })
   })
 })
 

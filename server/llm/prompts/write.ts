@@ -47,10 +47,17 @@ export function writeLessonPrompt(opts: {
   const sections = opts.outline.sections
     .map((s, i) => `${i + 1}. ${s.title}\n   - ${s.points.join('\n   - ')}${s.citations.length ? `\n   - 引用来源：${s.citations.map((c) => `[${c}]`).join('')}` : ''}`)
     .join('\n')
+  const objectives = opts.outline.objectives
+    .map((o, i) => `${i + 1}. ${o}`)
+    .join('\n')
   return `写一节 15 分钟微课（markdown）。
 
 课题：「${opts.topicName}」
 本课知识点：${opts.node.name} —— ${opts.node.description}
+难度：${opts.outline.difficulty}
+
+本课学习目标（正文与小结都要围绕它们，学完应能达成）：
+${objectives}
 
 大纲：
 ${sections}
@@ -72,7 +79,7 @@ ${opts.learnerCtx}
 3. 关键事实性结论标注来源引用 [n]
 4. 代码示例用围栏代码块并标语言
 5. 开头用 2~3 句话结合学习者当前状态引入（参考掌握度快照和错题摘要），让学习者明白"为什么现在学这个"
-6. 结尾加"本课小结"和"下一课预告"（依据掌握度快照推测）
+6. 结尾加"本课小结"和"下一课预告"（依据掌握度快照推测）；"本课小结"要逐条回应上面的学习目标，让学习者自检是否达成
 7. 语言：中文，讲人话，避免堆砌术语
 8. 图示（重要，文字讲不清的就画图）：抽象结构、流程、对比、决策路径等用 Mermaid 围栏图表达（\`\`\`mermaid，flowchart/sequence/er/class 等类型），每课 1~3 张，节点文字简洁；放在最需要看图的讲解段落之后
 9. 配图：研究笔记 images 里若有贴切的图，挑 0~2 张用 \`![一句话图注](localPath)\` 嵌入（优先 localPath 字段；图注说明"这张图帮读者看懂什么"）；没有贴切的就不放，严禁编造图片 URL

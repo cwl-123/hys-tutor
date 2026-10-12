@@ -399,6 +399,25 @@ onUnmounted(() => {
         >
           为什么这节课讲这个：{{ scheduleReason }}
         </p>
+        <div
+          v-if="lessonStore.lesson.objectives?.length"
+          class="lesson__goals"
+        >
+          <span class="lesson__goals-tag">{{ lessonStore.lesson.difficulty ?? '进阶' }}</span>
+          <div>
+            <div class="lesson__goals-title">
+              本课学习目标
+            </div>
+            <ul>
+              <li
+                v-for="(o, i) in lessonStore.lesson.objectives"
+                :key="i"
+              >
+                {{ o }}
+              </li>
+            </ul>
+          </div>
+        </div>
         <div class="lesson__actions">
           <button
             v-if="editing"
@@ -821,6 +840,37 @@ onUnmounted(() => {
   border-left: 3px solid var(--primary);
   padding: 10px 14px;
   border-radius: 0 var(--r-sm) var(--r-sm) 0;
+}
+.lesson__goals {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-subtle);
+  font-size: 13px;
+}
+.lesson__goals-tag {
+  flex: none;
+  padding: 2px 9px;
+  border-radius: var(--r-pill);
+  background: var(--primary);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+.lesson__goals-title {
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+.lesson__goals ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-secondary);
+  line-height: 1.8;
 }
 .lesson__actions {
   margin-top: 12px;
