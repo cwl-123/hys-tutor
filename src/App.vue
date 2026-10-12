@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Heart, Settings } from 'lucide-vue-next'
+import { GraduationCap, Heart, Settings } from 'lucide-vue-next'
 import SettingsModal from '@/components/SettingsModal.vue'
 import ToastHost from '@/components/ToastHost.vue'
 
@@ -10,29 +10,34 @@ const showSettings = ref(false)
 <template>
   <div class="app">
     <header class="app-header">
-      <RouterLink
-        to="/"
-        class="app-title"
-      >
-        hys-tutor
-      </RouterLink>
-      <span class="app-subtitle">AI 自适应私教</span>
-      <RouterLink
-        to="/preferences"
-        class="app-settings app-settings--link"
-        title="我的偏好"
-      >
-        <Heart :size="14" />
-        偏好
-      </RouterLink>
-      <button
-        class="app-settings"
-        title="模型设置"
-        @click="showSettings = true"
-      >
-        <Settings :size="14" />
-        设置
-      </button>
+      <div class="app-header__inner">
+        <RouterLink
+          to="/"
+          class="app-brand"
+        >
+          <span class="app-brand__mark"><GraduationCap :size="15" /></span>
+          <span class="app-title">hys-tutor</span>
+          <span class="app-subtitle">AI 自适应私教</span>
+        </RouterLink>
+        <div class="app-actions">
+          <RouterLink
+            to="/preferences"
+            class="app-settings"
+            title="我的偏好"
+          >
+            <Heart :size="14" />
+            偏好
+          </RouterLink>
+          <button
+            class="app-settings"
+            title="模型设置"
+            @click="showSettings = true"
+          >
+            <Settings :size="14" />
+            设置
+          </button>
+        </div>
+      </div>
     </header>
     <main class="app-main">
       <RouterView />
@@ -52,25 +57,60 @@ const showSettings = ref(false)
   flex-direction: column;
 }
 .app-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  height: var(--header-h);
-  padding: 0 24px;
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
   border-bottom: 1px solid var(--border);
 }
-.app-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text);
+.app-header__inner {
+  max-width: 1240px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--header-h);
+  padding: 0 24px;
+}
+.app-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   text-decoration: none;
 }
+.app-brand__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--primary-btn) 20%, #4f46e5 100%);
+  box-shadow:
+    0 1px 4px rgb(var(--primary-rgb) / 35%),
+    inset 0 0 0 1px rgb(255 255 255 / 15%);
+}
+.app-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.1px;
+  color: var(--text);
+}
 .app-subtitle {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-dim);
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+}
+.app-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 .app-settings {
-  margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -80,24 +120,17 @@ const showSettings = ref(false)
   background: none;
   border: 1px solid transparent;
   border-radius: var(--r-sm);
-  padding: 5px 12px;
+  padding: 6px 12px;
   cursor: pointer;
+  text-decoration: none;
   transition:
     color var(--dur-fast) var(--ease),
     background var(--dur-fast) var(--ease),
     border-color var(--dur-fast) var(--ease);
 }
-.app-settings--link {
-  margin-left: auto;
-  text-decoration: none;
-}
-.app-settings--link + .app-settings {
-  margin-left: 0;
-}
 .app-settings:hover {
   color: var(--text);
-  border-color: var(--border);
-  background: var(--bg-subtle);
+  background: var(--bg-muted);
 }
 .app-main {
   flex: 1;
