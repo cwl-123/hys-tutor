@@ -2,7 +2,14 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { z } from 'zod'
 import { sendJson } from '../index'
 import { startSse } from '../sse'
-import { createTopic, getGraph, getTopic, listTopics, saveGraph } from '../services/graph-service'
+import {
+  createTopic,
+  getGraph,
+  getTopic,
+  listTopics,
+  saveGraph,
+  updateTopicProfile,
+} from '../services/graph-service'
 import { chatGraphEdit } from '../services/graph-chat-service'
 import { getTopicStats } from '../services/lesson-service'
 import { knowledgeNodeSchema, topicProfileSchema } from '../../shared/types'
@@ -91,8 +98,29 @@ export async function handleTopics(
     return
   }
 
+  // PATCH /api/topics/:id/profile — 更新学习偏好（讲解风格/当前程度/其他要求）
+  if (sub === 'profile' && req.method === 'PATCH') {
+    const body = updateProfileBodySchema.safeParse(await readBody(req))
+    if (!body.success) {
+      sendJson(res, 400, { error: body.error.issues.map((i) => i.message).join('；') })
+      return
+    }
+    try {
+      const topic = await updateTopicProfile(topicId, body.data.profile)
+      sendJson(res, 200, { topic })
+    } catch (err) {
+      const status = (err as { status?: number }).status ?? 500
+      sendJson(res, status, { error: err instanceof Error ? err.message : String(err) })
+    }
+    return
+  }
+
   sendJson(res, 404, { error: 'Not found' })
 }
+
+const updateProfileBodySchema = z.object({
+  profile: topicProfileSchema,
+})
 
 const graphChatBodySchema = z.object({
   message: z.string().min(1).max(2000),

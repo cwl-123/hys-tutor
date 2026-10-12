@@ -204,6 +204,24 @@ export async function createTopic(
   return { topic, graph }
 }
 
+// 更新学习偏好（讲解风格/当前程度/其他要求）：写回 topic.json 并同步 topics.json 索引；
+// 全部清空则移除 profile。改动对之后生成的课程生效（已生成课件不回溯）。
+export async function updateTopicProfile(topicId: string, profile: TopicProfile): Promise<Topic> {
+  const topic = await getTopic(topicId)
+  if (!topic) {
+    throw Object.assign(new Error('课题不存在'), { status: 404 })
+  }
+  const next: TopicProfile | undefined =
+    profile.style || profile.level || profile.extra
+      ? { style: profile.style, level: profile.level, extra: profile.extra }
+      : undefined
+  const updated: Topic = { ...topic, profile: next }
+  await writeJson(dataPath('topics', topicId, 'topic.json'), updated)
+  const topics = await listTopics()
+  await writeJson(topicsFile(), topics.map((t) => (t.id === topicId ? updated : t)))
+  return updated
+}
+
 // 手动编辑保存：全量替换节点，服务端重新校验（无环、依赖存在、掌握分合法）
 export async function saveGraph(topicId: string, nodes: KnowledgeNode[]): Promise<Graph> {
   const issues = validateGraphNodes(nodes)

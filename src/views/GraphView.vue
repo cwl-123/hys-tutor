@@ -4,7 +4,15 @@ import { useRoute, useRouter } from 'vue-router'
 import { VueFlow, type Node, type Edge, type NodeMouseEvent } from '@vue-flow/core'
 import { Controls } from '@vue-flow/controls'
 import { Background } from '@vue-flow/background'
-import { ArrowLeft, ArrowRight, Bot, LoaderCircle, PartyPopper, X } from 'lucide-vue-next'
+import {
+  ArrowLeft,
+  ArrowRight,
+  Bot,
+  LoaderCircle,
+  PartyPopper,
+  Settings2,
+  X,
+} from 'lucide-vue-next'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import '@vue-flow/controls/dist/style.css'
@@ -13,6 +21,7 @@ import { layoutGraph } from '@/utils/layout'
 import GraphNode from '@/components/GraphNode.vue'
 import NodePanel from '@/components/NodePanel.vue'
 import GraphChatPanel from '@/components/GraphChatPanel.vue'
+import TopicProfilePanel from '@/components/TopicProfilePanel.vue'
 import type { LessonMeta } from '@shared/api'
 import type { KnowledgeNode } from '@shared/types'
 
@@ -23,7 +32,27 @@ const store = useTopicStore()
 const topicId = computed(() => String(route.params.id))
 const selectedId = ref<string | null>(null)
 const chatVisible = ref(false)
+const profileVisible = ref(false)
 const applyError = ref<string | null>(null)
+
+// 学习设置保存提示
+const profileSaved = ref(false)
+let profileToastTimer: number | undefined
+function onProfileSaved() {
+  profileSaved.value = true
+  window.clearTimeout(profileToastTimer)
+  profileToastTimer = window.setTimeout(() => (profileSaved.value = false), 6000)
+}
+
+// AI 调整与学习设置互斥，避免两个侧栏同时展开
+function toggleChat() {
+  chatVisible.value = !chatVisible.value
+  if (chatVisible.value) profileVisible.value = false
+}
+function toggleProfile() {
+  profileVisible.value = !profileVisible.value
+  if (profileVisible.value) chatVisible.value = false
+}
 
 onMounted(async () => {
   await store.loadTopic(topicId.value)
@@ -69,6 +98,7 @@ watch(
 onUnmounted(() => {
   stopPolling()
   window.clearTimeout(toastTimer)
+  window.clearTimeout(profileToastTimer)
 })
 
 const positions = computed(() => layoutGraph(store.nodes))
@@ -233,8 +263,17 @@ async function deleteLesson(lessonId: string) {
           </RouterLink>
           <button
             class="btn"
+            :class="{ 'btn--on': profileVisible }"
+            title="编辑讲解风格、当前程度与其他要求，应用于之后的课程"
+            @click="toggleProfile"
+          >
+            <Settings2 :size="14" />
+            学习设置
+          </button>
+          <button
+            class="btn"
             :class="{ 'btn--on': chatVisible }"
-            @click="chatVisible = !chatVisible"
+            @click="toggleChat"
           >
             <Bot :size="14" />
             AI 调整
@@ -273,6 +312,24 @@ async function deleteLesson(lessonId: string) {
         </button>
       </div>
 
+      <div
+        v-if="profileSaved"
+        class="done-toast"
+      >
+        <Settings2
+          :size="16"
+          class="done-toast__icon"
+        />
+        <span class="done-toast__text">学习设置已保存，将应用于之后的课程</span>
+        <button
+          class="done-toast__close"
+          title="关闭"
+          @click="profileSaved = false"
+        >
+          <X :size="15" />
+        </button>
+      </div>
+
       <div class="canvas-wrap">
         <VueFlow
           :nodes="flowNodes"
@@ -304,6 +361,12 @@ async function deleteLesson(lessonId: string) {
           :topic-id="topicId"
           @apply="applyAiProposal"
           @close="chatVisible = false"
+        />
+
+        <TopicProfilePanel
+          v-if="profileVisible"
+          @saved="onProfileSaved"
+          @close="profileVisible = false"
         />
       </div>
     </template>

@@ -97,6 +97,21 @@ export const useTopicStore = defineStore('topic', () => {
     return created
   }
 
+  // 更新学习偏好（讲解风格/当前程度/其他要求），改动对之后生成的课程生效
+  async function updateProfile(profile: TopicProfile): Promise<void> {
+    if (!topic.value) throw new Error('课题未加载')
+    const res = await fetch(`/api/topics/${topic.value.id}/profile`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile }),
+    })
+    const data = (await res.json()) as { topic?: Topic; error?: string }
+    if (!res.ok || !data.topic) throw new Error(data.error ?? `保存失败：${res.status}`)
+    topic.value = data.topic
+    const idx = topics.value.findIndex((t) => t.id === data.topic!.id)
+    if (idx >= 0) topics.value[idx] = { ...topics.value[idx], profile: data.topic.profile }
+  }
+
   async function saveGraph(nextNodes: KnowledgeNode[]) {
     if (!topic.value) throw new Error('课题未加载')
     const res = await fetch(`/api/topics/${topic.value.id}/graph`, {
@@ -122,6 +137,7 @@ export const useTopicStore = defineStore('topic', () => {
     loadTopic,
     fetchLessons,
     createTopic,
+    updateProfile,
     saveGraph,
   }
 })

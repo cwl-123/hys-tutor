@@ -136,7 +136,7 @@ function fmtRelative(iso: string): string {
 
         <div class="create__footer">
           <p class="create__hint">
-            以上选择会注入调研、图谱与每节课的生成，随时可在课题内调整图谱
+            以上选择会注入调研、图谱与每节课的生成，进入方向后可随时在「学习设置」中调整
           </p>
           <button
             class="create__submit"
