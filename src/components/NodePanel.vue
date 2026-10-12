@@ -14,6 +14,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   learn: [id: string]
+  focusNode: [id: string]
   deleteLesson: [id: string]
 }>()
 
@@ -95,11 +96,19 @@ function confirmDelete(id: string) {
     <section class="panel__section">
       <span class="panel__label">前置依赖</span>
       <div class="deps">
-        <span
+        <button
           v-for="d in deps"
           :key="d.id"
+          type="button"
           class="dep-chip"
-        >{{ d.name }}</span>
+          :title="`在图谱中定位：${d.name}（${d.mastery} 分）`"
+          @click="emit('focusNode', d.id)"
+        >
+          <i
+            class="dep-chip__dot"
+            :class="`dep-chip__dot--${masteryLevel(d.mastery)}`"
+          />{{ d.name }}
+        </button>
         <span
           v-if="deps.length === 0"
           class="panel__muted"
@@ -171,7 +180,7 @@ function confirmDelete(id: string) {
 
     <footer class="panel__footer">
       <button
-        class="btn btn--success btn--lg learn-btn"
+        class="btn btn--primary btn--lg learn-btn"
         :disabled="lockedDeps.length > 0"
         :title="lockedDeps.length ? `前置未达标：${lockedDeps.map((d) => `${d.name}=${d.mastery}`).join('、')}` : ''"
         @click="emit('learn', node.id)"
@@ -197,6 +206,17 @@ function confirmDelete(id: string) {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+}
+/* 窄窗口：面板浮在画布上方而不是把画布挤没 */
+@media (max-width: 1100px) {
+  .panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 5;
+    box-shadow: var(--shadow-drawer);
+  }
 }
 .panel__header {
   display: flex;
@@ -309,11 +329,36 @@ function confirmDelete(id: string) {
   gap: 6px;
 }
 .dep-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: inherit;
   font-size: 12px;
   padding: 3px 10px;
+  border: none;
   border-radius: var(--r-pill);
   background: var(--bg-muted);
   color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+.dep-chip:hover {
+  background: var(--primary-bg);
+  color: var(--primary-hover);
+}
+.dep-chip__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--mastery-red);
+}
+.dep-chip__dot--yellow {
+  background: var(--mastery-yellow);
+}
+.dep-chip__dot--green {
+  background: var(--mastery-green);
 }
 .lessons {
   display: flex;
@@ -398,7 +443,8 @@ function confirmDelete(id: string) {
   cursor: pointer;
 }
 .lesson-item__yes {
-  background: var(--mastery-red);
+  /* 固定深红：暗色下 --mastery-red 变亮，白字对比度不够 */
+  background: #dc2626;
   color: #fff;
 }
 .lesson-item__no {

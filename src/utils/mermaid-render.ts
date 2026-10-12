@@ -7,12 +7,24 @@ type MermaidApi = typeof import('mermaid').default
 
 let mermaidApi: MermaidApi | null = null
 let renderSeq = 0
+// 当前渲染主题：切换外观后 re-initialize（缓存 key 也带主题，避免串色）
+let currentTheme: 'neutral' | 'dark' | null = null
 // 缓存上限（LRU）：编辑弹窗实时预览每敲一键就产生新条目，不设上限内存单调增长
 const CACHE_MAX = 100
 const cache = new Map<string, string>()
 
+function resolveTheme(): 'neutral' | 'dark' {
+  if (typeof document === 'undefined') return 'neutral'
+  return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'neutral'
+}
+
 export function mermaidCacheKey(code: string): string {
   return code.trim()
+}
+
+// 缓存 key 附带主题：切换外观后同一份代码不串色
+function cacheKey(code: string): string {
+  return `${resolveTheme()}\n${code}`
 }
 
 function randomSuffix(): string {
@@ -21,8 +33,9 @@ function randomSuffix(): string {
 
 // 渲染 mermaid 代码为 SVG 字符串；语法错误/空代码返回 null（调用方保留代码块原样）
 export async function renderMermaid(code: string): Promise<string | null> {
-  const key = mermaidCacheKey(code)
-  if (!key) return null
+  const text = mermaidCacheKey(code)
+  if (!text) return null
+  const key = cacheKey(text)
   const cached = cache.get(key)
   if (cached) {
     cache.delete(key)
@@ -30,18 +43,20 @@ export async function renderMermaid(code: string): Promise<string | null> {
     return cached
   }
   try {
-    if (!mermaidApi) {
-      mermaidApi = (await import('mermaid')).default
+    const theme = resolveTheme()
+    if (!mermaidApi || currentTheme !== theme) {
+      mermaidApi ??= (await import('mermaid')).default
       mermaidApi.initialize({
         startOnLoad: false,
         // strict：antiscript 只剥 <script>，label 里的 <img onerror> 等事件属性会进 SVG 造成 XSS
         securityLevel: 'strict',
-        theme: 'neutral',
+        theme,
         suppressErrorRendering: true,
       })
+      currentTheme = theme
     }
     const renderId = `hys-r${++renderSeq}-${randomSuffix()}`
-    const { svg } = await mermaidApi.render(renderId, key)
+    const { svg } = await mermaidApi.render(renderId, text)
     // 整体重写渲染 id 为挂载 id：
     // - 样式作用域 #id 挂在根 svg 上，id 必须保留（删了整个配色会失效、图变黑块）
     // - 但页面上的 id 绝不能与后续 mermaid.render 传入的 id 相同

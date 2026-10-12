@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { VueFlow, type Node, type Edge, type NodeMouseEvent } from '@vue-flow/core'
+import { VueFlow, useVueFlow, type Node, type Edge, type NodeMouseEvent } from '@vue-flow/core'
 import { Controls } from '@vue-flow/controls'
 import { Background } from '@vue-flow/background'
 import {
   ArrowLeft,
   ArrowRight,
   Bot,
+  Filter,
   LoaderCircle,
   PartyPopper,
   Settings2,
@@ -17,7 +18,9 @@ import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import '@vue-flow/controls/dist/style.css'
 import { useTopicStore } from '@/stores/topic'
-import { layoutGraph } from '@/utils/layout'
+import { layoutGraph, NODE_WIDTH, NODE_HEIGHT } from '@/utils/layout'
+import { scheduleNext } from '@shared/scheduler'
+import { isDark } from '@/utils/theme'
 import GraphNode from '@/components/GraphNode.vue'
 import NodePanel from '@/components/NodePanel.vue'
 import GraphChatPanel from '@/components/GraphChatPanel.vue'
@@ -30,12 +33,55 @@ import { errMsg } from '@shared/error'
 const route = useRoute()
 const router = useRouter()
 const store = useTopicStore()
+const { fitView, setCenter, viewport } = useVueFlow()
 
 const topicId = computed(() => String(route.params.id))
 const selectedId = ref<string | null>(null)
 const chatVisible = ref(false)
 const profileVisible = ref(false)
 const applyError = ref<string | null>(null)
+
+// 视图过滤：全部 / 待学（<80）/ 推荐路径（下一课 + 其全部前置链）
+const viewMode = ref<'all' | 'todo' | 'path'>('all')
+const VIEW_MODES = [
+  { k: 'all', label: '全部', tip: '显示全部知识点' },
+  { k: 'todo', label: '待学', tip: '只显示未掌握（<80 分）的知识点' },
+  { k: 'path', label: '推荐路径', tip: '只显示下一课及其全部前置依赖链' },
+] as const
+
+// 排课引擎的推荐：图上唯一带「下一课」角标的节点
+const recommendation = computed(() => scheduleNext(store.nodes))
+const recommendedId = computed(() => recommendation.value.nodeId)
+
+const pathIds = computed<Set<string> | null>(() => {
+  if (!recommendedId.value) return null
+  const byId = new Map(store.nodes.map((n) => [n.id, n]))
+  const out = new Set<string>()
+  const walk = (id: string): void => {
+    if (out.has(id)) return
+    out.add(id)
+    for (const d of byId.get(id)?.deps ?? []) walk(d)
+  }
+  walk(recommendedId.value)
+  return out
+})
+
+const visibleNodes = computed<KnowledgeNode[]>(() => {
+  if (viewMode.value === 'todo') {
+    return store.nodes.filter((n) => n.mastery < 80 || n.id === recommendedId.value)
+  }
+  if (viewMode.value === 'path') {
+    const ids = pathIds.value
+    if (!ids) return store.nodes
+    return store.nodes.filter((n) => ids.has(n.id))
+  }
+  return store.nodes
+})
+
+// 过滤后选中节点可能已隐藏，同步清掉
+watch(visibleNodes, (list) => {
+  if (selectedId.value && !list.some((n) => n.id === selectedId.value)) selectedId.value = null
+})
 
 // 学习设置保存提示
 const profileSaved = ref(false)
@@ -103,7 +149,17 @@ onUnmounted(() => {
   window.clearTimeout(profileToastTimer)
 })
 
-const positions = computed(() => layoutGraph(store.nodes))
+const positions = computed(() => layoutGraph(visibleNodes.value))
+
+// 节点集合变化（首次加载/切换过滤）后重新取景，限制最小缩放保证节点可读
+watch(
+  () => visibleNodes.value.length,
+  async (len) => {
+    if (!len) return
+    await nextTick()
+    fitView({ padding: 0.2, minZoom: 0.4, maxZoom: 1, duration: 300 })
+  },
+)
 
 const lessonCountByNode = computed(() => {
   const counts = new Map<string, number>()
@@ -133,7 +189,7 @@ const nodeStatusByNode = computed(() => {
 })
 
 const flowNodes = computed<Node[]>(() =>
-  store.nodes.map((n) => ({
+  visibleNodes.value.map((n) => ({
     id: n.id,
     type: 'knode',
     position: positions.value.get(n.id) ?? { x: 0, y: 0 },
@@ -142,14 +198,15 @@ const flowNodes = computed<Node[]>(() =>
       selected: n.id === selectedId.value,
       lessonCount: lessonCountByNode.value.get(n.id) ?? 0,
       lessonStatus: nodeStatusByNode.value.get(n.id),
+      recommended: n.id === recommendedId.value,
     },
     draggable: false,
   })),
 )
 
 const flowEdges = computed<Edge[]>(() => {
-  const ids = new Set(store.nodes.map((n) => n.id))
-  return store.nodes.flatMap((n) =>
+  const ids = new Set(visibleNodes.value.map((n) => n.id))
+  return visibleNodes.value.flatMap((n) =>
     n.deps
       .filter((d) => ids.has(d) && d !== n.id)
       .map<Edge>((d) => ({
@@ -157,6 +214,10 @@ const flowEdges = computed<Edge[]>(() => {
         source: d,
         target: n.id,
         markerEnd: 'arrowclosed',
+        // 指向推荐节点的边高亮，画出「下一步走这条」的路径感
+        ...(n.id === recommendedId.value
+          ? { style: { stroke: 'var(--primary)', strokeWidth: 2 } }
+          : {}),
       })),
   )
 })
@@ -169,6 +230,20 @@ const selectedNodeLessons = computed(() =>
 
 function onNodeClick(event: NodeMouseEvent) {
   selectedId.value = event.node.id
+}
+
+// 面板点前置依赖 chip：节点被过滤隐藏则先切回全部，再选中并平移画布定位
+function focusNode(id: string) {
+  if (!visibleNodes.value.some((n) => n.id === id)) viewMode.value = 'all'
+  selectedId.value = id
+  const pos = positions.value.get(id)
+  if (!pos) return
+  void nextTick().then(() =>
+    setCenter(pos.x + NODE_WIDTH / 2, pos.y + NODE_HEIGHT / 2, {
+      zoom: Math.max(viewport.value.zoom, 0.8),
+      duration: 300,
+    }),
+  )
 }
 
 // AI 建议的图谱确认后直接落盘
@@ -208,7 +283,8 @@ async function deleteLesson(lessonId: string) {
       v-if="store.loading"
       class="state"
     >
-      <p>加载中…</p>
+      <span class="spinner" />
+      <p>加载图谱中…</p>
     </div>
 
     <div
@@ -237,6 +313,26 @@ async function deleteLesson(lessonId: string) {
         </RouterLink>
         <strong>{{ store.topic.name }}</strong>
         <span class="toolbar__count">{{ store.nodes.length }} 个知识点</span>
+        <div
+          class="view-toggle"
+          role="group"
+          aria-label="图谱视图过滤"
+        >
+          <button
+            v-for="m in VIEW_MODES"
+            :key="m.k"
+            class="view-toggle__btn"
+            :class="{ 'view-toggle__btn--on': viewMode === m.k }"
+            :title="m.tip"
+            @click="viewMode = m.k"
+          >
+            <Filter
+              v-if="m.k === 'todo'"
+              :size="12"
+            />
+            {{ m.label }}
+          </button>
+        </div>
         <div class="toolbar__legend">
           <span class="legend"><i class="legend__dot legend__dot--red" />未掌握 &lt;{{ MASTERY_LOW_THRESHOLD }}</span>
           <span class="legend"><i class="legend__dot legend__dot--yellow" />学习中 {{ MASTERY_LOW_THRESHOLD }}-{{ MASTERY_UNLOCK_THRESHOLD - 1 }}</span>
@@ -257,7 +353,7 @@ async function deleteLesson(lessonId: string) {
           </RouterLink>
           <RouterLink
             :to="`/lesson/new?topic=${topicId}`"
-            class="btn btn--go"
+            class="btn btn--primary"
             title="由排课引擎自动选择：已解锁且掌握分最低的知识点"
           >
             开始下一课
@@ -338,15 +434,43 @@ async function deleteLesson(lessonId: string) {
           :edges="flowEdges"
           :default-viewport="{ zoom: 0.85 }"
           :default-edge-options="{ style: { stroke: 'var(--border-strong)' } }"
-          fit-view-on-init
+          :min-zoom="0.3"
+          :max-zoom="1.6"
           @node-click="onNodeClick"
         >
-          <Background />
+          <Background :color="isDark ? '#2e3846' : undefined" />
           <Controls :show-interactive="false" />
           <template #node-knode="nodeProps">
             <GraphNode :data="nodeProps.data" />
           </template>
         </VueFlow>
+
+        <div
+          v-if="visibleNodes.length === 0"
+          class="canvas-empty"
+        >
+          <template v-if="store.nodes.length === 0">
+            <p>还没有知识点图谱</p>
+          </template>
+          <template v-else-if="viewMode === 'todo'">
+            <p>全部知识点均已掌握 🎉</p>
+            <button
+              class="btn"
+              @click="viewMode = 'all'"
+            >
+              查看全部
+            </button>
+          </template>
+          <template v-else>
+            <p>当前视图没有可显示的知识点</p>
+            <button
+              class="btn"
+              @click="viewMode = 'all'"
+            >
+              查看全部
+            </button>
+          </template>
+        </div>
 
         <NodePanel
           v-if="selectedNode"
@@ -355,6 +479,7 @@ async function deleteLesson(lessonId: string) {
           :lessons="selectedNodeLessons"
           @close="selectedId = null"
           @learn="learnNode"
+          @focus-node="focusNode"
           @delete-lesson="deleteLesson"
         />
 
@@ -385,6 +510,11 @@ async function deleteLesson(lessonId: string) {
   margin: auto;
   text-align: center;
   padding: 24px;
+  color: var(--text-dim);
+}
+.state .spinner {
+  display: block;
+  margin: 0 auto 12px;
 }
 .state__error {
   color: var(--mastery-red);
@@ -392,7 +522,8 @@ async function deleteLesson(lessonId: string) {
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 10px 12px;
   padding: 10px 16px;
   border-bottom: 1px solid var(--border);
 }
@@ -412,6 +543,38 @@ async function deleteLesson(lessonId: string) {
 .toolbar__legend {
   display: flex;
   gap: 14px;
+}
+.view-toggle {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--bg-muted);
+}
+.view-toggle__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 12px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+.view-toggle__btn:hover {
+  color: var(--text);
+}
+.view-toggle__btn--on {
+  background: var(--bg);
+  color: var(--primary-hover);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
 }
 .legend {
   display: inline-flex;
@@ -438,6 +601,18 @@ async function deleteLesson(lessonId: string) {
   margin-left: auto;
   display: flex;
   gap: 8px;
+}
+/* 窄窗口优先保操作按钮：先收图例，再允许换行 */
+@media (max-width: 1240px) {
+  .toolbar__legend {
+    display: none;
+  }
+}
+@media (max-width: 1080px) {
+  .toolbar__actions {
+    margin-left: 0;
+    flex-wrap: wrap;
+  }
 }
 .toolbar__error {
   padding: 6px 16px;
@@ -486,10 +661,10 @@ async function deleteLesson(lessonId: string) {
   border-radius: var(--r-sm);
   padding: 6px 12px;
   text-decoration: none;
-  transition: background var(--dur-fast) var(--ease);
+  transition: filter var(--dur-fast) var(--ease);
 }
 .done-toast__go:hover {
-  background: var(--green-hover);
+  filter: brightness(1.12);
 }
 .done-toast__close {
   display: inline-flex;
@@ -506,6 +681,7 @@ async function deleteLesson(lessonId: string) {
   background: var(--bg-muted);
 }
 .canvas-wrap {
+  position: relative;
   flex: 1;
   display: flex;
   min-height: 0;
@@ -513,14 +689,20 @@ async function deleteLesson(lessonId: string) {
 .canvas-wrap :deep(.vue-flow) {
   flex: 1;
 }
-.btn--go {
-  background: var(--green-strong);
-  border-color: var(--green-strong);
-  color: #fff;
+.canvas-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--text-dim);
+  font-size: 14px;
+  pointer-events: none;
 }
-.btn--go:hover {
-  background: var(--green-hover);
-  border-color: var(--green-hover);
+.canvas-empty .btn {
+  pointer-events: auto;
 }
 .btn--on {
   border-color: var(--primary);

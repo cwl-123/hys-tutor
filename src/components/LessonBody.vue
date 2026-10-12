@@ -5,7 +5,10 @@ import { parseSections } from '@shared/lesson-md'
 import type { LessonQuote } from '@shared/lesson-chat'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 
-const props = defineProps<{ content: string }>()
+const props = defineProps<{
+  content: string
+  citeSources?: { idx: number; title: string; url?: string }[]
+}>()
 const emit = defineEmits<{
   quote: [payload: LessonQuote]
   'edit-mermaid': [code: string]
@@ -87,6 +90,7 @@ onBeforeUnmount(() => window.removeEventListener('scroll', clearTip, true))
       </button>
       <MarkdownRenderer
         :content="s.raw"
+        :cite-sources="citeSources"
         editable
         @edit-mermaid="emit('edit-mermaid', $event)"
       />
@@ -124,7 +128,7 @@ onBeforeUnmount(() => window.removeEventListener('scroll', clearTip, true))
   padding: 2px 8px;
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
-  background: #fff;
+  background: var(--bg);
   color: var(--text-dim);
   cursor: pointer;
   opacity: 0;
@@ -154,7 +158,7 @@ onBeforeUnmount(() => window.removeEventListener('scroll', clearTip, true))
   border: none;
   border-radius: var(--r-pill);
   background: var(--text);
-  color: #fff;
+  color: var(--bg);
   cursor: pointer;
   box-shadow: var(--shadow-lg);
   transition: transform var(--dur-fast) var(--ease);

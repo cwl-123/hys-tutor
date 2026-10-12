@@ -26,7 +26,7 @@ import {
 } from '../llm/prompts/selfcheck'
 import { QUIZ_SYSTEM_PROMPT, llmQuizSchema, quizPrompt } from '../llm/prompts/quiz'
 import { TAUGHT_SYSTEM_PROMPT, llmTaughtSchema, taughtExtractPrompt } from '../llm/prompts/taught'
-import { scheduleNext } from './scheduler'
+import { scheduleNext } from '../../shared/scheduler'
 import { getGraph, getTopic } from './graph-service'
 import { findLesson } from './lesson-service'
 import { preferenceContextText } from './preference-service'

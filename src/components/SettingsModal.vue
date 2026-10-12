@@ -2,9 +2,16 @@
 import { ref, watch } from 'vue'
 import { Download, Eye, EyeOff, Pencil, Plus, Trash2, X } from 'lucide-vue-next'
 import { errMsg } from '@shared/error'
+import { applyTheme, themePref } from '@/utils/theme'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
+
+const THEME_OPTIONS = [
+  { k: 'auto', label: '跟随系统' },
+  { k: 'light', label: '浅色' },
+  { k: 'dark', label: '深色' },
+] as const
 
 const PRESET_MODELS = [
   'deepseek-v4-pro',
@@ -238,6 +245,29 @@ async function save() {
             class="modal__effective-src"
           >{{ effective.providerName }}</span>
         </p>
+
+        <!-- 外观主题 -->
+        <div class="appearance">
+          <span class="appearance__label">外观</span>
+          <div
+            class="appearance__chips"
+            role="radiogroup"
+            aria-label="外观主题"
+          >
+            <button
+              v-for="m in THEME_OPTIONS"
+              :key="m.k"
+              type="button"
+              class="appearance__chip"
+              :class="{ 'appearance__chip--on': themePref === m.k }"
+              role="radio"
+              :aria-checked="themePref === m.k"
+              @click="applyTheme(m.k)"
+            >
+              {{ m.label }}
+            </button>
+          </div>
+        </div>
 
         <!-- 模型源列表 -->
         <div class="providers">
@@ -573,6 +603,44 @@ async function save() {
   margin-left: 8px;
   font-size: 12px;
 }
+.appearance {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.appearance__label {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.appearance__chips {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--bg-muted);
+}
+.appearance__chip {
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 12px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+.appearance__chip:hover {
+  color: var(--text);
+}
+.appearance__chip--on {
+  background: var(--bg);
+  color: var(--primary-hover);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
 .providers {
   display: flex;
   flex-direction: column;
@@ -624,7 +692,7 @@ async function save() {
   gap: 10px;
   padding: 6px 8px;
   border-radius: var(--r-sm);
-  background: #fff;
+  background: var(--bg);
   border: 1px solid var(--border);
 }
 .candidate__main {

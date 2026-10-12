@@ -14,6 +14,9 @@
   --primary: #3b82f6;
   --primary-strong: #2563eb;
   --primary-hover: #1d4ed8;
+  /* 按钮填充色与文字强调色分离：暗色下文字需要变亮、按钮填充需保白字对比度 */
+  --primary-btn: #2563eb;
+  --primary-btn-hover: #1d4ed8;
   --primary-bg: #eff6ff;
   --primary-bg-strong: #dbeafe;
   --primary-border: #bfdbfe;
@@ -31,6 +34,10 @@
   --green-hover: #15803d;
   --green-bg: #f0fdf4;
   --green-border: #bbf7d0;
+  /* 掌握度淡色底（图谱节点等大面积使用，与 badge 底色解耦便于暗色单独调） */
+  --red-tint: #fef2f2;
+  --amber-tint: #fffbeb;
+  --green-tint: #f0fdf4;
 
   /* 圆角 */
   --r-sm: 8px;
@@ -126,13 +133,13 @@ body {
   box-shadow: 0 0 0 3px rgb(var(--primary-rgb) / 25%);
 }
 .btn--primary {
-  background: var(--primary-strong);
-  border-color: var(--primary-strong);
+  background: var(--primary-btn);
+  border-color: var(--primary-btn);
   color: #fff;
 }
 .btn--primary:hover:not(:disabled) {
-  background: var(--primary-hover);
-  border-color: var(--primary-hover);
+  background: var(--primary-btn-hover);
+  border-color: var(--primary-btn-hover);
 }
 .btn--success {
   background: var(--green-strong);
@@ -194,6 +201,138 @@ body {
 /* lucide 图标在文本行内垂直居中 */
 .lucide {
   vertical-align: -2px;
+}
+
+/* ---- 加载 spinner（全局统一） ---- */
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--primary);
+  animation: spin 0.7s linear infinite;
+}
+
+/* ---- 骨架屏 ---- */
+.skeleton {
+  border-radius: var(--r-md);
+  background: linear-gradient(
+    90deg,
+    var(--bg-muted) 25%,
+    var(--bg-subtle) 37%,
+    var(--bg-muted) 63%
+  );
+  background-size: 400% 100%;
+  animation: skeleton-shine 1.4s ease infinite;
+}
+@keyframes skeleton-shine {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+/* ---- 键盘导航焦点环（.btn 自带 focus-visible 光晕，此处覆盖其余可聚焦元素） ---- */
+button:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible,
+.chip:focus-visible,
+.card:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.btn:focus-visible {
+  outline: none;
+}
+
+/* ============================================================
+ * 暗色模式：<html data-theme="dark">（由 utils/theme.ts 维护）
+ * ============================================================ */
+html[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #0f141a;
+  --bg-subtle: #151b23;
+  --bg-muted: #1c242e;
+  --text: #e8edf3;
+  --text-secondary: #b9c2cd;
+  --text-dim: #8b95a3;
+  --text-faint: #626c7a;
+  --border: #262e39;
+  --border-strong: #36404d;
+
+  --primary: #60a5fa;
+  --primary-strong: #60a5fa;
+  --primary-hover: #93c5fd;
+  --primary-btn: #2563eb;
+  --primary-btn-hover: #1d4ed8;
+  --primary-bg: #16233a;
+  --primary-bg-strong: #1b2f4d;
+  --primary-border: #274470;
+  --primary-soft: #3f6fb8;
+
+  --mastery-red: #f87171;
+  --mastery-yellow: #fbbf24;
+  --mastery-green: #4ade80;
+  --red-bg: #2a1517;
+  --red-tint: #1f1214;
+  --amber-bg: #241b0d;
+  --amber-tint: #1e170c;
+  --amber-border: #4a3a16;
+  --amber-text: #f0b24a;
+  --green-strong: #16a34a;
+  --green-hover: #4ade80;
+  --green-bg: #12261a;
+  --green-tint: #102017;
+  --green-border: #1f4a2f;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+  --shadow-md: 0 1px 2px rgb(0 0 0 / 35%), 0 4px 12px rgb(0 0 0 / 45%);
+  --shadow-lg: 0 4px 8px rgb(0 0 0 / 40%), 0 12px 32px rgb(0 0 0 / 55%);
+  --shadow-xl: 0 8px 16px rgb(0 0 0 / 45%), 0 24px 56px rgb(0 0 0 / 65%);
+  --shadow-drawer: -8px 0 24px rgb(0 0 0 / 55%);
+
+  --mask-bg: rgb(0 0 0 / 65%);
+  --ring-primary: 0 0 0 3px rgb(96 165 250 / 25%);
+  --ink-rgb: 0 0 0;
+  --primary-rgb: 96 165 250;
+
+  /* Vue Flow 主题变量 */
+  --vf-node-bg: #151b23;
+  --vf-node-text: #e8edf3;
+  --vf-connection-path: #3d4756;
+  --vf-handle: #5b6675;
+}
+html[data-theme='dark'] body {
+  background: var(--bg);
+}
+html[data-theme='dark'] ::selection {
+  background: #23417a;
+}
+/* 暗色下的控件补丁 */
+html[data-theme='dark'] .vue-flow__controls-button {
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-dim);
+  fill: currentColor;
+}
+html[data-theme='dark'] .vue-flow__controls-button:hover {
+  background: var(--bg-muted);
+  color: var(--text);
+}
+html[data-theme='dark'] .vue-flow__handle {
+  background: var(--vf-handle);
+}
+html[data-theme='dark'] .vue-flow__edge-textbg {
+  fill: var(--bg-subtle);
+}
+html[data-theme='dark'] input,
+html[data-theme='dark'] textarea,
+html[data-theme='dark'] select {
+  color-scheme: dark;
 }
 
 /* ---- 输入控件统一聚焦态 ---- */

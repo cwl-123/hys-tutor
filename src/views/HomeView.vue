@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowRight, LoaderCircle } from 'lucide-vue-next'
 import { useTopicStore } from '@/stores/topic'
+import { masteryLevel } from '@shared/types'
 import { fmtDate } from '@/utils/format'
 import { PROFILE_LEVELS, PROFILE_STYLES, pickOption } from '@/utils/topic-profile'
 
@@ -175,54 +176,106 @@ function fmtRelative(iso: string): string {
       </div>
 
       <div class="topics__grid">
-        <RouterLink
+        <div
           v-for="t in store.topics"
           :key="t.id"
-          :to="`/topic/${t.id}`"
           class="card"
         >
-          <div class="card__top">
-            <div class="card__title">
-              <span class="card__name">{{ t.name }}</span>
-              <span
-                v-if="t.stats.generatingLesson"
-                class="card__live"
-              ><LoaderCircle
-                :size="11"
-                class="spin"
-              /> 课件生成中</span>
+          <RouterLink
+            :to="`/topic/${t.id}`"
+            class="card__main"
+          >
+            <div class="card__top">
+              <div class="card__title">
+                <span class="card__name">{{ t.name }}</span>
+                <span
+                  v-if="t.stats.generatingLesson"
+                  class="card__live"
+                ><LoaderCircle
+                  :size="11"
+                  class="spin"
+                /> 课件生成中</span>
+              </div>
+              <span class="card__arrow"><ArrowRight :size="17" /></span>
             </div>
-            <span class="card__arrow"><ArrowRight :size="17" /></span>
-          </div>
+
+            <div
+              v-if="t.profile?.style || t.profile?.level"
+              class="card__tags"
+            >
+              <span
+                v-if="t.profile?.level"
+                class="tag"
+              >{{ t.profile.level }}</span>
+              <span
+                v-if="t.profile?.style"
+                class="tag tag--style"
+              >{{ t.profile.style }}</span>
+            </div>
+
+            <div class="card__stats">
+              <span><strong>{{ t.stats.nodeCount }}</strong> 知识点</span>
+              <span class="card__dot">·</span>
+              <span><strong>{{ t.stats.lessonCount }}</strong> 节课</span>
+              <span
+                v-if="t.stats.lastLessonAt"
+                class="card__dot"
+              >·</span>
+              <span v-if="t.stats.lastLessonAt">最近学习 {{ fmtRelative(t.stats.lastLessonAt) }}</span>
+            </div>
+          </RouterLink>
 
           <div
-            v-if="t.profile?.style || t.profile?.level"
-            class="card__tags"
+            v-if="t.stats.nodeCount > 0"
+            class="card__progress"
           >
-            <span
-              v-if="t.profile?.level"
-              class="tag"
-            >{{ t.profile.level }}</span>
-            <span
-              v-if="t.profile?.style"
-              class="tag tag--style"
-            >{{ t.profile.style }}</span>
+            <div class="card__progress-row">
+              <span class="card__progress-label">平均掌握</span>
+              <strong class="card__progress-score">{{ t.stats.avgMastery }}</strong>
+              <span class="card__progress-sub">{{ t.stats.masteredCount }}/{{ t.stats.nodeCount }} 已掌握</span>
+            </div>
+            <div class="card__bar">
+              <i
+                :class="`card__bar-fill--${masteryLevel(t.stats.avgMastery)}`"
+                :style="{ width: `${t.stats.avgMastery}%` }"
+              />
+            </div>
           </div>
 
-          <div class="card__stats">
-            <span><strong>{{ t.stats.nodeCount }}</strong> 知识点</span>
-            <span class="card__dot">·</span>
-            <span><strong>{{ t.stats.lessonCount }}</strong> 节课</span>
+          <div class="card__foot">
+            <span class="card__meta">创建于 {{ fmtDate(t.createdAt) }}</span>
             <span
-              v-if="t.stats.lastLessonAt"
-              class="card__dot"
-            >·</span>
-            <span v-if="t.stats.lastLessonAt">最近学习 {{ fmtRelative(t.stats.lastLessonAt) }}</span>
+              v-if="t.stats.generatingLesson"
+              class="card__waiting"
+            ><LoaderCircle
+              :size="12"
+              class="spin"
+            /> 课件生成中</span>
+            <RouterLink
+              v-else
+              class="btn btn--primary btn--sm card__go"
+              :to="`/lesson/new?topic=${t.id}`"
+              :title="t.stats.lessonCount ? '由排课引擎自动选下一课' : '开始第一课'"
+              @click.stop
+            >
+              {{ t.stats.lessonCount ? '继续学习' : '开始学习' }}
+              <ArrowRight :size="13" />
+            </RouterLink>
           </div>
-          <div class="card__meta">
-            创建于 {{ fmtDate(t.createdAt) }}
+        </div>
+
+        <!-- 加载骨架 -->
+        <template v-if="store.loading && store.topics.length === 0">
+          <div
+            v-for="i in 3"
+            :key="`sk-${i}`"
+            class="card card--skeleton"
+          >
+            <div class="skeleton card__sk-title" />
+            <div class="skeleton card__sk-line" />
+            <div class="skeleton card__sk-line card__sk-line--short" />
           </div>
-        </RouterLink>
+        </template>
 
         <div
           v-if="!store.loading && store.topics.length === 0"
@@ -377,19 +430,21 @@ function fmtRelative(iso: string): string {
   padding: 11px 26px;
   border: none;
   border-radius: var(--r-md);
-  background: var(--text);
+  background: var(--primary-btn);
   color: #fff;
   cursor: pointer;
   transition:
+    background var(--dur-fast) var(--ease),
     opacity var(--dur-fast) var(--ease),
     transform var(--dur-fast) var(--ease);
 }
 .create__submit:hover:not(:disabled) {
-  opacity: 0.92;
+  background: var(--primary-btn-hover);
   transform: translateY(-1px);
 }
+/* 禁用态保留品牌色降饱和，避免「按钮坏了」的观感 */
 .create__submit:disabled {
-  opacity: 0.4;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 .create__progress {
@@ -463,7 +518,7 @@ function fmtRelative(iso: string): string {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 22px 24px;
+  padding: 22px 24px 18px;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
@@ -478,6 +533,88 @@ function fmtRelative(iso: string): string {
   transform: translateY(-2px);
   border-color: var(--primary-border);
   box-shadow: 0 10px 28px rgb(var(--primary-rgb) / 10%);
+}
+.card__main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+}
+.card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+.card__waiting {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--amber-text);
+}
+.card__go {
+  text-decoration: none;
+}
+.card__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.card__progress-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.card__progress-score {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.card__bar {
+  position: relative;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--bg-muted);
+  overflow: hidden;
+}
+.card__bar i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: var(--r-pill);
+  transition: width var(--dur) var(--ease);
+}
+.card__bar-fill--red {
+  background: var(--mastery-red);
+}
+.card__bar-fill--yellow {
+  background: var(--mastery-yellow);
+}
+.card__bar-fill--green {
+  background: var(--mastery-green);
+}
+.card--skeleton {
+  pointer-events: none;
+}
+.card__sk-title {
+  height: 22px;
+  width: 60%;
+}
+.card__sk-line {
+  height: 14px;
+  width: 100%;
+}
+.card__sk-line--short {
+  width: 45%;
 }
 .card__top {
   display: flex;

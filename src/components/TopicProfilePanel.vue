@@ -144,6 +144,17 @@ async function save() {
   min-height: 0;
   background: var(--bg);
 }
+/* 窄窗口浮在画布上方，避免把图挤没 */
+@media (max-width: 1100px) {
+  .settings {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 5;
+    box-shadow: var(--shadow-drawer);
+  }
+}
 .settings__header {
   display: flex;
   justify-content: space-between;

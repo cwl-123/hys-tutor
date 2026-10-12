@@ -1,5 +1,5 @@
-import { kahn } from '../../shared/dag'
-import { MASTERY_UNLOCK_THRESHOLD, type KnowledgeNode } from '../../shared/types'
+import { kahn } from './dag'
+import { MASTERY_UNLOCK_THRESHOLD, type KnowledgeNode } from './types'
 
 export interface ScheduleResult {
   nodeId: string | null

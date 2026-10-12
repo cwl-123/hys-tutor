@@ -1,13 +1,22 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, CircleCheckBig, MessageSquare, Pencil, Sparkles, X } from 'lucide-vue-next'
+import {
+  ArrowLeft,
+  ArrowRight,
+  CircleCheckBig,
+  Ellipsis,
+  MessageSquare,
+  Pencil,
+  Sparkles,
+  X,
+} from 'lucide-vue-next'
 import { useLessonStore, LESSON_PHASES } from '@/stores/lesson'
 import { useTopicStore } from '@/stores/topic'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import LessonBody from '@/components/LessonBody.vue'
 import LessonChatPanel from '@/components/LessonChatPanel.vue'
-import { replaceMermaidBlock } from '@shared/lesson-md'
+import { parseSections, replaceMermaidBlock } from '@shared/lesson-md'
 import type { LessonQuote } from '@shared/lesson-chat'
 import { errMsg } from '@shared/error'
 
@@ -97,6 +106,67 @@ async function reloadLesson() {
   if (lesson) await lessonStore.load(lesson.id)
 }
 
+// ---------- 低频操作收进「⋯」菜单 ----------
+const menuOpen = ref(false)
+function onDocClick(e: MouseEvent) {
+  if (!(e.target as Element).closest('.lesson-menu')) menuOpen.value = false
+}
+function openEditing() {
+  menuOpen.value = false
+  startEditing()
+}
+function openRevise() {
+  menuOpen.value = false
+  reviseOpen.value = true
+}
+
+// ---------- 目录 / 阅读进度 / 悬浮练习入口 ----------
+const tocItems = computed(() =>
+  parseSections(lessonStore.lesson?.contentMd ?? '')
+    .map((s, idx) => ({ idx, heading: s.heading }))
+    .filter((x): x is { idx: number; heading: string } => x.heading !== null),
+)
+const activeSection = ref(-1)
+const readPercent = ref(0)
+const footerInView = ref(false)
+const articleEl = ref<HTMLElement | null>(null)
+
+function sectionEls(): HTMLElement[] {
+  return Array.from(
+    articleEl.value?.querySelectorAll<HTMLElement>('.lesson-body__section') ?? [],
+  )
+}
+
+function scrollToSection(idx: number) {
+  sectionEls()[idx]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+function onScroll() {
+  const els = sectionEls()
+  if (!els.length) return
+  const total = document.documentElement.scrollHeight - window.innerHeight
+  readPercent.value = total > 0 ? Math.min(100, Math.round((window.scrollY / total) * 100)) : 0
+
+  let current = -1
+  for (let i = 0; i < els.length; i++) {
+    if (els[i].getBoundingClientRect().top <= 120) current = i
+  }
+  activeSection.value = current
+
+  const footer = articleEl.value?.querySelector<HTMLElement>('.lesson__footer')
+  footerInView.value = !!footer && footer.getBoundingClientRect().top < window.innerHeight - 40
+}
+
+// 悬浮「去随堂练习」：读了一段后出现，footer CTA 可见时让位
+const floatCtaVisible = computed(
+  () =>
+    isGenerated.value &&
+    !editing.value &&
+    readPercent.value > 12 &&
+    !footerInView.value &&
+    !chatOpen.value,
+)
+
 const isNew = computed(() => route.params.id === 'new')
 const nodeName = computed(() => {
   const lesson = lessonStore.lesson
@@ -112,6 +182,13 @@ const topicHome = computed(
 const isGenerated = computed(
   () => lessonStore.lesson?.status === 'generated' && lessonStore.lesson.contentMd.trim().length > 0,
 )
+// 正文挂载后初始化阅读进度/目录高亮
+watch(isGenerated, async (v) => {
+  if (v) {
+    await nextTick()
+    onScroll()
+  }
+})
 // 记录存在但既未生成完成、又已不在生成中（例如服务重启把任务丢了）
 const isInterrupted = computed(
   () =>
@@ -190,6 +267,8 @@ async function startGeneration() {
 }
 
 onMounted(async () => {
+  window.addEventListener('scroll', onScroll, { passive: true })
+  document.addEventListener('click', onDocClick)
   try {
     if (isNew.value) {
       await startGeneration()
@@ -236,6 +315,8 @@ async function startRevise() {
 onUnmounted(() => {
   disposed = true
   window.clearInterval(tickTimer)
+  window.removeEventListener('scroll', onScroll)
+  document.removeEventListener('click', onDocClick)
   lessonStore.detach()
 })
 </script>
@@ -376,8 +457,17 @@ onUnmounted(() => {
     <!-- 课程正文 -->
     <article
       v-else-if="lessonStore.lesson && isGenerated"
+      ref="articleEl"
       class="lesson"
     >
+      <!-- 阅读进度条（顶部固定） -->
+      <div
+        class="read-progress"
+        aria-hidden="true"
+      >
+        <i :style="{ width: `${readPercent}%` }" />
+      </div>
+
       <div
         v-if="lessonStore.justCompleted"
         class="lesson__done-banner"
@@ -429,51 +519,71 @@ onUnmounted(() => {
           </div>
         </div>
         <div class="lesson__actions">
-          <button
-            v-if="editing"
-            class="btn btn--primary"
-            @click="saveEditing"
-          >
-            保存修改
-          </button>
-          <button
-            v-if="editing"
-            class="btn"
-            @click="editing = false"
-          >
-            取消
-          </button>
-          <button
-            v-else
-            class="btn"
-            :disabled="lessonStore.generating"
-            @click="startEditing"
-          >
-            <Pencil :size="13" />
-            编辑正文
-          </button>
-          <button
-            class="btn"
-            :disabled="lessonStore.generating || editing"
-            @click="chatOpen = !chatOpen"
-          >
-            <MessageSquare :size="13" />
-            {{ chatOpen ? '收起 AI 对话' : 'AI 对话优化' }}
-          </button>
-          <button
-            class="btn"
-            :disabled="lessonStore.generating || editing"
-            @click="reviseOpen = true"
-          >
-            <Sparkles :size="13" />
-            AI 优化本课
-          </button>
-          <span
-            v-if="lessonStore.lesson.revisedAt"
-            class="lesson__revised"
-          >
-            已于 {{ new Date(lessonStore.lesson.revisedAt).toLocaleString('zh-CN') }} 优化
-          </span>
+          <template v-if="editing">
+            <button
+              class="btn btn--primary"
+              @click="saveEditing"
+            >
+              保存修改
+            </button>
+            <button
+              class="btn"
+              @click="editing = false"
+            >
+              取消
+            </button>
+          </template>
+          <template v-else>
+            <button
+              class="btn"
+              :class="{ 'btn--on': chatOpen }"
+              :disabled="lessonStore.generating"
+              @click="chatOpen = !chatOpen"
+            >
+              <MessageSquare :size="13" />
+              {{ chatOpen ? '收起 AI 对话' : 'AI 对话优化' }}
+            </button>
+            <!-- 低频编辑/AI 操作收进「⋯」，把头部空间让给学习目标 -->
+            <div class="lesson-menu">
+              <button
+                class="btn"
+                :disabled="lessonStore.generating"
+                aria-haspopup="menu"
+                :aria-expanded="menuOpen"
+                title="更多操作"
+                @click="menuOpen = !menuOpen"
+              >
+                <Ellipsis :size="14" />
+                更多
+              </button>
+              <div
+                v-if="menuOpen"
+                class="lesson-menu__pop"
+                role="menu"
+              >
+                <button
+                  role="menuitem"
+                  @click="openEditing"
+                >
+                  <Pencil :size="13" />
+                  编辑正文
+                </button>
+                <button
+                  role="menuitem"
+                  @click="openRevise"
+                >
+                  <Sparkles :size="13" />
+                  AI 优化本课
+                </button>
+              </div>
+            </div>
+            <span
+              v-if="lessonStore.lesson.revisedAt"
+              class="lesson__revised"
+            >
+              已于 {{ new Date(lessonStore.lesson.revisedAt).toLocaleString('zh-CN') }} 优化
+            </span>
+          </template>
         </div>
         <p
           v-if="opError"
@@ -494,19 +604,24 @@ onUnmounted(() => {
           spellcheck="false"
         />
         <div class="editor__preview">
-          <MarkdownRenderer :content="draft" />
+          <MarkdownRenderer
+            :content="draft"
+            :cite-sources="lessonStore.lesson.sources"
+          />
         </div>
       </div>
 
       <LessonBody
         v-else
         :content="lessonStore.lesson.contentMd"
+        :cite-sources="lessonStore.lesson.sources"
         @quote="onQuote"
         @edit-mermaid="openMermaidEdit"
       />
 
       <section
         v-if="!editing && lessonStore.lesson.images?.length"
+        id="lesson-sources"
         class="lesson__sources"
       >
         <h2>图片来源</h2>
@@ -553,12 +668,44 @@ onUnmounted(() => {
           去随堂练习（{{ lessonStore.questions.length }} 题）
         </RouterLink>
       </footer>
+
+      <!-- 右侧目录（宽屏固定，窄屏/对话打开时自动隐藏） -->
+      <nav
+        v-if="tocItems.length >= 2 && !chatOpen"
+        class="toc"
+        aria-label="本课目录"
+      >
+        <div class="toc__title">
+          本课目录
+        </div>
+        <button
+          v-for="t in tocItems"
+          :key="t.idx"
+          type="button"
+          class="toc__item"
+          :class="{ 'toc__item--on': activeSection === t.idx }"
+          @click="scrollToSection(t.idx)"
+        >
+          {{ t.heading }}
+        </button>
+      </nav>
+
+      <!-- 悬浮练习入口：读过一段后出现，页脚 CTA 出现时让位 -->
+      <RouterLink
+        v-if="floatCtaVisible"
+        class="float-cta"
+        :to="`/lesson/${lessonStore.lesson.id}/exercise`"
+      >
+        去随堂练习（{{ lessonStore.questions.length }} 题）
+        <ArrowRight :size="15" />
+      </RouterLink>
     </article>
 
     <div
       v-else
       class="state"
     >
+      <span class="spinner" />
       <p>加载中…</p>
     </div>
 
@@ -716,7 +863,7 @@ onUnmounted(() => {
   padding: 5px 12px 5px 6px;
   border: 1px solid var(--border);
   border-radius: var(--r-pill);
-  background: #fff;
+  background: var(--bg);
 }
 .progress__steps li.is-done {
   color: var(--green-hover);
@@ -745,7 +892,7 @@ onUnmounted(() => {
   background: var(--mastery-green);
 }
 .progress__steps li.is-active .progress__dot {
-  background: var(--primary);
+  background: var(--primary-btn);
   animation: progress-pulse 1.1s ease-in-out infinite;
 }
 @keyframes progress-pulse {
@@ -836,6 +983,10 @@ onUnmounted(() => {
   color: var(--text-dim);
   margin-bottom: 8px;
 }
+/* 目录跳转/锚点定位时留出呼吸空间 */
+.lesson :deep(.lesson-body__section) {
+  scroll-margin-top: 20px;
+}
 .lesson__crumb a {
   display: inline-flex;
   align-items: center;
@@ -866,7 +1017,7 @@ onUnmounted(() => {
   flex: none;
   padding: 2px 9px;
   border-radius: var(--r-pill);
-  background: var(--primary);
+  background: var(--primary-btn);
   color: #fff;
   font-size: 12px;
   font-weight: 600;
@@ -1017,6 +1168,11 @@ onUnmounted(() => {
 .state {
   text-align: center;
   padding: 60px 0;
+  color: var(--text-dim);
+}
+.state .spinner {
+  display: block;
+  margin: 0 auto 12px;
 }
 .state__error {
   color: var(--mastery-red);
@@ -1026,5 +1182,153 @@ onUnmounted(() => {
   display: flex;
   justify-content: center;
   gap: 10px;
+}
+
+/* ---------- 阅读进度 ---------- */
+.read-progress {
+  position: fixed;
+  top: var(--header-h);
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: var(--z-sticky);
+  background: transparent;
+  pointer-events: none;
+}
+.read-progress i {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.15s linear;
+}
+
+/* ---------- 「⋯」更多菜单 ---------- */
+.lesson-menu {
+  position: relative;
+}
+.lesson-menu__pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: var(--z-sticky);
+  min-width: 160px;
+  padding: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lesson-menu__pop button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+.lesson-menu__pop button:hover {
+  background: var(--primary-bg);
+  color: var(--primary-hover);
+}
+
+/* ---------- 右侧目录 ---------- */
+.toc {
+  position: fixed;
+  right: 28px;
+  top: calc(var(--header-h) + 48px);
+  width: 208px;
+  max-height: calc(100vh - var(--header-h) - 80px);
+  overflow-y: auto;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--bg);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.toc__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+.toc__item {
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.5;
+  padding: 5px 8px;
+  border: none;
+  border-left: 2px solid transparent;
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  background: none;
+  color: var(--text-dim);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition:
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
+}
+.toc__item:hover {
+  color: var(--text);
+  background: var(--bg-muted);
+}
+.toc__item--on {
+  color: var(--primary-hover);
+  border-left-color: var(--primary);
+  background: var(--primary-bg);
+  font-weight: 600;
+}
+/* 窄于内容列 + 目录宽度时收起，避免遮挡正文 */
+@media (max-width: 1360px) {
+  .toc {
+    display: none;
+  }
+}
+
+/* ---------- 悬浮练习入口 ---------- */
+.float-cta {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  z-index: var(--z-drawer);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 12px 22px;
+  border-radius: var(--r-pill);
+  background: var(--primary-btn);
+  color: #fff;
+  text-decoration: none;
+  box-shadow: var(--shadow-lg);
+  animation: toast-in var(--dur) var(--ease);
+  transition:
+    background var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+.float-cta:hover {
+  background: var(--primary-btn-hover);
+  transform: translateY(-2px);
+}
+@media (max-width: 900px) {
+  .float-cta {
+    right: 16px;
+    bottom: 16px;
+  }
 }
 </style>

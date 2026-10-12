@@ -32,7 +32,7 @@ import { toasts } from '@/utils/toast'
   padding: 9px 18px;
   border-radius: var(--r-pill);
   background: var(--text);
-  color: #fff;
+  color: var(--bg);
   font-size: 13px;
   line-height: 1.5;
   box-shadow: var(--shadow-lg);

@@ -513,7 +513,7 @@ function quoteLabel(q?: LessonQuote | null): string {
   background: var(--bg-subtle);
 }
 .chat__empty {
-  background: #fff;
+  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   padding: 16px;
@@ -561,7 +561,7 @@ function quoteLabel(q?: LessonQuote | null): string {
 .msg--user {
   align-self: flex-end;
   max-width: 88%;
-  background: var(--primary);
+  background: var(--primary-btn);
   color: #fff;
   padding: 9px 13px;
   border-radius: 14px 14px 4px 14px;
@@ -569,7 +569,7 @@ function quoteLabel(q?: LessonQuote | null): string {
 .msg--assistant {
   align-self: flex-start;
   max-width: 96%;
-  background: #fff;
+  background: var(--bg);
   border: 1px solid var(--border);
   padding: 10px 13px;
   border-radius: 14px 14px 14px 4px;
@@ -654,7 +654,7 @@ function quoteLabel(q?: LessonQuote | null): string {
 .chat__composer {
   padding: 10px 14px 12px;
   border-top: 1px solid var(--border);
-  background: #fff;
+  background: var(--bg);
 }
 .chat__error {
   margin: 0 0 8px;
@@ -705,7 +705,7 @@ function quoteLabel(q?: LessonQuote | null): string {
   padding: 8px 8px 8px 12px;
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  background: #fff;
+  background: var(--bg);
   transition: border-color 0.15s;
 }
 .chat__inputbox:focus-within {
@@ -802,7 +802,7 @@ function quoteLabel(q?: LessonQuote | null): string {
   gap: 12px;
   padding: 12px 18px;
   border-top: 1px solid var(--border);
-  background: #fff;
+  background: var(--bg);
 }
 .preview-modal__hint {
   font-size: 12px;

@@ -494,12 +494,14 @@ async function submitQuestionReport(q: Question) {
       <template v-else>
         <p class="hint">
           共 {{ questions.length }} 题：客观题提交即判，简答题由 AI 批改（约 20 秒）。全部作答后交卷。
-          <a
+          <button
             v-if="attempts.length > 0"
+            type="button"
             class="hint__history"
-            href="javascript:void 0"
             @click="backToReview"
-          >查看历史答题记录（{{ attempts.length }} 次）→</a>
+          >
+            查看历史答题记录（{{ attempts.length }} 次）→
+          </button>
         </p>
 
         <div
@@ -647,9 +649,17 @@ async function submitQuestionReport(q: Question) {
   font-size: 13px;
 }
 .hint__history {
+  font: inherit;
+  border: none;
+  background: none;
+  padding: 0;
   color: var(--primary-strong);
+  cursor: pointer;
   text-decoration: none;
   margin-left: 8px;
+}
+.hint__history:hover {
+  text-decoration: underline;
 }
 .not-ready {
   padding: 14px 16px;
@@ -765,7 +775,7 @@ async function submitQuestionReport(q: Question) {
   transform: translateX(-50%);
   z-index: var(--z-toast);
   background: var(--text);
-  color: #fff;
+  color: var(--bg);
   font-size: 13px;
   padding: 9px 18px;
   border-radius: var(--r-pill);

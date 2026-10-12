@@ -1,7 +1,7 @@
 import { readdir, rm } from 'node:fs/promises'
 import { dataPath, readJson } from '../repo/json-store'
 import { getTopic, listTopics } from './graph-service'
-import type { LessonMeta } from '../../shared/api'
+import type { LessonMeta, TopicStats } from '../../shared/api'
 import type { Lesson, QuestionSet, Topic } from '../../shared/types'
 
 export interface LessonDetail {
@@ -67,28 +67,26 @@ export async function listLessons(topicId: string): Promise<LessonMeta[]> {
   return metas.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 }
 
-// 课题统计（首页卡片展示）：知识点数 / 课程数 / 最近一课时间
-export interface TopicStats {
-  nodeCount: number
-  lessonCount: number
-  lastLessonAt: string | null
-  // 该方向是否有后台备课/优化任务在跑（首页卡片据此显示「课件生成中」）
-  generatingLesson: boolean
-}
+// 课题统计（首页卡片展示）：知识点数 / 课程数 / 最近一课时间 / 掌握度概览
+export type { TopicStats } from '../../shared/api'
 
 export async function getTopicStats(topicId: string): Promise<TopicStats> {
-  const graph = await readJson<{ nodes?: unknown[] } | null>(
+  const graph = await readJson<{ nodes?: { mastery?: number }[] } | null>(
     dataPath('topics', topicId, 'graph.json'),
     null,
   )
   const lessons = await listLessons(topicId)
   // 延迟引入避免 lesson-service ↔ lesson-jobs 循环依赖
   const { topicJobRunning } = await import('./lesson-jobs')
+  const nodes = graph?.nodes ?? []
+  const scores = nodes.map((n) => n.mastery ?? 0)
   return {
-    nodeCount: graph?.nodes?.length ?? 0,
+    nodeCount: nodes.length,
     lessonCount: lessons.length,
     lastLessonAt: lessons[0]?.createdAt ?? null,
     generatingLesson: topicJobRunning(topicId),
+    avgMastery: scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0,
+    masteredCount: scores.filter((s) => s >= 80).length,
   }
 }
 

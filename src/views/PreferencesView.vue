@@ -237,7 +237,7 @@ function sourceLabel(p: Preference): string {
   border: none;
   border-radius: var(--r-md);
   background: var(--text);
-  color: #fff;
+  color: var(--bg);
   cursor: pointer;
 }
 .prefs__add button:disabled {

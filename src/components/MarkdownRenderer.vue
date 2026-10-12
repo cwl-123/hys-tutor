@@ -56,7 +56,12 @@ async function highlight(source: string, lang: string): Promise<string> {
     return hit
   }
   const codeToHtml = await loadShiki()
-  const out = await codeToHtml(source, { lang, theme: 'github-light' })
+  // 双主题：元素只带 --shiki-light/-dark 变量，亮暗由 CSS 切换（见下方 .shiki 样式）
+  const out = await codeToHtml(source, {
+    lang,
+    themes: { light: 'github-light', dark: 'github-dark' },
+    defaultColor: false,
+  })
   if (highlightCache.size >= HIGHLIGHT_CACHE_MAX) {
     highlightCache.delete(highlightCache.keys().next().value!)
   }
@@ -64,7 +69,12 @@ async function highlight(source: string, lang: string): Promise<string> {
   return out
 }
 
-const props = defineProps<{ content: string; editable?: boolean }>()
+const props = defineProps<{
+  content: string
+  editable?: boolean
+  // 参考来源（供正文 [n] 引用标记 hover 显示标题预览）
+  citeSources?: { idx: number; title: string; url?: string }[]
+}>()
 const emit = defineEmits<{ (e: 'edit-mermaid', code: string): void }>()
 
 const container = ref<HTMLElement | null>(null)
@@ -125,7 +135,50 @@ async function enhanceCodeBlocks() {
   }
 }
 
-watch(html, () => void enhanceCodeBlocks(), { immediate: true })
+// 正文纯文本引用 [n] → 可 hover 预览来源标题的角标。
+// 走 DOM 文本节点替换（而不是改 html 字符串），不会误伤链接/属性里的方括号
+async function enhanceCitations() {
+  await nextTick()
+  const root = container.value
+  if (!root || !props.citeSources?.length) return
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  const targets: Text[] = []
+  let node: Node | null = walker.nextNode()
+  while (node) {
+    const text = node as Text
+    if (/\[\d+\]/.test(text.nodeValue ?? '')) {
+      const parent = text.parentElement
+      // 跳过代码块/链接/按钮/已处理角标
+      if (parent && !parent.closest('pre, code, a, button, .md-cite, figcaption')) {
+        targets.push(text)
+      }
+    }
+    node = walker.nextNode()
+  }
+  for (const text of targets) {
+    const frag = document.createDocumentFragment()
+    for (const part of (text.nodeValue ?? '').split(/(\[\d+\])/g)) {
+      const m = part.match(/^\[(\d+)\]$/)
+      if (!m) {
+        if (part) frag.appendChild(document.createTextNode(part))
+        continue
+      }
+      const n = Number(m[1])
+      const src = props.citeSources?.find((s) => s.idx === n)
+      const el = document.createElement('sup')
+      el.className = 'md-cite'
+      el.textContent = part
+      el.dataset.title = src ? `来源 ${n}：${src.title}` : `来源 ${n}`
+      frag.appendChild(el)
+    }
+    text.parentNode?.replaceChild(frag, text)
+  }
+}
+
+watch(html, () => {
+  void enhanceCodeBlocks()
+  void enhanceCitations()
+}, { immediate: true })
 </script>
 
 <template>
@@ -162,6 +215,21 @@ watch(html, () => void enhanceCodeBlocks(), { immediate: true })
   border-radius: var(--r-md);
   overflow-x: auto;
   font-size: 13px;
+}
+/* Shiki 双主题：defaultColor:false 输出 --shiki-light/-dark 变量，这里按主题选用 */
+.md-body :deep(.shiki) {
+  background-color: var(--shiki-light-bg) !important;
+  color: var(--shiki-light);
+}
+.md-body :deep(.shiki span) {
+  color: var(--shiki-light);
+}
+html[data-theme='dark'] .md-body :deep(.shiki) {
+  background-color: var(--shiki-dark-bg) !important;
+  color: var(--shiki-dark);
+}
+html[data-theme='dark'] .md-body :deep(.shiki span) {
+  color: var(--shiki-dark);
 }
 .md-body :deep(code) {
   font-family: 'SF Mono', Menlo, monospace;
@@ -208,11 +276,56 @@ watch(html, () => void enhanceCodeBlocks(), { immediate: true })
   font-size: 13px;
   color: var(--text-dim);
 }
+/* 引用角标：hover 显示来源标题预览 */
+.md-body :deep(.md-cite) {
+  position: relative;
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  padding: 0 4px;
+  margin: 0 1px;
+  border-radius: 4px;
+  background: var(--primary-bg);
+  color: var(--primary-strong);
+  cursor: help;
+  vertical-align: 1px;
+  user-select: none;
+}
+.md-body :deep(.md-cite)::after {
+  content: attr(data-title);
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 8px);
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 320px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.6;
+  text-align: left;
+  white-space: normal;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--dur-fast) var(--ease);
+  z-index: var(--z-toast);
+  pointer-events: none;
+}
+.md-body :deep(.md-cite:hover)::after {
+  opacity: 1;
+  visibility: visible;
+}
 .md-body :deep(.mermaid-diagram) {
   position: relative;
   margin: 16px 0;
   padding: 16px;
-  background: #fff;
+  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   overflow-x: auto;
@@ -229,7 +342,7 @@ watch(html, () => void enhanceCodeBlocks(), { immediate: true })
   padding: 2px 10px;
   font-size: 12px;
   color: var(--text-dim);
-  background: #fff;
+  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   cursor: pointer;

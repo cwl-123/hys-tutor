@@ -97,7 +97,7 @@ const showSettings = ref(false)
 .app-settings:hover {
   color: var(--text);
   border-color: var(--border);
-  background: #fff;
+  background: var(--bg-subtle);
 }
 .app-main {
   flex: 1;

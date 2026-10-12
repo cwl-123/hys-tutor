@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { scheduleNext } from '../server/services/scheduler'
+import { scheduleNext } from '../shared/scheduler'
 import type { KnowledgeNode } from '../shared/types'
 
 function node(id: string, mastery: number, deps: string[] = []): KnowledgeNode {

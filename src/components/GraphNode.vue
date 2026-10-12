@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Handle, Position } from '@vue-flow/core'
 import { computed } from 'vue'
-import { BookOpen, Check, LoaderCircle, TriangleAlert } from 'lucide-vue-next'
+import { ArrowRight, BookOpen, Check, LoaderCircle, TriangleAlert } from 'lucide-vue-next'
 import { masteryLevel, type KnowledgeNode } from '@shared/types'
 
 const props = defineProps<{
@@ -10,6 +10,7 @@ const props = defineProps<{
     selected: boolean
     lessonCount: number
     lessonStatus?: 'generating' | 'generated' | 'failed'
+    recommended?: boolean
   }
 }>()
 
@@ -19,12 +20,27 @@ const level = computed(() => masteryLevel(props.data.node.mastery))
 <template>
   <div
     class="knode"
-    :class="[`knode--${level}`, { 'knode--selected': data.selected }]"
+    :class="[
+      `knode--${level}`,
+      {
+        'knode--selected': data.selected,
+        'knode--rec': data.recommended,
+        'knode--dim': data.node.mastery >= 80 && !data.selected && !data.recommended,
+      },
+    ]"
+    :title="data.node.name"
   >
     <Handle
       type="target"
       :position="Position.Top"
     />
+    <span
+      v-if="data.recommended"
+      class="knode__rec"
+    >
+      下一课
+      <ArrowRight :size="10" />
+    </span>
     <div class="knode__name">
       {{ data.node.name }}
     </div>
@@ -65,7 +81,8 @@ const level = computed(() => masteryLevel(props.data.node.mastery))
 
 <style scoped>
 .knode {
-  width: 190px;
+  position: relative;
+  width: 200px;
   padding: 10px 14px;
   border-radius: var(--r-md);
   border: 1px solid var(--border);
@@ -74,28 +91,75 @@ const level = computed(() => masteryLevel(props.data.node.mastery))
   box-shadow: var(--shadow-sm);
   transition:
     box-shadow var(--dur-fast) var(--ease),
-    border-color var(--dur-fast) var(--ease);
+    border-color var(--dur-fast) var(--ease),
+    opacity var(--dur) var(--ease);
 }
 .knode:hover {
   border-color: var(--border-strong);
   box-shadow: var(--shadow-md);
+  opacity: 1 !important;
 }
+/* 掌握度淡色底：扫一眼即可看出全图状态分布 */
 .knode--red {
   border-left-color: var(--mastery-red);
+  background: var(--red-tint);
 }
 .knode--yellow {
   border-left-color: var(--mastery-yellow);
+  background: var(--amber-tint);
 }
 .knode--green {
   border-left-color: var(--mastery-green);
+  background: var(--green-tint);
+}
+/* 已掌握节点淡化，把视觉焦点让给待学节点 */
+.knode--dim {
+  opacity: 0.55;
 }
 .knode--selected {
   border-color: var(--primary);
   border-left-color: var(--primary);
   box-shadow: 0 0 0 3px rgb(var(--primary-rgb) / 15%);
+  opacity: 1;
+}
+/* 排课引擎推荐的下一课：光晕 + 呼吸角标 */
+.knode--rec {
+  border-color: var(--primary);
+  box-shadow:
+    0 0 0 3px rgb(var(--primary-rgb) / 18%),
+    var(--shadow-md);
+  animation: rec-glow 2.2s ease-in-out infinite;
+}
+@keyframes rec-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px rgb(var(--primary-rgb) / 18%),
+      var(--shadow-md);
+  }
+  50% {
+    box-shadow:
+      0 0 0 6px rgb(var(--primary-rgb) / 10%),
+      var(--shadow-md);
+  }
+}
+.knode__rec {
+  position: absolute;
+  top: -10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  background: var(--primary-btn);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
 }
 .knode__name {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text);
   overflow: hidden;

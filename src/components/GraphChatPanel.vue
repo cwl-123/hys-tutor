@@ -189,6 +189,17 @@ function applyProposal(msg: ChatMsg) {
   min-height: 0;
   background: var(--bg);
 }
+/* 窄窗口浮在画布上方，避免把图挤没 */
+@media (max-width: 1100px) {
+  .chat {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 5;
+    box-shadow: var(--shadow-drawer);
+  }
+}
 .chat__header {
   display: flex;
   justify-content: space-between;
@@ -248,7 +259,7 @@ function applyProposal(msg: ChatMsg) {
 }
 .msg--user {
   align-self: flex-end;
-  background: var(--primary);
+  background: var(--primary-btn);
   color: #fff;
   border-radius: 14px 14px 4px 14px;
 }
