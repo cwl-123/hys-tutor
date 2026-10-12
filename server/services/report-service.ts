@@ -1,4 +1,4 @@
-import { dataPath, newId, nowIso, readJson, writeJson } from '../repo/json-store'
+import { dataPath, newId, nowIso, readJson, withLock, writeJson } from '../repo/json-store'
 import type { ErrorReport, ReportInput } from '../../shared/types'
 
 export function reportsFile(topicId: string): string {
@@ -20,7 +20,9 @@ export async function addReport(topicId: string, input: ReportInput): Promise<Er
     note: input.note?.trim() || undefined,
     createdAt: nowIso(),
   }
-  const reports = await listReports(topicId)
-  await writeJson(reportsFile(topicId), [...reports, report])
+  await withLock(reportsFile(topicId), async () => {
+    const reports = await listReports(topicId)
+    await writeJson(reportsFile(topicId), [...reports, report])
+  })
   return report
 }

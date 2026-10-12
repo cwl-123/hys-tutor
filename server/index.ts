@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { errMsg } from '../shared/error'
 import { healthRoute } from './routes/health'
 import { handleGraphChat, handleTopics } from './routes/topics'
 import {
@@ -212,7 +213,7 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, next:
       res.end()
       return
     }
-    sendJson(res, 500, { error: err instanceof Error ? err.message : String(err) })
+    sendJson(res, 500, { error: errMsg(err) })
   }
 }
 

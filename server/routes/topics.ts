@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { z } from 'zod'
+import { errMsg } from '../../shared/error'
 import { sendJson } from '../index'
 import { startSse } from '../sse'
 import {
@@ -58,7 +59,7 @@ export async function handleTopics(
       const result = await createTopic(name, (stage, detail) => send('stage', { stage, detail }), profile)
       send('result', result)
     } catch (err) {
-      send('error', { message: err instanceof Error ? err.message : String(err) })
+      send('error', { message: errMsg(err) })
     } finally {
       res.end()
     }
@@ -93,7 +94,7 @@ export async function handleTopics(
       sendJson(res, 200, { graph })
     } catch (err) {
       const status = (err as { status?: number }).status ?? 500
-      sendJson(res, status, { error: err instanceof Error ? err.message : String(err) })
+      sendJson(res, status, { error: errMsg(err) })
     }
     return
   }
@@ -110,7 +111,7 @@ export async function handleTopics(
       sendJson(res, 200, { topic })
     } catch (err) {
       const status = (err as { status?: number }).status ?? 500
-      sendJson(res, status, { error: err instanceof Error ? err.message : String(err) })
+      sendJson(res, status, { error: errMsg(err) })
     }
     return
   }
@@ -146,6 +147,6 @@ export async function handleGraphChat(
     sendJson(res, 200, result)
   } catch (err) {
     const status = (err as { status?: number }).status ?? 500
-    sendJson(res, status, { error: err instanceof Error ? err.message : String(err) })
+    sendJson(res, status, { error: errMsg(err) })
   }
 }

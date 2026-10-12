@@ -1,4 +1,4 @@
-import { dataPath, newId, readJson, writeJson } from '../repo/json-store'
+import { dataPath, newId, readJson, withLock, writeJson } from '../repo/json-store'
 import type { Attempt, Question, QuestionSet } from '../../shared/types'
 
 function attemptsFile(topicId: string, lessonId: string): string {
@@ -46,8 +46,11 @@ export async function listAttempts(topicId: string, lessonId: string): Promise<A
   return list.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 }
 
-// 追加一次测验记录（同一课多次测验，整文件重写）
+// 追加一次测验记录（同一课多次测验，整文件重写）；持锁防并发提交互相覆盖
 export async function appendAttempt(topicId: string, attempt: Attempt): Promise<void> {
-  const list = await listAttempts(topicId, attempt.lessonId)
-  await writeJson(attemptsFile(topicId, attempt.lessonId), [...list, attempt])
+  const file = attemptsFile(topicId, attempt.lessonId)
+  await withLock(file, async () => {
+    const list = await listAttempts(topicId, attempt.lessonId)
+    await writeJson(file, [...list, attempt])
+  })
 }

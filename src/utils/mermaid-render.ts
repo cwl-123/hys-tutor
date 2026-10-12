@@ -7,6 +7,8 @@ type MermaidApi = typeof import('mermaid').default
 
 let mermaidApi: MermaidApi | null = null
 let renderSeq = 0
+// 缓存上限（LRU）：编辑弹窗实时预览每敲一键就产生新条目，不设上限内存单调增长
+const CACHE_MAX = 100
 const cache = new Map<string, string>()
 
 export function mermaidCacheKey(code: string): string {
@@ -22,13 +24,18 @@ export async function renderMermaid(code: string): Promise<string | null> {
   const key = mermaidCacheKey(code)
   if (!key) return null
   const cached = cache.get(key)
-  if (cached) return cached
+  if (cached) {
+    cache.delete(key)
+    cache.set(key, cached)
+    return cached
+  }
   try {
     if (!mermaidApi) {
       mermaidApi = (await import('mermaid')).default
       mermaidApi.initialize({
         startOnLoad: false,
-        securityLevel: 'antiscript',
+        // strict：antiscript 只剥 <script>，label 里的 <img onerror> 等事件属性会进 SVG 造成 XSS
+        securityLevel: 'strict',
         theme: 'neutral',
         suppressErrorRendering: true,
       })
@@ -41,6 +48,7 @@ export async function renderMermaid(code: string): Promise<string | null> {
     //   （render 前的 removeExistingElements 会删掉页面上同 id 的节点）
     const mountId = `hys-m${randomSuffix()}`
     const clean = svg.split(renderId).join(mountId)
+    if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value!)
     cache.set(key, clean)
     return clean
   } catch {

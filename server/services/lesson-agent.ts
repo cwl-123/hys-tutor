@@ -1,5 +1,5 @@
 import { readdir } from 'node:fs/promises'
-import { dataPath, newId, nowIso, readJson, writeJson } from '../repo/json-store'
+import { dataPath, newId, nowIso, readJson, withLock, writeJson } from '../repo/json-store'
 import { getLLM, getLLMModel, completeJson, completeText } from '../llm/client'
 import { runAgent, type AgentTool } from '../agent/loop'
 import { searchWeb } from '../agent/tools/web-search'
@@ -33,6 +33,7 @@ import { preferenceContextText } from './preference-service'
 import { listTaught, recordTaught, taughtContextText } from './taught-service'
 import { listAttempts } from './attempt-service'
 import { MASTERY_UNLOCK_THRESHOLD } from '../../shared/types'
+import { errMsg } from '../../shared/error'
 import { sanitizeCitations, stripTrailingSourceBlock } from '../../shared/lesson-md'
 import type {
   ErrorReport,
@@ -330,7 +331,7 @@ async function recordTaughtForLesson(
     })
     onStage({ stage: 'taught-recorded', detail: { nodeId: node.id, examples: out.examples.length } })
   } catch (err) {
-    onStage({ stage: 'taught-skip', detail: { message: err instanceof Error ? err.message : String(err) } })
+    onStage({ stage: 'taught-skip', detail: { message: errMsg(err) } })
   }
 }
 
@@ -468,7 +469,10 @@ export async function prepareLesson(
       explanation: q.explanation,
     })),
   }
-  await writeJson(dataPath('topics', topicId, 'lessons', `${lessonId}.json`), lesson)
+  // 与 lesson-jobs 的状态回写共用同一把文件锁，防止占位状态覆盖成品
+  await withLock(dataPath('topics', topicId, 'lessons', `${lessonId}.json`), () =>
+    writeJson(dataPath('topics', topicId, 'lessons', `${lessonId}.json`), lesson),
+  )
   await writeJson(dataPath('topics', topicId, 'lessons', `${lessonId}.questions.json`), questions)
 
   // 归档本课案例，供后续课程避免重复（失败不影响备课）
@@ -546,7 +550,7 @@ export async function reviseLesson(
       // 自查尽力而为：失败则保留重写正文与原有题目，不中断优化
       onStage({
         stage: 'self-check-skipped',
-        detail: { message: err instanceof Error ? err.message : String(err) },
+        detail: { message: errMsg(err) },
       })
     }
   }
@@ -559,8 +563,11 @@ export async function reviseLesson(
   lesson.contentMd = localized.contentMd
   lesson.images = localized.images
   lesson.status = 'generated'
+  lesson.error = undefined
   lesson.revisedAt = nowIso()
-  await writeJson(dataPath('topics', topic.id, 'lessons', `${lessonId}.json`), lesson)
+  await withLock(dataPath('topics', topic.id, 'lessons', `${lessonId}.json`), () =>
+    writeJson(dataPath('topics', topic.id, 'lessons', `${lessonId}.json`), lesson),
+  )
   if (questions) {
     await writeJson(dataPath('topics', topic.id, 'lessons', `${lessonId}.questions.json`), questions)
   }

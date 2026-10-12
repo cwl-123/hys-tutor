@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { Attempt, Lesson, LessonImage, Question, Topic } from '@shared/types'
+import { errMsg } from '@shared/error'
 import { getSse } from '@/utils/sse'
 import { showNewPreferences } from '@/utils/toast'
 
@@ -164,7 +165,7 @@ export const useLessonStore = defineStore('lesson', () => {
       await attach(data.lessonId, preface)
       return data.lessonId
     } catch (err) {
-      error.value = err instanceof Error ? err.message : String(err)
+      error.value = errMsg(err)
       generating.value = false
       return null
     }
@@ -219,7 +220,7 @@ export const useLessonStore = defineStore('lesson', () => {
     } catch (err) {
       // 主动中断（重新挂接/离开页面）不算错误
       if (!controller.signal.aborted) {
-        error.value = err instanceof Error ? err.message : String(err)
+        error.value = errMsg(err)
       }
     } finally {
       if (attachAbort === controller) {

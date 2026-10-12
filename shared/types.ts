@@ -228,12 +228,14 @@ export const preferenceSchema = z.object({
 export type Preference = z.infer<typeof preferenceSchema>
 
 // ---------- 通用工具 ----------
+// 掌握分 <40 为未掌握（红）
+export const MASTERY_LOW_THRESHOLD = 40
+// 掌握分 ≥80 视为已掌握（绿），解锁下游
+export const MASTERY_UNLOCK_THRESHOLD = 80
+
 // 掌握分颜色：红 <40 / 黄 40-79 / 绿 ≥80（PRD 领域规则）
 export function masteryLevel(mastery: number): 'red' | 'yellow' | 'green' {
-  if (mastery < 40) return 'red'
-  if (mastery < 80) return 'yellow'
+  if (mastery < MASTERY_LOW_THRESHOLD) return 'red'
+  if (mastery < MASTERY_UNLOCK_THRESHOLD) return 'yellow'
   return 'green'
 }
-
-// 掌握分 ≥80 视为已掌握，解锁下游
-export const MASTERY_UNLOCK_THRESHOLD = 80

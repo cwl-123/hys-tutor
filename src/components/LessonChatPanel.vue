@@ -5,6 +5,7 @@ import { findSectionByHeading } from '@shared/lesson-md'
 import type { LessonChatMessage, LessonQuote, LessonVersion } from '@shared/lesson-chat'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import { showNewPreferences } from '@/utils/toast'
+import { errMsg } from '@shared/error'
 
 const props = defineProps<{
   lessonId: string
@@ -127,7 +128,7 @@ async function send() {
     messages.value = messages.value.filter((m) => m.id !== tempId)
     input.value = message
     pendingQuote.value = quote ?? null
-    error.value = err instanceof Error ? err.message : String(err)
+    error.value = errMsg(err)
   } finally {
     loading.value = false
   }
@@ -154,7 +155,7 @@ async function applyProposal(msg: LessonChatMessage) {
     previewMsgId.value = null
     emit('updated')
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
+    error.value = errMsg(err)
   } finally {
     applyingId.value = null
   }
@@ -175,7 +176,7 @@ async function undo() {
     versions.value = data.versions ?? versions.value
     emit('updated')
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
+    error.value = errMsg(err)
   }
 }
 

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import type { Graph, KnowledgeNode, Topic, TopicProfile } from '@shared/types'
 import type { LessonMeta, TopicWithStats } from '@shared/api'
+import { errMsg } from '@shared/error'
 import { postSse } from '@/utils/sse'
 
 export const useTopicStore = defineStore('topic', () => {
@@ -34,7 +35,7 @@ export const useTopicStore = defineStore('topic', () => {
       graph.value = data.graph
       await fetchLessons(id)
     } catch (err) {
-      error.value = err instanceof Error ? err.message : String(err)
+      error.value = errMsg(err)
     } finally {
       loading.value = false
     }
@@ -53,6 +54,15 @@ export const useTopicStore = defineStore('topic', () => {
     let created: Topic | null = null
     try {
       await new Promise<void>((resolve, reject) => {
+        let settled = false
+        const ok = () => {
+          settled = true
+          resolve()
+        }
+        const fail = (err: Error) => {
+          settled = true
+          reject(err)
+        }
         postSse(
           '/api/topics',
           { name, profile },
@@ -79,16 +89,21 @@ export const useTopicStore = defineStore('topic', () => {
                 topic.value = r.topic
                 graph.value = r.graph
                 lessons.value = []
-                resolve()
+                ok()
               } else if (event === 'error') {
-                reject(new Error((data as { message: string }).message))
+                fail(new Error((data as { message: string }).message))
               }
             },
           },
-        ).catch(reject)
+        )
+          // 流正常结束却没等到 result/error（服务进程被杀等路径）：兜底失败，不能永远卡在调研中
+          .then(() => {
+            if (!settled) fail(new Error('调研中断：服务连接已关闭，请重试'))
+          })
+          .catch(fail)
       })
     } catch (err) {
-      error.value = err instanceof Error ? err.message : String(err)
+      error.value = errMsg(err)
     } finally {
       stageText.value = null
       loading.value = false

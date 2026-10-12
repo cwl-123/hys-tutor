@@ -3,12 +3,14 @@ import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowRight, LoaderCircle } from 'lucide-vue-next'
 import { useTopicStore } from '@/stores/topic'
+import { fmtDate } from '@/utils/format'
+import { PROFILE_LEVELS, PROFILE_STYLES, pickOption } from '@/utils/topic-profile'
 
 const store = useTopicStore()
 const router = useRouter()
 
-const STYLES = ['通俗直观', '严谨推导', '实战代码', '案例驱动']
-const LEVELS = ['完全新手', '有一定基础', '比较熟悉想精进']
+const STYLES = PROFILE_STYLES
+const LEVELS = PROFILE_LEVELS
 
 const topicName = ref('')
 const style = ref<string | null>(null)
@@ -32,10 +34,6 @@ watch(
 )
 onUnmounted(() => window.clearInterval(pollTimer))
 
-function pick(list: string[], current: string | null, value: string): string | null {
-  return current === value ? null : value
-}
-
 async function createTopic() {
   const name = topicName.value.trim()
   if (!name || creating.value) return
@@ -54,10 +52,6 @@ async function createTopic() {
   } finally {
     creating.value = false
   }
-}
-
-function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
 function fmtRelative(iso: string): string {
@@ -103,7 +97,7 @@ function fmtRelative(iso: string): string {
                 class="chip"
                 :class="{ 'chip--on': style === s }"
                 :disabled="creating"
-                @click="style = pick(STYLES, style, s)"
+                @click="style = pickOption(style, s)"
               >
                 {{ s }}
               </button>
@@ -119,7 +113,7 @@ function fmtRelative(iso: string): string {
                 class="chip"
                 :class="{ 'chip--on': level === l }"
                 :disabled="creating"
-                @click="level = pick(LEVELS, level, l)"
+                @click="level = pickOption(level, l)"
               >
                 {{ l }}
               </button>

@@ -2,6 +2,7 @@
 import { nextTick, ref, watch } from 'vue'
 import { X } from 'lucide-vue-next'
 import type { KnowledgeNode } from '@shared/types'
+import { errMsg } from '@shared/error'
 
 interface GraphDiff {
   added: string[]
@@ -76,7 +77,7 @@ async function send() {
       { role: 'assistant', content: data.reply ?? '', proposal: data.proposal, diff: data.diff },
     ]
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
+    error.value = errMsg(err)
   } finally {
     loading.value = false
   }

@@ -1,5 +1,6 @@
 import type OpenAI from 'openai'
 import { getLLM, getLLMModel } from '../llm/client'
+import { errMsg } from '../../shared/error'
 
 export interface AgentTool {
   name: string
@@ -110,7 +111,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<string> {
           resultText = truncate(typeof result === 'string' ? result : JSON.stringify(result, null, 2), resultMaxChars)
         } catch (err) {
           ok = false
-          resultText = `工具执行失败：${err instanceof Error ? err.message : String(err)}`
+          resultText = `工具执行失败：${errMsg(err)}`
         }
       }
       opts.onEvent?.({ type: 'tool_result', name: call.function.name, ok, preview: resultText.slice(0, 200) })

@@ -16,12 +16,18 @@ async function readSseStream(res: Response, handlers: SseHandlers): Promise<void
     buf = frames.pop() ?? ''
     for (const frame of frames) {
       let event = 'message'
-      let data = ''
+      const dataLines: string[] = []
       for (const line of frame.split('\n')) {
         if (line.startsWith('event:')) event = line.slice(6).trim()
-        else if (line.startsWith('data:')) data += line.slice(5).trim()
+        // SSE 规范：多行 data: 以 \n 拼接
+        else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim())
       }
-      if (data) handlers.onEvent(event, JSON.parse(data))
+      if (dataLines.length === 0) continue
+      try {
+        handlers.onEvent(event, JSON.parse(dataLines.join('\n')))
+      } catch {
+        // 一帧坏数据不应杀掉整条流，跳过即可
+      }
     }
   }
 }

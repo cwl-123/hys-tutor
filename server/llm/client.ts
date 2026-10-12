@@ -1,6 +1,7 @@
 import OpenAI from 'openai'
 import { z } from 'zod'
 import { resolveLlm } from '../services/settings-service'
+import { errMsg } from '../../shared/error'
 
 // 配置优先级：页面设置的激活模型源 > .env
 export interface ResolvedLlmConfig {
@@ -120,12 +121,12 @@ export async function completeJson<T>(opts: {
         finishReason: res.choices[0]?.finish_reason,
         contentLen: text.length,
         contentPreview: text.slice(0, 500),
-        error: err instanceof Error ? err.message : String(err),
+        error: errMsg(err),
       })
       messages.push({ role: 'assistant', content: text })
       messages.push({
         role: 'user',
-        content: `输出校验失败：${err instanceof Error ? err.message : String(err)}。请重新输出，只输出合法 JSON，不要任何解释；字符串值内部严禁出现未转义的英文双引号（引用词句用「」）。`,
+        content: `输出校验失败：${errMsg(err)}。请重新输出，只输出合法 JSON，不要任何解释；字符串值内部严禁出现未转义的英文双引号（引用词句用「」）。`,
       })
     }
   }

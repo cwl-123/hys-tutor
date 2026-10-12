@@ -1,14 +1,11 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import MarkdownIt from 'markdown-it'
 import markdownKatex from '@traptitech/markdown-it-katex'
-import { codeToHtml } from 'shiki'
 import { renderMermaid } from '@/utils/mermaid-render'
 import 'katex/dist/katex.min.css'
 
-const props = defineProps<{ content: string; editable?: boolean }>()
-const emit = defineEmits<{ (e: 'edit-mermaid', code: string): void }>()
-
+// MarkdownIt 规则配置是确定性的，全应用共享单例（否则一页 20+ 实例各自重建）
 const md = new MarkdownIt({ html: false, linkify: true })
 md.use(markdownKatex, { throwOnError: false })
 
@@ -37,6 +34,39 @@ md.renderer.rules.image = (tokens, idx, options, env, self) => {
   return `<figure class="md-figure">${img}${figcaption}</figure>`
 }
 
+// Shiki 动态导入（全量 grammar 数 MB，不进首屏共享 chunk）
+type CodeToHtml = typeof import('shiki')['codeToHtml']
+let shikiPromise: Promise<CodeToHtml> | null = null
+function loadShiki(): Promise<CodeToHtml> {
+  shikiPromise ??= import('shiki').then((m) => m.codeToHtml)
+  return shikiPromise
+}
+
+// 高亮结果按 lang+源码缓存（LRU 上限 200）：流式/编辑场景每个 delta 都重渲，
+// 不缓存的话同一段代码会被 codeToHtml 反复计算
+const highlightCache = new Map<string, string>()
+const HIGHLIGHT_CACHE_MAX = 200
+
+async function highlight(source: string, lang: string): Promise<string> {
+  const key = `${lang}\n${source}`
+  const hit = highlightCache.get(key)
+  if (hit) {
+    highlightCache.delete(key)
+    highlightCache.set(key, hit)
+    return hit
+  }
+  const codeToHtml = await loadShiki()
+  const out = await codeToHtml(source, { lang, theme: 'github-light' })
+  if (highlightCache.size >= HIGHLIGHT_CACHE_MAX) {
+    highlightCache.delete(highlightCache.keys().next().value!)
+  }
+  highlightCache.set(key, out)
+  return out
+}
+
+const props = defineProps<{ content: string; editable?: boolean }>()
+const emit = defineEmits<{ (e: 'edit-mermaid', code: string): void }>()
+
 const container = ref<HTMLElement | null>(null)
 const html = computed(() => md.render(props.content))
 
@@ -56,29 +86,38 @@ function mountMermaid(pre: HTMLPreElement, code: string, svg: string) {
   pre.replaceWith(wrap)
 }
 
+// 过期增强任务丢弃：内容快速变化时多轮 enhance 交错，旧轮次不得再操作 DOM
+let enhanceRun = 0
+onUnmounted(() => {
+  enhanceRun++
+})
+
 // Shiki/Mermaid 都是异步的：先渲染普通 <pre><code>，挂载后逐块替换
 async function enhanceCodeBlocks() {
+  const run = ++enhanceRun
   await nextTick()
   const root = container.value
   if (!root) return
   const blocks = root.querySelectorAll<HTMLPreElement>('pre')
   for (const pre of blocks) {
+    if (run !== enhanceRun) return
+    // Shiki 产物（pre.shiki）不含 language class，跳过避免被当成新块重复高亮
+    if (pre.classList.contains('shiki') || pre.dataset.enhanced) continue
     const code = pre.querySelector('code')
-    if (!code || pre.dataset.enhanced) continue
+    if (!code) continue
     pre.dataset.enhanced = '1'
     const lang = code.className.match(/language-([\w-]+)/)?.[1] || 'text'
     const source = code.textContent ?? ''
 
     if (lang === 'mermaid') {
       const svg = source.trim() ? await renderMermaid(source) : null
+      if (run !== enhanceRun) return
       if (svg) mountMermaid(pre, source, svg)
       continue
     }
     try {
-      const highlighted = await codeToHtml(source, {
-        lang,
-        theme: 'github-light',
-      })
+      const highlighted = await highlight(source, lang)
+      if (run !== enhanceRun) return
       pre.outerHTML = highlighted
     } catch {
       // 未知语言等高亮失败时保留原样

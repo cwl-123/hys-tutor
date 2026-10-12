@@ -2,9 +2,11 @@
 import { ref } from 'vue'
 import { X } from 'lucide-vue-next'
 import { useTopicStore } from '@/stores/topic'
+import { errMsg } from '@shared/error'
+import { PROFILE_LEVELS, PROFILE_STYLES, pickOption } from '@/utils/topic-profile'
 
-const STYLES = ['通俗直观', '严谨推导', '实战代码', '案例驱动']
-const LEVELS = ['完全新手', '有一定基础', '比较熟悉想精进']
+const STYLES = PROFILE_STYLES
+const LEVELS = PROFILE_LEVELS
 
 const emit = defineEmits<{
   close: []
@@ -19,9 +21,7 @@ const extra = ref(store.topic?.profile?.extra ?? '')
 const saving = ref(false)
 const error = ref<string | null>(null)
 
-function pick(current: string | null, value: string): string | null {
-  return current === value ? null : value
-}
+const pick = pickOption
 
 async function save() {
   if (saving.value) return
@@ -36,7 +36,7 @@ async function save() {
     emit('saved')
     emit('close')
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
+    error.value = errMsg(err)
   } finally {
     saving.value = false
   }

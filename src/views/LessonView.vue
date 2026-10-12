@@ -2,14 +2,14 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, CircleCheckBig, MessageSquare, Pencil, Sparkles, X } from 'lucide-vue-next'
-import { useLessonStore } from '@/stores/lesson'
+import { useLessonStore, LESSON_PHASES } from '@/stores/lesson'
 import { useTopicStore } from '@/stores/topic'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import LessonBody from '@/components/LessonBody.vue'
 import LessonChatPanel from '@/components/LessonChatPanel.vue'
 import { replaceMermaidBlock } from '@shared/lesson-md'
-import { LESSON_PHASES } from '@/stores/lesson'
 import type { LessonQuote } from '@shared/lesson-chat'
+import { errMsg } from '@shared/error'
 
 const route = useRoute()
 const router = useRouter()
@@ -31,8 +31,19 @@ function onQuote(quote: LessonQuote) {
 
 // ---------- Mermaid 图表编辑 ----------
 const mermaidEdit = ref<{ code: string; draft: string } | null>(null)
+// 预览防抖：每敲一键都全量渲染太重，延迟 300ms
+const mermaidDraftDebounced = ref('')
+let mermaidPreviewTimer: ReturnType<typeof setTimeout> | undefined
+watch(
+  () => mermaidEdit.value?.draft,
+  (d) => {
+    clearTimeout(mermaidPreviewTimer)
+    mermaidPreviewTimer = setTimeout(() => (mermaidDraftDebounced.value = d ?? ''), 300)
+  },
+)
+onUnmounted(() => clearTimeout(mermaidPreviewTimer))
 const mermaidPreview = computed(() =>
-  mermaidEdit.value ? `\`\`\`mermaid\n${mermaidEdit.value.draft}\n\`\`\`` : '',
+  mermaidEdit.value ? `\`\`\`mermaid\n${mermaidDraftDebounced.value}\n\`\`\`` : '',
 )
 
 function openMermaidEdit(code: string) {
@@ -57,7 +68,7 @@ async function saveMermaidEdit() {
     await lessonStore.saveContent(next, '修改 Mermaid 图表')
     mermaidEdit.value = null
   } catch (err) {
-    opError.value = err instanceof Error ? err.message : String(err)
+    opError.value = errMsg(err)
   }
 }
 
@@ -77,7 +88,7 @@ async function saveEditing() {
     await lessonStore.saveContent(draft.value, '手动编辑课件')
     editing.value = false
   } catch (err) {
-    opError.value = err instanceof Error ? err.message : String(err)
+    opError.value = errMsg(err)
   }
 }
 
@@ -185,7 +196,6 @@ onMounted(async () => {
     } else {
       // 直接进入已有课程：先清空上一课的残留状态（尤其是 error），否则旧错误会盖住新课页面
       lessonStore.reset()
-      lessonStore.justCompleted = false
       await lessonStore.load(String(route.params.id))
       const lessonTopicId = lessonStore.lesson?.topicId
       if (lessonTopicId && topicStore.topic?.id !== lessonTopicId) {
@@ -199,7 +209,7 @@ onMounted(async () => {
       }
     }
   } catch (err) {
-    lessonStore.error = err instanceof Error ? err.message : String(err)
+    lessonStore.error = errMsg(err)
   }
 })
 

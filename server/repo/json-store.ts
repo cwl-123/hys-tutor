@@ -27,6 +27,24 @@ export async function writeJson(file: string, data: unknown): Promise<void> {
   await rename(tmp, file)
 }
 
+// 按 key 串行化的异步互斥锁：保护 read-modify-write 序列，防并发写互相覆盖丢数据
+const locks = new Map<string, Promise<void>>()
+
+export async function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const prev = locks.get(key) ?? Promise.resolve()
+  let release!: () => void
+  const gate = new Promise<void>((r) => (release = r))
+  const stored = prev.then(() => gate)
+  locks.set(key, stored)
+  await prev
+  try {
+    return await fn()
+  } finally {
+    release()
+    if (locks.get(key) === stored) locks.delete(key)
+  }
+}
+
 export function newId(prefix: string): string {
   return `${prefix}_${randomUUID().slice(0, 8)}`
 }

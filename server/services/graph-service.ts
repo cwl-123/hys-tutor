@@ -1,4 +1,5 @@
 import { readFile, readdir } from 'node:fs/promises'
+import { errMsg } from '../../shared/error'
 import { dataPath, newId, nowIso, readJson, writeJson } from '../repo/json-store'
 import { completeJson, getLLMModel } from '../llm/client'
 import { GRAPH_SYSTEM_PROMPT, graphUserPrompt, llmGraphSchema } from '../llm/prompts/graph'
@@ -144,7 +145,7 @@ async function runTopicResearch(
       },
     })
   } catch (err) {
-    onStage('research-failed', { message: err instanceof Error ? err.message : String(err) })
+    onStage('research-failed', { message: errMsg(err) })
     return null
   }
   return saved

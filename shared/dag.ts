@@ -67,7 +67,13 @@ export function repairNodes(nodes: KnowledgeNode[], maxNodes = 40): KnowledgeNod
   for (const n of deduped) {
     n.deps = n.deps.filter((d) => d !== n.id && seen.has(d))
   }
-  return breakCycles(deduped).slice(0, maxNodes)
+  const repaired = breakCycles(deduped).slice(0, maxNodes)
+  // 截断后被依赖节点可能被切掉，需重新过滤一遍悬空依赖
+  const kept = new Set(repaired.map((n) => n.id))
+  for (const n of repaired) {
+    n.deps = n.deps.filter((d) => kept.has(d))
+  }
+  return repaired
 }
 
 export function validateGraphNodes(nodes: KnowledgeNode[]): GraphIssue[] {

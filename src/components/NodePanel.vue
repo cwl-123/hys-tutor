@@ -2,7 +2,8 @@
 import { computed, ref } from 'vue'
 import { ArrowRight, Trash2, X } from 'lucide-vue-next'
 import type { LessonMeta } from '@shared/api'
-import { masteryLevel, type KnowledgeNode } from '@shared/types'
+import { MASTERY_UNLOCK_THRESHOLD, masteryLevel, type KnowledgeNode } from '@shared/types'
+import { fmtDateTime } from '@/utils/format'
 
 const props = defineProps<{
   node: KnowledgeNode
@@ -28,11 +29,7 @@ const deps = computed(() =>
 )
 
 // 前置未全部 ≥80 则锁定，不能指定学习
-const lockedDeps = computed(() => deps.value.filter((d) => d.mastery < 80))
-
-function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
+const lockedDeps = computed(() => deps.value.filter((d) => d.mastery < MASTERY_UNLOCK_THRESHOLD))
 
 function statusLabel(status: string): string {
   if (status === 'failed') return '失败'
@@ -91,7 +88,7 @@ function confirmDelete(id: string) {
         <i class="mastery__unlock" />
       </div>
       <p class="panel__muted">
-        {{ node.mastery >= 80 ? '已解锁下游知识点' : '达到 80 分解锁下游知识点' }}
+        {{ node.mastery >= MASTERY_UNLOCK_THRESHOLD ? '已解锁下游知识点' : `达到 ${MASTERY_UNLOCK_THRESHOLD} 分解锁下游知识点` }}
       </p>
     </section>
 
@@ -134,7 +131,7 @@ function confirmDelete(id: string) {
               >{{ statusLabel(l.status) }}</em>
             </span>
             <span class="lesson-item__meta">
-              {{ fmtDate(l.createdAt) }}<template v-if="l.status === 'generated'"> · {{ l.wordCount }} 字</template>
+              {{ fmtDateTime(l.createdAt) }}<template v-if="l.status === 'generated'"> · {{ l.wordCount }} 字</template>
             </span>
           </RouterLink>
           <button
@@ -179,14 +176,14 @@ function confirmDelete(id: string) {
         :title="lockedDeps.length ? `前置未达标：${lockedDeps.map((d) => `${d.name}=${d.mastery}`).join('、')}` : ''"
         @click="emit('learn', node.id)"
       >
-        {{ node.mastery >= 80 ? '再学一遍这个知识点' : '学这个知识点' }}
+        {{ node.mastery >= MASTERY_UNLOCK_THRESHOLD ? '再学一遍这个知识点' : '学这个知识点' }}
         <ArrowRight :size="15" />
       </button>
       <p
         v-if="lockedDeps.length"
         class="panel__muted"
       >
-        前置未达标：{{ lockedDeps.map((d) => `${d.name} ${d.mastery} 分`).join('、') }}（需 80 分）
+        前置未达标：{{ lockedDeps.map((d) => `${d.name} ${d.mastery} 分`).join('、') }}（需 {{ MASTERY_UNLOCK_THRESHOLD }} 分）
       </p>
     </footer>
   </aside>

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { sendJson } from '../index'
 import { startSse } from '../sse'
 import { newId, nowIso } from '../repo/json-store'
+import { errMsg } from '../../shared/error'
 import { startLessonJob, attachLesson, subscribeJob, startReviseJob } from '../services/lesson-jobs'
 import { deleteLesson, findLesson, getLessonDetail, listLessons, stripQuestions } from '../services/lesson-service'
 import { gradeObjective, gradeShort } from '../services/grading-service'
@@ -33,7 +34,7 @@ export async function handleCreateLesson(
     const { lessonId, reused } = await startLessonJob(topicId, { nodeId: body.nodeId || undefined })
     sendJson(res, 200, { lessonId, reused })
   } catch (err) {
-    sendJson(res, 500, { error: err instanceof Error ? err.message : String(err) })
+    sendJson(res, 500, { error: errMsg(err) })
   }
 }
 
@@ -246,7 +247,7 @@ export async function handleRegenerateQuestions(
     const questions = await regenerateQuestions(lessonId)
     sendJson(res, 200, { questions: stripQuestions(questions) })
   } catch (err) {
-    sendJson(res, 500, { error: err instanceof Error ? err.message : String(err) })
+    sendJson(res, 500, { error: errMsg(err) })
   }
 }
 
@@ -282,7 +283,7 @@ export async function handleUpdateLessonContent(
     sendJson(res, 200, { contentMd: result.contentMd, images: result.images })
   } catch (err) {
     const status = (err as { status?: number }).status ?? 500
-    sendJson(res, status, { error: err instanceof Error ? err.message : String(err) })
+    sendJson(res, status, { error: errMsg(err) })
   }
 }
 
@@ -311,7 +312,7 @@ export async function handleReviseLesson(
     }
     sendJson(res, 200, { ...result, newPreferences })
   } catch (err) {
-    sendJson(res, 409, { error: err instanceof Error ? err.message : String(err) })
+    sendJson(res, 409, { error: errMsg(err) })
   }
 }
 
@@ -342,7 +343,7 @@ export async function handleGetLessonChat(
   try {
     sendJson(res, 200, await getLessonChat(lessonId))
   } catch (err) {
-    sendJson(res, chatErrorStatus(err), { error: err instanceof Error ? err.message : String(err) })
+    sendJson(res, chatErrorStatus(err), { error: errMsg(err) })
   }
 }
 
@@ -360,7 +361,7 @@ export async function handlePostLessonChat(
   try {
     sendJson(res, 200, await postLessonChat(lessonId, body.data))
   } catch (err) {
-    sendJson(res, chatErrorStatus(err), { error: err instanceof Error ? err.message : String(err) })
+    sendJson(res, chatErrorStatus(err), { error: errMsg(err) })
   }
 }
 
@@ -378,7 +379,7 @@ export async function handleApplyLessonChat(
   try {
     sendJson(res, 200, await applyLessonChat(lessonId, body.data.messageId))
   } catch (err) {
-    sendJson(res, chatErrorStatus(err), { error: err instanceof Error ? err.message : String(err) })
+    sendJson(res, chatErrorStatus(err), { error: errMsg(err) })
   }
 }
 
@@ -391,7 +392,7 @@ export async function handleUndoLessonChat(
   try {
     sendJson(res, 200, await undoLessonChat(lessonId))
   } catch (err) {
-    sendJson(res, chatErrorStatus(err), { error: err instanceof Error ? err.message : String(err) })
+    sendJson(res, chatErrorStatus(err), { error: errMsg(err) })
   }
 }
 

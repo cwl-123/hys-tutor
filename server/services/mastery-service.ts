@@ -1,4 +1,4 @@
-import { dataPath, newId, nowIso, readJson, writeJson } from '../repo/json-store'
+import { dataPath, newId, nowIso, readJson, withLock, writeJson } from '../repo/json-store'
 import { clampMastery, masteryDelta, type MasteryDeltaInput } from '../../shared/mastery'
 import type { MasteryChange } from '../../shared/api'
 import type { Graph, MasteryLogEntry } from '../../shared/types'
@@ -20,50 +20,53 @@ export async function applyMasteryChanges(
   topicId: string,
   entries: ApplyEntry[],
 ): Promise<ApplyResult> {
-  const graphFile = dataPath('topics', topicId, 'graph.json')
-  const graph = await readJson<Graph | null>(graphFile, null)
-  if (!graph) throw new Error('图谱不存在')
+  // 整个读-改-写（graph.json + mastery-log.json）持同一把锁，防并发交卷互相覆盖丢更新/丢日志
+  return withLock(`mastery:${topicId}`, async () => {
+    const graphFile = dataPath('topics', topicId, 'graph.json')
+    const graph = await readJson<Graph | null>(graphFile, null)
+    if (!graph) throw new Error('图谱不存在')
 
-  // 同节点多题变更先聚合；delta 为 0 也保留原因，保证每题都留痕
-  const acc = new Map<string, { delta: number; reasons: string[] }>()
-  for (const e of entries) {
-    const d = masteryDelta(e.deltaInput)
-    const cur = acc.get(e.nodeId) ?? { delta: 0, reasons: [] }
-    cur.delta += d
-    cur.reasons.push(e.reason)
-    acc.set(e.nodeId, cur)
-  }
+    // 同节点多题变更先聚合；delta 为 0 也保留原因，保证每题都留痕
+    const acc = new Map<string, { delta: number; reasons: string[] }>()
+    for (const e of entries) {
+      const d = masteryDelta(e.deltaInput)
+      const cur = acc.get(e.nodeId) ?? { delta: 0, reasons: [] }
+      cur.delta += d
+      cur.reasons.push(e.reason)
+      acc.set(e.nodeId, cur)
+    }
 
-  const logFile = dataPath('topics', topicId, 'mastery-log.json')
-  const history = await readJson<MasteryLogEntry[]>(logFile, [])
+    const logFile = dataPath('topics', topicId, 'mastery-log.json')
+    const history = await readJson<MasteryLogEntry[]>(logFile, [])
 
-  const changes: MasteryChange[] = []
-  const newLogs: MasteryLogEntry[] = []
-  for (const [nodeId, { delta, reasons }] of acc) {
-    const node = graph.nodes.find((n) => n.id === nodeId)
-    if (!node) continue
-    const before = node.mastery
-    const after = clampMastery(before + delta)
-    const actual = after - before
-    node.mastery = after
-    const reason = reasons.join('；')
-    changes.push({ nodeId, nodeName: node.name, before, after, delta: actual, reason })
-    newLogs.push({
-      id: newId('m'),
-      nodeId,
-      before,
-      after,
-      delta: actual,
-      reason,
-      sourceType: 'question',
-      createdAt: nowIso(),
-    })
-  }
+    const changes: MasteryChange[] = []
+    const newLogs: MasteryLogEntry[] = []
+    for (const [nodeId, { delta, reasons }] of acc) {
+      const node = graph.nodes.find((n) => n.id === nodeId)
+      if (!node) continue
+      const before = node.mastery
+      const after = clampMastery(before + delta)
+      const actual = after - before
+      node.mastery = after
+      const reason = reasons.join('；')
+      changes.push({ nodeId, nodeName: node.name, before, after, delta: actual, reason })
+      newLogs.push({
+        id: newId('m'),
+        nodeId,
+        before,
+        after,
+        delta: actual,
+        reason,
+        sourceType: 'question',
+        createdAt: nowIso(),
+      })
+    }
 
-  if (newLogs.length > 0) {
-    graph.updatedAt = nowIso()
-    await writeJson(graphFile, graph)
-    await writeJson(logFile, [...history, ...newLogs])
-  }
-  return { changes, logs: newLogs }
+    if (newLogs.length > 0) {
+      graph.updatedAt = nowIso()
+      await writeJson(graphFile, graph)
+      await writeJson(logFile, [...history, ...newLogs])
+    }
+    return { changes, logs: newLogs }
+  })
 }

@@ -9,6 +9,8 @@ import {
 } from '@/utils/preferences'
 import { showToast } from '@/utils/toast'
 import type { Preference } from '@shared/types'
+import { errMsg } from '@shared/error'
+import { fmtDate } from '@/utils/format'
 
 const prefs = ref<Preference[]>([])
 const loading = ref(true)
@@ -22,7 +24,7 @@ onMounted(async () => {
   try {
     prefs.value = await listPreferences()
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
+    error.value = errMsg(err)
   } finally {
     loading.value = false
   }
@@ -37,7 +39,7 @@ async function add() {
     prefs.value = [...prefs.value, await createPreference(text)]
     newText.value = ''
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
+    error.value = errMsg(err)
   } finally {
     adding.value = false
   }
@@ -57,7 +59,7 @@ async function saveEdit() {
     prefs.value = prefs.value.map((p) => (p.id === id ? updated : p))
     editingId.value = null
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
+    error.value = errMsg(err)
   }
 }
 
@@ -67,7 +69,7 @@ async function remove(p: Preference) {
     prefs.value = prefs.value.filter((x) => x.id !== p.id)
     showToast('已删除该偏好')
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
+    error.value = errMsg(err)
   }
 }
 
@@ -76,9 +78,6 @@ function sourceLabel(p: Preference): string {
   return p.source.label ? `来自：${p.source.label}` : 'AI 提取'
 }
 
-function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
-}
 </script>
 
 <template>

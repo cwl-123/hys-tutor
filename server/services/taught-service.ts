@@ -1,4 +1,4 @@
-import { dataPath, nowIso, readJson, writeJson } from '../repo/json-store'
+import { dataPath, nowIso, readJson, withLock, writeJson } from '../repo/json-store'
 
 // 方向级「已讲元素」记忆：记录每课用过的具体案例/例子，供后续备课避免重复、做递进。
 export interface TaughtEntry {
@@ -23,9 +23,12 @@ export async function recordTaught(
   topicId: string,
   entry: Omit<TaughtEntry, 'at'>,
 ): Promise<void> {
-  const list = await listTaught(topicId)
-  const next = [...list.filter((e) => e.lessonId !== entry.lessonId), { ...entry, at: nowIso() }]
-  await writeJson(taughtFile(topicId), next)
+  const file = taughtFile(topicId)
+  await withLock(file, async () => {
+    const list = await listTaught(topicId)
+    const next = [...list.filter((e) => e.lessonId !== entry.lessonId), { ...entry, at: nowIso() }]
+    await writeJson(file, next)
+  })
 }
 
 // 备课注入文本：已讲过的知识点与案例，写作时避免照搬

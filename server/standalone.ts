@@ -2,6 +2,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { errMsg } from '../shared/error'
 import { handleApi } from './index'
 
 const DIST = path.resolve(process.cwd(), 'dist')
@@ -73,7 +74,7 @@ const server = createServer((req, res) => {
       if (!res.headersSent) {
         res.statusCode = 500
         res.setHeader('Content-Type', 'application/json')
-        res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }))
+        res.end(JSON.stringify({ error: errMsg(err) }))
       } else {
         res.end()
       }

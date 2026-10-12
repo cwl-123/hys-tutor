@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ArrowLeft, ArrowRight, TriangleAlert } from 'lucide-vue-next'
 import { useLessonStore } from '@/stores/lesson'
@@ -8,6 +8,8 @@ import { submitReport } from '@/utils/report'
 import { showNewPreferences } from '@/utils/toast'
 import { MASTERY_UNLOCK_THRESHOLD, masteryLevel } from '@shared/types'
 import type { AnswerRecord, Attempt, Question } from '@shared/types'
+import { errMsg } from '@shared/error'
+import { fmtTime, optionLetter } from '@/utils/format'
 
 const route = useRoute()
 const lessonStore = useLessonStore()
@@ -87,13 +89,6 @@ function isRightOption(q: Question, value: string): boolean {
   return q.answer.trim() === value
 }
 
-function fmtTime(iso: string): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getMonth() + 1}月${d.getDate()}日 ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
 function attemptSummary(a: Attempt): string {
   const passed = a.records.filter((r) => recordPassed(r)).length
   return `达标 ${passed}/${a.records.length}`
@@ -160,7 +155,7 @@ async function submit() {
     activeIdx.value = attempts.value.length - 1
     mode.value = 'review'
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
+    error.value = errMsg(err)
   } finally {
     submitting.value = false
   }
@@ -170,6 +165,14 @@ async function submit() {
 const reportingQid = ref<string | null>(null)
 const reportNote = ref('')
 const reportToast = ref<string | null>(null)
+let toastTimer: ReturnType<typeof setTimeout> | undefined
+onUnmounted(() => clearTimeout(toastTimer))
+
+function flashToast(msg: string, ms: number) {
+  clearTimeout(toastTimer)
+  reportToast.value = msg
+  toastTimer = setTimeout(() => (reportToast.value = null), ms)
+}
 
 function toggleReport(qid: string) {
   reportingQid.value = reportingQid.value === qid ? null : qid
@@ -187,12 +190,10 @@ async function submitQuestionReport(q: Question) {
     })
     reportingQid.value = null
     reportNote.value = ''
-    reportToast.value = '已记录，同知识点后续出题会避开这个坑'
-    setTimeout(() => (reportToast.value = null), 3000)
+    flashToast('已记录，同知识点后续出题会避开这个坑', 3000)
     showNewPreferences(newPreferences)
   } catch (err) {
-    reportToast.value = err instanceof Error ? err.message : String(err)
-    setTimeout(() => (reportToast.value = null), 4000)
+    flashToast(errMsg(err), 4000)
   }
 }
 </script>
@@ -333,18 +334,18 @@ async function submitQuestionReport(q: Question) {
                 :key="oi"
                 class="option"
                 :class="{
-                  'option--on': item.record?.userAnswer === 'ABCD'[oi],
-                  'option--right': isRightOption(item.q, 'ABCD'[oi]),
+                  'option--on': item.record?.userAnswer === optionLetter(oi),
+                  'option--right': isRightOption(item.q, optionLetter(oi)),
                 }"
               >
                 <input
                   type="radio"
                   :name="`review-${activeAttempt.id}-${item.q.id}`"
-                  :checked="item.record?.userAnswer === 'ABCD'[oi]"
+                  :checked="item.record?.userAnswer === optionLetter(oi)"
                   disabled
                 >
-                <span class="option__letter">{{ 'ABCD'[oi] }}</span>
-                <MarkdownRenderer :content="optText(opt, 'ABCD'[oi])" />
+                <span class="option__letter">{{ optionLetter(oi) }}</span>
+                <MarkdownRenderer :content="optText(opt, optionLetter(oi))" />
               </label>
             </div>
 
@@ -546,17 +547,17 @@ async function submitQuestionReport(q: Question) {
               v-for="(opt, oi) in q.options"
               :key="oi"
               class="option"
-              :class="{ 'option--on': answers[q.id] === 'ABCD'[oi] }"
+              :class="{ 'option--on': answers[q.id] === optionLetter(oi) }"
             >
               <input
                 type="radio"
                 :name="q.id"
-                :value="'ABCD'[oi]"
-                :checked="answers[q.id] === 'ABCD'[oi]"
-                @change="pick(q, 'ABCD'[oi])"
+                :value="optionLetter(oi)"
+                :checked="answers[q.id] === optionLetter(oi)"
+                @change="pick(q, optionLetter(oi))"
               >
-              <span class="option__letter">{{ 'ABCD'[oi] }}</span>
-              <MarkdownRenderer :content="optText(opt, 'ABCD'[oi])" />
+              <span class="option__letter">{{ optionLetter(oi) }}</span>
+              <MarkdownRenderer :content="optText(opt, optionLetter(oi))" />
             </label>
           </div>
 

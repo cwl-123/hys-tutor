@@ -24,6 +24,8 @@ import GraphChatPanel from '@/components/GraphChatPanel.vue'
 import TopicProfilePanel from '@/components/TopicProfilePanel.vue'
 import type { LessonMeta } from '@shared/api'
 import type { KnowledgeNode } from '@shared/types'
+import { MASTERY_LOW_THRESHOLD, MASTERY_UNLOCK_THRESHOLD } from '@shared/types'
+import { errMsg } from '@shared/error'
 
 const route = useRoute()
 const router = useRouter()
@@ -175,7 +177,7 @@ async function applyAiProposal(nodes: KnowledgeNode[]) {
   try {
     await store.saveGraph(nodes.map((n) => ({ ...n, deps: [...n.deps] })))
   } catch (err) {
-    applyError.value = err instanceof Error ? err.message : String(err)
+    applyError.value = errMsg(err)
   }
 }
 
@@ -195,7 +197,7 @@ async function deleteLesson(lessonId: string) {
     }
     await store.fetchLessons(topicId.value)
   } catch (err) {
-    applyError.value = err instanceof Error ? err.message : String(err)
+    applyError.value = errMsg(err)
   }
 }
 </script>
@@ -236,9 +238,9 @@ async function deleteLesson(lessonId: string) {
         <strong>{{ store.topic.name }}</strong>
         <span class="toolbar__count">{{ store.nodes.length }} 个知识点</span>
         <div class="toolbar__legend">
-          <span class="legend"><i class="legend__dot legend__dot--red" />未掌握 &lt;40</span>
-          <span class="legend"><i class="legend__dot legend__dot--yellow" />学习中 40-79</span>
-          <span class="legend"><i class="legend__dot legend__dot--green" />已掌握 ≥80</span>
+          <span class="legend"><i class="legend__dot legend__dot--red" />未掌握 &lt;{{ MASTERY_LOW_THRESHOLD }}</span>
+          <span class="legend"><i class="legend__dot legend__dot--yellow" />学习中 {{ MASTERY_LOW_THRESHOLD }}-{{ MASTERY_UNLOCK_THRESHOLD - 1 }}</span>
+          <span class="legend"><i class="legend__dot legend__dot--green" />已掌握 ≥{{ MASTERY_UNLOCK_THRESHOLD }}</span>
         </div>
         <div class="toolbar__actions">
           <RouterLink

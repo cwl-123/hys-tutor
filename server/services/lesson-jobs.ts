@@ -1,4 +1,5 @@
-import { dataPath, nowIso, readJson, writeJson } from '../repo/json-store'
+import { dataPath, nowIso, readJson, withLock, writeJson } from '../repo/json-store'
+import { errMsg } from '../../shared/error'
 import { prepareLesson, reviseLesson, type StageEvent } from './lesson-agent'
 import type { Lesson, LessonStatus } from '../../shared/types'
 
@@ -38,13 +39,17 @@ async function patchLessonStatus(
   status: LessonStatus,
   error?: string,
 ): Promise<void> {
-  const lesson = await readJson<Lesson | null>(lessonFile(topicId, lessonId), null)
-  if (!lesson) return
-  // 迟到的状态回写不得覆盖已落盘的成品（防止并发写入把正文冲成空占位）
-  if (lesson.status === 'generated') return
-  lesson.status = status
-  lesson.error = error
-  await writeJson(lessonFile(topicId, lessonId), lesson)
+  const file = lessonFile(topicId, lessonId)
+  // 读-判-写全程持锁（与 lesson-agent 成品落盘共用同一把锁），
+  // 否则迟到的状态回写可能在成品写入的间隙把正文冲成空占位
+  await withLock(file, async () => {
+    const lesson = await readJson<Lesson | null>(file, null)
+    if (!lesson) return
+    if (lesson.status === 'generated') return
+    lesson.status = status
+    lesson.error = error
+    await writeJson(file, lesson)
+  })
 }
 
 function emit(job: Job, ev: Parameters<JobListener>[0]) {
@@ -87,18 +92,18 @@ export async function startLessonJob(
         job.stages.push(e)
         emit(job, { type: 'stage', e })
         const status = STAGE_TO_STATUS[e.stage]
-        if (status) void patchLessonStatus(topicId, lessonId, status)
+        if (status) void patchLessonStatus(topicId, lessonId, status).catch(() => {})
       }, { ...opts, lessonId })
       job.status = 'done'
       emit(job, { type: 'result' })
     } catch (err) {
       job.status = 'failed'
-      job.error = err instanceof Error ? err.message : String(err)
+      job.error = errMsg(err)
       console.error(`[lesson-job] 备课失败 ${lessonId}:`, err)
       await patchLessonStatus(topicId, lessonId, 'failed', job.error).catch(() => {})
       emit(job, { type: 'error', message: job.error })
     } finally {
-      runningByTopic.delete(topicId)
+      if (runningByTopic.get(topicId) === job) runningByTopic.delete(topicId)
       // 进度缓存保留 10 分钟供回连回放，之后释放
       setTimeout(() => jobsByLesson.delete(lessonId), 10 * 60_000)
     }
@@ -125,6 +130,11 @@ export async function startReviseJob(
   if (!detail) throw new Error('课程不存在')
   if (detail.lesson.status !== 'generated') throw new Error('仅生成完成的课程可以优化')
   const topicId = detail.topic.id
+  // 同课题已有备课任务在跑时不允许并发优化：两者都会写 taught.json / 占用 runningByTopic
+  const topicRunning = runningByTopic.get(topicId)
+  if (topicRunning && topicRunning.status === 'running') {
+    throw new Error('该方向有备课任务进行中，完成后再试')
+  }
 
   const job: Job = { topicId, lessonId, stages: [], status: 'running', listeners: new Set() }
   jobsByLesson.set(lessonId, job)
@@ -137,19 +147,19 @@ export async function startReviseJob(
         job.stages.push(e)
         emit(job, { type: 'stage', e })
         const status = STAGE_TO_STATUS[e.stage]
-        if (status) void patchLessonStatus(topicId, lessonId, status)
+        if (status) void patchLessonStatus(topicId, lessonId, status).catch(() => {})
       })
       job.status = 'done'
       emit(job, { type: 'result' })
     } catch (err) {
       job.status = 'failed'
-      job.error = err instanceof Error ? err.message : String(err)
+      job.error = errMsg(err)
       console.error(`[lesson-job] 优化失败 ${lessonId}:`, err)
       // 优化失败保留原课程内容
       await patchLessonStatus(topicId, lessonId, 'generated', job.error).catch(() => {})
       emit(job, { type: 'error', message: job.error })
     } finally {
-      runningByTopic.delete(topicId)
+      if (runningByTopic.get(topicId) === job) runningByTopic.delete(topicId)
       setTimeout(() => jobsByLesson.delete(lessonId), 10 * 60_000)
     }
   })()

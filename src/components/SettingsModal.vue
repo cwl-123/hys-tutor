@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { Download, Eye, EyeOff, Pencil, Plus, Trash2, X } from 'lucide-vue-next'
+import { errMsg } from '@shared/error'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
@@ -143,7 +144,7 @@ async function loadCandidates() {
     candidates.value = data.candidates
   } catch (err) {
     messageError.value = true
-    message.value = err instanceof Error ? err.message : String(err)
+    message.value = errMsg(err)
   } finally {
     candidatesLoading.value = false
   }
@@ -166,7 +167,7 @@ async function doImport(c: ImportCandidate) {
     message.value = `已导入并保存「${c.name}」，选中单选框即可设为激活源`
   } catch (err) {
     messageError.value = true
-    message.value = err instanceof Error ? err.message : String(err)
+    message.value = errMsg(err)
   } finally {
     importingId.value = null
   }
@@ -201,7 +202,7 @@ async function save() {
     message.value = '已保存，后续调研/备课/批改立即使用激活源'
   } catch (err) {
     messageError.value = true
-    message.value = err instanceof Error ? err.message : String(err)
+    message.value = errMsg(err)
   } finally {
     saving.value = false
   }
