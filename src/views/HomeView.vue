@@ -1,19 +1,9 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import {
-  ArrowRight,
-  ArrowUpRight,
-  Gauge,
-  Globe,
-  LoaderCircle,
-  Repeat,
-  Sparkles,
-  Zap,
-} from 'lucide-vue-next'
+import { ArrowRight, ArrowUpRight, LoaderCircle, Sparkles, Zap } from 'lucide-vue-next'
 import { useTopicStore } from '@/stores/topic'
 import { masteryLevel, type Topic, type TopicProfile } from '@shared/types'
-import { fmtDate } from '@/utils/format'
 import { PROFILE_LEVELS, PROFILE_STYLES, pickOption } from '@/utils/topic-profile'
 import OnboardingChat from '@/components/OnboardingChat.vue'
 
@@ -79,11 +69,7 @@ function fmtRelative(iso: string): string {
   if (days <= 0) return '今天'
   if (days === 1) return '昨天'
   if (days < 30) return `${days} 天前`
-  return fmtDate(iso)
-}
-
-function initialOf(name: string): string {
-  return [...name.trim()][0]?.toUpperCase() ?? '学'
+  return ''
 }
 </script>
 
@@ -94,13 +80,8 @@ function initialOf(name: string): string {
       <div class="hero__copy">
         <h1>把任何方向，<br>学成自己的体系</h1>
         <p class="hero__sub">
-          AI 联网调研知识体系，每轮微课按你的掌握度定制，练习反馈实时驱动下一课。
+          AI 联网调研构建知识图谱，按你的掌握度持续生成个性化微课。
         </p>
-        <ul class="hero__feats">
-          <li><Globe :size="13" />联网调研构建图谱</li>
-          <li><Gauge :size="13" />掌握度个性排课</li>
-          <li><Repeat :size="13" />练习反馈闭环</li>
-        </ul>
       </div>
 
       <div class="create">
@@ -135,56 +116,51 @@ function initialOf(name: string): string {
             v-model="topicName"
             class="create__name"
             type="text"
-            placeholder="想学什么？如：CTR/CVR 预估模型、Kubernetes 网络、期权定价…"
+            placeholder="想学什么？"
             :disabled="creating"
           >
 
-          <div class="create__guide">
-            <div class="guide-row">
-              <span class="guide-row__label">讲解风格</span>
-              <div class="chips">
-                <button
-                  v-for="s in STYLES"
-                  :key="s"
-                  type="button"
-                  class="chip"
-                  :class="{ 'chip--on': style === s }"
-                  :disabled="creating"
-                  @click="style = pickOption(style, s)"
-                >
-                  {{ s }}
-                </button>
-              </div>
+          <div class="guide-row">
+            <span class="guide-row__label">风格</span>
+            <div class="chips">
+              <button
+                v-for="s in STYLES"
+                :key="s"
+                type="button"
+                class="chip"
+                :class="{ 'chip--on': style === s }"
+                :disabled="creating"
+                @click="style = pickOption(style, s)"
+              >
+                {{ s }}
+              </button>
             </div>
-            <div class="guide-row">
-              <span class="guide-row__label">当前程度</span>
-              <div class="chips">
-                <button
-                  v-for="l in LEVELS"
-                  :key="l"
-                  type="button"
-                  class="chip"
-                  :class="{ 'chip--on': level === l }"
-                  :disabled="creating"
-                  @click="level = pickOption(level, l)"
-                >
-                  {{ l }}
-                </button>
-              </div>
-            </div>
-            <input
-              v-model="extra"
-              class="create__extra"
-              type="text"
-              placeholder="其他要求（可选）：如「多结合广告业务案例」「少讲数学多讲工程实现」…"
-              :disabled="creating"
-            >
           </div>
+          <div class="guide-row">
+            <span class="guide-row__label">程度</span>
+            <div class="chips">
+              <button
+                v-for="l in LEVELS"
+                :key="l"
+                type="button"
+                class="chip"
+                :class="{ 'chip--on': level === l }"
+                :disabled="creating"
+                @click="level = pickOption(level, l)"
+              >
+                {{ l }}
+              </button>
+            </div>
+          </div>
+          <input
+            v-model="extra"
+            class="create__extra"
+            type="text"
+            placeholder="其他要求（可选）"
+            :disabled="creating"
+          >
 
           <div class="create__footer">
-            <p class="create__hint">
-              以上选择会注入调研、图谱与每节课的生成，进入方向后可随时在「学习设置」中调整
-            </p>
             <button
               class="create__submit"
               type="submit"
@@ -192,13 +168,13 @@ function initialOf(name: string): string {
             >
               <LoaderCircle
                 v-if="creating"
-                :size="15"
+                :size="14"
                 class="spin"
               />
               {{ creating ? 'AI 调研生成中…' : '开启学习方向' }}
               <ArrowRight
                 v-if="!creating"
-                :size="15"
+                :size="14"
               />
             </button>
           </div>
@@ -220,7 +196,7 @@ function initialOf(name: string): string {
               {{ store.stageText }}
             </div>
             <div class="create__stage-sub">
-              联网调研 → 生成知识图谱，约 1~3 分钟，请勿关闭页面
+              联网调研 → 生成知识图谱，约 1~3 分钟
             </div>
           </div>
         </div>
@@ -241,95 +217,66 @@ function initialOf(name: string): string {
       </div>
 
       <div class="topics__grid">
-        <div
-          v-for="(t, i) in store.topics"
+        <RouterLink
+          v-for="t in store.topics"
           :key="t.id"
           class="card"
-          :style="{ '--i': i }"
+          :to="`/topic/${t.id}`"
         >
-          <RouterLink
-            :to="`/topic/${t.id}`"
-            class="card__main"
-          >
-            <div class="card__top">
-              <span class="card__avatar">{{ initialOf(t.name) }}</span>
-              <div class="card__heading">
-                <div class="card__title">
-                  <span class="card__name">{{ t.name }}</span>
-                  <span
-                    v-if="t.stats.generatingLesson"
-                    class="card__live"
-                  ><LoaderCircle
-                    :size="11"
-                    class="spin"
-                  /> 课件生成中</span>
-                </div>
-                <div
-                  v-if="t.profile?.style || t.profile?.level"
-                  class="card__tags"
-                >
-                  <span
-                    v-if="t.profile?.level"
-                    class="tag"
-                  >{{ t.profile.level }}</span>
-                  <span
-                    v-if="t.profile?.style"
-                    class="tag"
-                  >{{ t.profile.style }}</span>
-                </div>
-              </div>
-              <span class="card__arrow"><ArrowUpRight :size="16" /></span>
-            </div>
+          <div class="card__top">
+            <span class="card__name">{{ t.name }}</span>
+            <span
+              v-if="t.stats.generatingLesson"
+              class="card__live"
+            ><LoaderCircle
+              :size="11"
+              class="spin"
+            /> 备课中</span>
+            <ArrowUpRight
+              :size="15"
+              class="card__arrow"
+            />
+          </div>
 
-            <div class="card__stats">
-              <span><strong>{{ t.stats.nodeCount }}</strong> 知识点</span>
-              <span class="card__dot" />
-              <span><strong>{{ t.stats.lessonCount }}</strong> 节课</span>
-              <template v-if="t.stats.lastLessonAt">
-                <span class="card__dot" />
-                <span>最近学习 {{ fmtRelative(t.stats.lastLessonAt) }}</span>
-              </template>
-            </div>
-          </RouterLink>
+          <div class="card__meta">
+            <span>{{ t.stats.nodeCount }} 知识点</span>
+            <span>·</span>
+            <span>{{ t.stats.lessonCount }} 节课</span>
+            <template v-if="t.stats.lastLessonAt && fmtRelative(t.stats.lastLessonAt)">
+              <span>·</span>
+              <span>{{ fmtRelative(t.stats.lastLessonAt) }}学过</span>
+            </template>
+            <span
+              v-if="t.profile?.level"
+              class="tag"
+            >{{ t.profile.level }}</span>
+          </div>
 
           <div
             v-if="t.stats.nodeCount > 0"
             class="card__progress"
           >
-            <div class="card__progress-row">
-              <span class="card__progress-label">平均掌握</span>
-              <strong class="card__progress-score">{{ t.stats.avgMastery }}</strong>
-              <span class="card__progress-sub">{{ t.stats.masteredCount }}/{{ t.stats.nodeCount }} 已掌握</span>
-            </div>
             <div class="card__bar">
               <i
                 :class="`card__bar-fill--${masteryLevel(t.stats.avgMastery)}`"
                 :style="{ width: `${t.stats.avgMastery}%` }"
               />
             </div>
+            <span class="card__progress-text">{{ t.stats.avgMastery }} 分 · {{ t.stats.masteredCount }}/{{ t.stats.nodeCount }} 已掌握</span>
           </div>
 
           <div class="card__foot">
-            <span class="card__meta">创建于 {{ fmtDate(t.createdAt) }}</span>
-            <span
-              v-if="t.stats.generatingLesson"
-              class="card__waiting"
-            ><LoaderCircle
-              :size="12"
-              class="spin"
-            /> 课件生成中</span>
             <RouterLink
-              v-else
-              class="btn btn--primary btn--sm card__go"
+              v-if="!t.stats.generatingLesson"
+              class="btn btn--primary btn--sm"
               :to="`/lesson/new?topic=${t.id}`"
               :title="t.stats.lessonCount ? '由排课引擎自动选下一课' : '开始第一课'"
               @click.stop
             >
               {{ t.stats.lessonCount ? '继续学习' : '开始学习' }}
-              <ArrowRight :size="13" />
             </RouterLink>
           </div>
-        </div>
+        </RouterLink>
 
         <!-- 加载骨架 -->
         <template v-if="store.loading && store.topics.length === 0">
@@ -338,13 +285,7 @@ function initialOf(name: string): string {
             :key="`sk-${i}`"
             class="card card--skeleton"
           >
-            <div class="card__sk-top">
-              <div class="skeleton card__sk-avatar" />
-              <div class="card__sk-head">
-                <div class="skeleton card__sk-title" />
-                <div class="skeleton card__sk-line card__sk-line--short" />
-              </div>
-            </div>
+            <div class="skeleton card__sk-title" />
             <div class="skeleton card__sk-line" />
             <div class="skeleton card__sk-line card__sk-line--short" />
           </div>
@@ -364,56 +305,35 @@ function initialOf(name: string): string {
 <style scoped>
 .home {
   min-height: calc(100vh - var(--header-h));
-  background: var(--bg);
 }
 
 /* ---------- Hero + 创建 ---------- */
 .hero {
-  max-width: 1120px;
+  max-width: 1080px;
   margin: 0 auto;
-  padding: 88px 40px 64px;
+  padding: 96px 32px 72px;
   display: grid;
-  grid-template-columns: 1fr 1.05fr;
-  gap: 72px;
+  grid-template-columns: 1fr 1fr;
+  gap: 80px;
   align-items: center;
 }
 .hero__copy h1 {
   margin: 0;
   font-size: 40px;
   line-height: 1.3;
-  letter-spacing: -0.5px;
+  letter-spacing: -1px;
   font-weight: 650;
 }
 .hero__sub {
-  margin: 20px 0 0;
+  margin: 18px 0 0;
   font-size: 15px;
-  line-height: 1.9;
+  line-height: 1.8;
   color: var(--text-dim);
-  max-width: 400px;
-}
-.hero__feats {
-  list-style: none;
-  margin: 32px 0 0;
-  padding: 0;
-  display: flex;
-  gap: 24px;
-}
-.hero__feats li {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 13px;
-  color: var(--text-dim);
-}
-.hero__feats .lucide {
-  color: var(--text-faint);
 }
 .create {
-  background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  padding: 24px 28px 26px;
-  box-shadow: var(--shadow-md);
+  border-radius: var(--r-md);
+  padding: 20px 22px;
 }
 .create__tabs {
   display: inline-flex;
@@ -427,15 +347,15 @@ function initialOf(name: string): string {
   align-items: center;
   gap: 5px;
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
-  padding: 6px 16px;
+  padding: 5px 14px;
   border: none;
   border-radius: var(--r-pill);
   background: transparent;
   color: var(--text-dim);
   cursor: pointer;
-  transition: all var(--dur-fast) var(--ease);
+  transition: color var(--dur-fast) var(--ease);
 }
 .create__tab:hover:not(:disabled):not(.create__tab--on) {
   color: var(--text);
@@ -450,13 +370,13 @@ function initialOf(name: string): string {
   cursor: not-allowed;
 }
 .create__name {
-  margin-top: 18px;
+  margin-top: 16px;
   width: 100%;
   font: inherit;
-  font-size: 15px;
-  padding: 12px 16px;
+  font-size: 14px;
+  padding: 10px 14px;
   border: 1px solid var(--border);
-  border-radius: var(--r-md);
+  border-radius: var(--r-sm);
   background: var(--bg);
   transition:
     border-color var(--dur-fast) var(--ease),
@@ -467,39 +387,30 @@ function initialOf(name: string): string {
   border-color: var(--primary);
   box-shadow: var(--ring-primary);
 }
-.create__guide {
-  margin-top: 14px;
-  padding: 16px 18px;
-  border-radius: var(--r-md);
-  background: var(--bg-subtle);
-  border: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  gap: 13px;
-}
 .guide-row {
+  margin-top: 14px;
   display: flex;
   align-items: center;
   gap: 12px;
 }
 .guide-row__label {
   flex: none;
-  width: 60px;
+  width: 28px;
   font-size: 12px;
-  color: var(--text-dim);
+  color: var(--text-faint);
 }
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: 6px;
 }
 .chip {
   font: inherit;
   font-size: 12px;
-  padding: 4px 13px;
+  padding: 4px 12px;
   border-radius: var(--r-pill);
   border: 1px solid var(--border);
-  background: var(--bg);
+  background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
   transition: all var(--dur-fast) var(--ease);
@@ -515,13 +426,14 @@ function initialOf(name: string): string {
   font-weight: 500;
 }
 .create__extra {
+  margin-top: 12px;
   width: 100%;
   font: inherit;
   font-size: 12px;
-  padding: 9px 13px;
-  border: 1px dashed var(--border-strong);
+  padding: 8px 12px;
+  border: 1px dashed var(--border);
   border-radius: var(--r-sm);
-  background: var(--bg);
+  background: transparent;
   color: var(--text);
 }
 .create__extra:focus {
@@ -531,29 +443,20 @@ function initialOf(name: string): string {
   box-shadow: var(--ring-primary);
 }
 .create__footer {
-  margin-top: 20px;
+  margin-top: 18px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-.create__hint {
-  margin: 0;
-  font-size: 12px;
-  color: var(--text-faint);
-  line-height: 1.6;
+  justify-content: flex-end;
 }
 .create__submit {
-  flex: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  padding: 11px 24px;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 18px;
   border: none;
-  border-radius: var(--r-md);
+  border-radius: var(--r-sm);
   background: var(--primary-btn);
   color: #fff;
   cursor: pointer;
@@ -564,25 +467,24 @@ function initialOf(name: string): string {
 .create__submit:hover:not(:disabled) {
   background: var(--primary-btn-hover);
 }
-/* 禁用态保留品牌色降饱和，避免「按钮坏了」的观感 */
 .create__submit:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 .create__progress {
-  margin-top: 16px;
+  margin-top: 14px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: var(--r-md);
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
   background: var(--bg-subtle);
   border: 1px solid var(--border);
 }
 .create__spinner {
   flex: none;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   border: 2px solid var(--border-strong);
   border-top-color: var(--text-dim);
@@ -595,119 +497,75 @@ function initialOf(name: string): string {
 }
 .create__stage {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text);
 }
 .create__stage-sub {
-  margin-top: 2px;
+  margin-top: 1px;
   font-size: 12px;
   color: var(--text-dim);
 }
 .create__error {
-  margin: 12px 0 0;
+  margin: 10px 0 0;
   font-size: 13px;
   color: var(--mastery-red);
 }
 
 /* ---------- 方向列表 ---------- */
 .topics {
-  max-width: 1120px;
+  max-width: 1080px;
   margin: 0 auto;
-  padding: 0 40px 88px;
+  padding: 0 32px 96px;
 }
 .topics__head {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 22px;
+  gap: 8px;
+  margin-bottom: 16px;
 }
 .topics__head h2 {
   margin: 0;
-  font-size: 17px;
+  font-size: 14px;
   font-weight: 600;
-  letter-spacing: 0.1px;
 }
 .topics__count {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   color: var(--text-dim);
   background: var(--bg-muted);
   border-radius: var(--r-pill);
-  padding: 2px 9px;
+  padding: 1px 8px;
 }
 .topics__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
 }
 .card {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 20px 22px 16px;
-  background: var(--bg);
+  gap: 10px;
+  padding: 16px 18px;
   border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  animation: card-in 0.3s var(--ease) both;
-  animation-delay: calc(var(--i, 0) * 40ms);
+  border-radius: var(--r-md);
+  text-decoration: none;
+  color: inherit;
   transition:
     border-color var(--dur-fast) var(--ease),
-    box-shadow var(--dur-fast) var(--ease);
-}
-@keyframes card-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
+    background var(--dur-fast) var(--ease);
 }
 .card:hover {
   border-color: var(--border-strong);
-  box-shadow: var(--shadow-md);
-}
-.card__main {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  text-decoration: none;
-  color: inherit;
-  min-width: 0;
 }
 .card__top {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.card__avatar {
-  flex: none;
-  width: 36px;
-  height: 36px;
-  border-radius: 9px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--bg);
-  background: var(--text);
-}
-.card__heading {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.card__title {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
 }
 .card__name {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
-  color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -718,77 +576,43 @@ function initialOf(name: string): string {
   align-items: center;
   gap: 4px;
   font-size: 11px;
-  padding: 2px 9px;
-  border-radius: var(--r-pill);
   color: var(--amber-text);
-  background: var(--amber-bg);
-  border: 1px solid var(--amber-border);
   white-space: nowrap;
 }
 .card__arrow {
   flex: none;
-  display: inline-flex;
-  color: var(--text-dim);
+  margin-left: auto;
+  color: var(--text-faint);
   opacity: 0;
   transition: opacity var(--dur-fast) var(--ease);
 }
 .card:hover .card__arrow {
   opacity: 1;
 }
-.card__tags {
+.card__meta {
   display: flex;
+  align-items: center;
   gap: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
 }
 .tag {
   font-size: 11px;
-  padding: 2px 9px;
+  padding: 1px 8px;
   border-radius: var(--r-pill);
   background: var(--bg-muted);
-  color: var(--text-secondary);
-}
-.card__stats {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 12px;
   color: var(--text-dim);
-}
-.card__stats strong {
-  color: var(--text);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-.card__dot {
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: var(--border-strong);
 }
 .card__progress {
   display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-.card__progress-row {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-dim);
-}
-.card__progress-score {
-  font-size: 14px;
-  font-weight: 650;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-}
-.card__progress-sub {
-  margin-left: auto;
-  color: var(--text-faint);
+  align-items: center;
+  gap: 10px;
 }
 .card__bar {
+  flex: 1;
   position: relative;
-  height: 4px;
+  height: 3px;
   border-radius: var(--r-pill);
   background: var(--bg-muted);
   overflow: hidden;
@@ -810,47 +634,19 @@ function initialOf(name: string): string {
 .card__bar-fill--green {
   background: var(--mastery-green);
 }
+.card__progress-text {
+  flex: none;
+  font-size: 11px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
 .card__foot {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding-top: 13px;
-  border-top: 1px solid var(--border);
-}
-.card__meta {
-  font-size: 12px;
-  color: var(--text-faint);
-}
-.card__waiting {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  color: var(--amber-text);
-}
-.card__go {
-  text-decoration: none;
+  justify-content: flex-end;
+  min-height: 26px;
 }
 .card--skeleton {
   pointer-events: none;
-}
-.card__sk-top {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.card__sk-avatar {
-  flex: none;
-  width: 36px;
-  height: 36px;
-  border-radius: 9px;
-}
-.card__sk-head {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }
 .card__sk-title {
   height: 16px;
@@ -868,9 +664,9 @@ function initialOf(name: string): string {
   padding: 44px;
   text-align: center;
   color: var(--text-dim);
-  font-size: 14px;
+  font-size: 13px;
   border: 1px dashed var(--border);
-  border-radius: var(--r-lg);
+  border-radius: var(--r-md);
 }
 
 @media (max-width: 900px) {
