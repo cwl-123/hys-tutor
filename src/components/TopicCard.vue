@@ -1,25 +1,43 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { ArrowRight, ArrowUpRight, LoaderCircle } from 'lucide-vue-next'
+import { ArrowRight, ArrowUpRight } from 'lucide-vue-next'
 import type { TopicWithStats } from '@shared/api'
 import { fmtDate } from '@/utils/format'
+import { topicColor, topicInitial } from '@/utils/topic-color'
 
-// 首页「我的学习方向」卡片：名称 / 偏好标签 / 三项指标 / 已掌握进度 / 底栏操作
+// 首页「我的学习方向」卡片：专属色图标 + 名称 / 偏好标签 / 三项指标 / 三段掌握进度 / 底栏操作
 const props = defineProps<{ topic: TopicWithStats }>()
 
-// 进度条按「已掌握知识点占比」计算，与右侧 x / y 已掌握 文案同口径
-const pct = computed(() => {
-  const { nodeCount, masteredCount } = props.topic.stats
-  return nodeCount ? Math.round((masteredCount / nodeCount) * 100) : 0
+const color = computed(() => topicColor(props.topic.id))
+const initial = computed(() => topicInitial(props.topic.name))
+
+// 三段进度条：绿 已掌握 / 黄 学习中 / 红 薄弱，其余为未开始（灰色底轨）
+const segments = computed(() => {
+  const { nodeCount, masteredCount, learningCount, weakCount } = props.topic.stats
+  const pct = (n: number) => (nodeCount ? (n / nodeCount) * 100 : 0)
+  return [
+    { key: 'green', n: masteredCount, width: pct(masteredCount) },
+    { key: 'yellow', n: learningCount, width: pct(learningCount) },
+    { key: 'red', n: weakCount, width: pct(weakCount) },
+  ].filter((seg) => seg.n > 0)
 })
 
-const lastStudied = computed(() => {
+const breakdownTitle = computed(() => {
+  const { nodeCount, masteredCount, learningCount, weakCount } = props.topic.stats
+  const untouched = nodeCount - masteredCount - learningCount - weakCount
+  return `已掌握 ${masteredCount} · 学习中 ${learningCount} · 薄弱 ${weakCount} · 未开始 ${untouched}`
+})
+
+const RECENT_DAYS = 7
+const daysSince = computed(() => {
   const iso = props.topic.stats.lastLessonAt
-  return iso ? fmtRelative(iso) : ''
+  return iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000) : null
 })
+const lastStudied = computed(() => (daysSince.value === null ? '' : fmtRelative(daysSince.value)))
+// 一周内学过视为活跃，最近学习前显示绿点
+const isRecent = computed(() => daysSince.value !== null && daysSince.value < RECENT_DAYS)
 
-function fmtRelative(iso: string): string {
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)
+function fmtRelative(days: number): string {
   if (days <= 0) return '今天'
   if (days === 1) return '昨天'
   if (days < 30) return `${days} 天前`
@@ -31,8 +49,13 @@ function fmtRelative(iso: string): string {
   <RouterLink
     class="card"
     :to="`/topic/${topic.id}`"
+    :style="{ '--topic': color }"
   >
     <div class="card__head">
+      <span
+        class="card__icon"
+        aria-hidden="true"
+      >{{ initial }}</span>
       <span
         class="card__name"
         :title="topic.name"
@@ -70,20 +93,30 @@ function fmtRelative(iso: string): string {
       <div class="stat">
         <dt>最近学习</dt>
         <dd :class="{ 'stat__none': !lastStudied }">
-          {{ lastStudied || '—' }}
+          <span
+            v-if="isRecent"
+            class="stat__dot"
+            title="近一周有学习"
+          />{{ lastStudied || '—' }}
         </dd>
       </div>
     </dl>
 
-    <div class="mastery">
+    <div
+      class="mastery"
+      :title="breakdownTitle"
+    >
       <div
         class="mastery__bar"
-        role="progressbar"
-        :aria-valuenow="pct"
-        aria-valuemin="0"
-        aria-valuemax="100"
+        role="img"
+        :aria-label="breakdownTitle"
       >
-        <i :style="{ width: `${pct}%` }" />
+        <i
+          v-for="seg in segments"
+          :key="seg.key"
+          :class="`mastery__seg--${seg.key}`"
+          :style="{ width: `${seg.width}%` }"
+        />
       </div>
       <span class="mastery__text"><strong>{{ topic.stats.masteredCount }}</strong> / {{ topic.stats.nodeCount }} 已掌握</span>
     </div>
@@ -93,10 +126,7 @@ function fmtRelative(iso: string): string {
       <span
         v-if="topic.stats.generatingLesson"
         class="card__status"
-      ><LoaderCircle
-        :size="12"
-        class="spin"
-      />课件生成中</span>
+      ><span class="card__pulse" />课件生成中</span>
       <RouterLink
         v-else
         class="card__cta"
@@ -129,14 +159,28 @@ function fmtRelative(iso: string): string {
     box-shadow var(--dur-fast) var(--ease);
 }
 .card:hover {
-  border-color: var(--border-strong);
+  border-color: color-mix(in srgb, var(--topic) 28%, var(--border-strong));
   box-shadow: var(--shadow-sm);
 }
 .card__head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 22px;
+  gap: 10px;
+  height: 28px;
+}
+.card__icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--topic);
+  background: color-mix(in srgb, var(--topic) 11%, var(--bg));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--topic) 22%, transparent);
 }
 .card__name {
   min-width: 0;
@@ -208,6 +252,16 @@ function fmtRelative(iso: string): string {
   color: var(--text);
   white-space: nowrap;
 }
+.stat__dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 7px;
+  vertical-align: 3px;
+  border-radius: 50%;
+  background: var(--mastery-green);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mastery-green) 18%, transparent);
+}
 .stat dd.stat__none {
   color: var(--text-faint);
   font-weight: 400;
@@ -220,19 +274,29 @@ function fmtRelative(iso: string): string {
   margin-top: 20px;
 }
 .mastery__bar {
-  position: relative;
+  display: flex;
   flex: 1;
+  gap: 2px;
   height: 4px;
   border-radius: 2px;
   background: var(--bg-muted);
   overflow: hidden;
 }
 .mastery__bar i {
-  position: absolute;
-  inset: 0 auto 0 0;
+  flex: none;
+  min-width: 3px;
+  height: 100%;
   border-radius: 2px;
-  background: var(--mastery-green);
   transition: width var(--dur) var(--ease);
+}
+.mastery__seg--green {
+  background: var(--mastery-green);
+}
+.mastery__seg--yellow {
+  background: var(--mastery-yellow);
+}
+.mastery__seg--red {
+  background: var(--mastery-red);
 }
 .mastery__text {
   flex: none;
@@ -295,8 +359,25 @@ function fmtRelative(iso: string): string {
   transform: translateX(2px);
 }
 .card__status {
-  margin-right: -10px;
+  height: 24px;
+  padding: 0 9px;
+  margin-right: 0;
   color: var(--amber-text);
+  background: var(--amber-bg);
+  box-shadow: inset 0 0 0 1px var(--amber-border);
+}
+.card__pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--mastery-yellow);
+  animation: card-pulse 1.4s var(--ease) infinite;
+}
+@keyframes card-pulse {
+  50% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
 }
 
 </style>

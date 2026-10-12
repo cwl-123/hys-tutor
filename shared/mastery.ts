@@ -1,5 +1,6 @@
 // 掌握分算法规则（Design.md §3，MVP 版）
 // 阈值集中在 MASTERY_RULES，便于调参；纯函数，前后端共用
+import { masteryLevel } from './types'
 
 export const MASTERY_RULES = {
   objectiveCorrectDelta: 20, // 客观题答对（每题满分 20）
@@ -29,4 +30,24 @@ export function masteryDelta(input: MasteryDeltaInput): number {
   if (input.score === undefined || Number.isNaN(input.score)) return 0
   const score = Math.max(0, Math.min(1, input.score))
   return Math.round((score - MASTERY_RULES.shortPassScore) * MASTERY_RULES.shortScale)
+}
+
+// 掌握度分档：绿 ≥80 已掌握 / 黄 40-79 学习中 / 红 1-39 薄弱 / 0 分未开始
+// 0 分单列，避免没学过的知识点被渲染成红色「薄弱」
+export interface MasteryBreakdown {
+  mastered: number
+  learning: number
+  weak: number
+  untouched: number
+}
+
+export function masteryBreakdown(scores: readonly number[]): MasteryBreakdown {
+  const result: MasteryBreakdown = { mastered: 0, learning: 0, weak: 0, untouched: 0 }
+  return scores.reduce<MasteryBreakdown>((acc, s) => {
+    if (s <= 0) return { ...acc, untouched: acc.untouched + 1 }
+    const level = masteryLevel(s)
+    if (level === 'green') return { ...acc, mastered: acc.mastered + 1 }
+    if (level === 'yellow') return { ...acc, learning: acc.learning + 1 }
+    return { ...acc, weak: acc.weak + 1 }
+  }, result)
 }

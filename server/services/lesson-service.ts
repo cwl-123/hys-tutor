@@ -3,6 +3,7 @@ import { dataPath, readJson } from '../repo/json-store'
 import { getTopic, listTopics } from './graph-service'
 import type { LessonMeta, TopicStats } from '../../shared/api'
 import type { Lesson, QuestionSet, Topic } from '../../shared/types'
+import { masteryBreakdown } from '../../shared/mastery'
 
 export interface LessonDetail {
   topic: Topic
@@ -79,14 +80,15 @@ export async function getTopicStats(topicId: string): Promise<TopicStats> {
   // 延迟引入避免 lesson-service ↔ lesson-jobs 循环依赖
   const { topicJobRunning } = await import('./lesson-jobs')
   const nodes = graph?.nodes ?? []
-  const scores = nodes.map((n) => n.mastery ?? 0)
+  const breakdown = masteryBreakdown(nodes.map((n) => n.mastery ?? 0))
   return {
     nodeCount: nodes.length,
     lessonCount: lessons.length,
     lastLessonAt: lessons[0]?.createdAt ?? null,
     generatingLesson: topicJobRunning(topicId),
-    avgMastery: scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0,
-    masteredCount: scores.filter((s) => s >= 80).length,
+    masteredCount: breakdown.mastered,
+    learningCount: breakdown.learning,
+    weakCount: breakdown.weak,
   }
 }
 

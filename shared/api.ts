@@ -9,10 +9,12 @@ export interface TopicStats {
   lastLessonAt: string | null
   // 该方向是否有后台备课/优化任务在跑（首页卡片据此显示「课件生成中」）
   generatingLesson: boolean
-  // 平均掌握分（0-100），首页卡片进度条
-  avgMastery: number
   // 已掌握（≥80）知识点数
   masteredCount: number
+  // 学习中（40-79）知识点数
+  learningCount: number
+  // 薄弱（1-39）知识点数；0 分视为未开始，不计入
+  weakCount: number
 }
 export type TopicWithStats = Topic & { stats: TopicStats }
 

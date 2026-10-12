@@ -11,17 +11,17 @@
   --border: #e4e4e7;
   --border-strong: #d4d4d8;
 
-  /* 主色（蓝） */
-  --primary: #3b82f6;
-  --primary-strong: #2563eb;
-  --primary-hover: #1d4ed8;
+  /* 品牌主色（靛蓝）：只用于主按钮、选中态、聚焦与品牌标，保持小面积 */
+  --primary: #5b5bd6;
+  --primary-strong: #4f4fc9;
+  --primary-hover: #4343b5;
   /* 按钮填充色与文字强调色分离：暗色下文字需要变亮、按钮填充需保白字对比度 */
-  --primary-btn: #2563eb;
-  --primary-btn-hover: #1d4ed8;
-  --primary-bg: #eff6ff;
-  --primary-bg-strong: #dbeafe;
-  --primary-border: #bfdbfe;
-  --primary-soft: #93c5fd;
+  --primary-btn: #5b5bd6;
+  --primary-btn-hover: #4f4fc9;
+  --primary-bg: #f4f4fe;
+  --primary-bg-strong: #e7e7fc;
+  --primary-border: #cdcdf6;
+  --primary-soft: #a9a9ee;
 
   /* 语义色 */
   --mastery-red: #ef4444;
@@ -58,11 +58,11 @@
   --mask-bg: rgb(15 23 42 / 40%);
 
   /* 聚焦光晕 */
-  --ring-primary: 0 0 0 3px rgb(59 130 246 / 12%);
+  --ring-primary: 0 0 0 3px rgb(91 91 214 / 14%);
 
   /* RGB 通道（用于透明度合成） */
   --ink-rgb: 15 23 42;
-  --primary-rgb: 59 130 246;
+  --primary-rgb: 91 91 214;
 
   /* 层级 */
   --z-sticky: 100;
@@ -268,15 +268,15 @@ html[data-theme='dark'] {
   --border: #262e39;
   --border-strong: #36404d;
 
-  --primary: #60a5fa;
-  --primary-strong: #60a5fa;
-  --primary-hover: #93c5fd;
-  --primary-btn: #2563eb;
-  --primary-btn-hover: #1d4ed8;
-  --primary-bg: #16233a;
-  --primary-bg-strong: #1b2f4d;
-  --primary-border: #274470;
-  --primary-soft: #3f6fb8;
+  --primary: #9d9df5;
+  --primary-strong: #9d9df5;
+  --primary-hover: #babaf8;
+  --primary-btn: #5b5bd6;
+  --primary-btn-hover: #6c6ce0;
+  --primary-bg: #1a1a33;
+  --primary-bg-strong: #222247;
+  --primary-border: #343466;
+  --primary-soft: #4d4da8;
 
   --mastery-red: #f87171;
   --mastery-yellow: #fbbf24;
@@ -301,9 +301,9 @@ html[data-theme='dark'] {
   --shadow-drawer: -8px 0 24px rgb(0 0 0 / 55%);
 
   --mask-bg: rgb(0 0 0 / 65%);
-  --ring-primary: 0 0 0 3px rgb(96 165 250 / 25%);
+  --ring-primary: 0 0 0 3px rgb(157 157 245 / 25%);
   --ink-rgb: 0 0 0;
-  --primary-rgb: 96 165 250;
+  --primary-rgb: 157 157 245;
 
   /* Vue Flow 主题变量 */
   --vf-node-bg: #151b23;
@@ -315,7 +315,7 @@ html[data-theme='dark'] body {
   background: var(--bg);
 }
 html[data-theme='dark'] ::selection {
-  background: #23417a;
+  background: #2e2e66;
 }
 /* 暗色下的控件补丁 */
 html[data-theme='dark'] .vue-flow__controls-button {

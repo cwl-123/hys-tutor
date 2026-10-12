@@ -366,7 +366,8 @@ async function onChatCreate(payload: { name: string; profile: TopicProfile }) {
   width: 16px;
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
   font-size: 11px;
-  color: var(--text-faint);
+  font-weight: 500;
+  color: var(--primary);
 }
 .step__title {
   flex: none;
@@ -527,9 +528,10 @@ async function onChatCreate(payload: { name: string; profile: TopicProfile }) {
 }
 .chip--on,
 .chip--on:hover:not(:disabled) {
-  border-color: var(--text);
-  background: var(--text);
-  color: var(--bg);
+  border-color: var(--primary-border);
+  background: var(--primary-bg);
+  color: var(--primary-strong);
+  font-weight: 500;
 }
 .chip:disabled {
   cursor: not-allowed;

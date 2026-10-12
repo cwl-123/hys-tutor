@@ -30,7 +30,7 @@ const showSettings = ref(false)
             <path
               d="M7.5 16.5 12 7.5l4.5 9"
               fill="none"
-              stroke="var(--bg)"
+              stroke="#fff"
               stroke-width="1.6"
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -39,19 +39,19 @@ const showSettings = ref(false)
               cx="12"
               cy="7.5"
               r="2.1"
-              fill="var(--bg)"
+              fill="#fff"
             />
             <circle
               cx="7.5"
               cy="16.5"
               r="2.1"
-              fill="var(--bg)"
+              fill="#fff"
             />
             <circle
               cx="16.5"
               cy="16.5"
               r="2.1"
-              fill="var(--bg)"
+              fill="#fff"
             />
           </svg>
           <span class="app-title">hys-tutor</span>
@@ -122,7 +122,7 @@ const showSettings = ref(false)
   flex: none;
   width: 22px;
   height: 22px;
-  color: var(--text);
+  color: var(--primary-btn);
 }
 .app-title {
   font-size: 14px;
