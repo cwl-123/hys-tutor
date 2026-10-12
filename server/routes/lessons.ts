@@ -160,6 +160,34 @@ export async function handleSubmitLesson(
     return
   }
 
+  // 幂等：同一份答卷重复提交（双击/重试/刷新重发）直接返回上一次的批改结果，
+  // 不重新批改、不重复结算掌握分、不追加答题记录
+  const incoming = new Map(body.data.answers.map((a) => [a.questionId, a.userAnswer]))
+  const attempts = await listAttempts(topicId, lessonId)
+  const dup = attempts.findLast(
+    (at) =>
+      at.records.length === incoming.size &&
+      at.records.every((r) => r.result && incoming.get(r.questionId) === r.userAnswer),
+  )
+  if (dup) {
+    const results: SubmitResult['results'] = {}
+    const revealed: SubmitResult['revealed'] = {}
+    const qByIdDup = new Map(detail.questions.questions.map((q) => [q.id, q]))
+    for (const r of dup.records) {
+      if (r.result) results[r.questionId] = r.result
+      const q = qByIdDup.get(r.questionId)
+      if (q) revealed[q.id] = { answer: q.answer, referenceAnswer: q.referenceAnswer, explanation: q.explanation }
+    }
+    sendJson(res, 200, {
+      lessonId,
+      results,
+      masteryChanges: dup.masteryChanges,
+      masteryLogs: [],
+      revealed,
+    } satisfies SubmitResult)
+    return
+  }
+
   const qById = new Map(detail.questions.questions.map((q) => [q.id, q]))
   const records: AnswerRecord[] = []
   const entries: ApplyEntry[] = []

@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { dataPath, nowIso, readJson, writeJson } from '../repo/json-store'
+import { assertPublicHttpUrl } from '../ssrf'
 import type { LessonImage } from '../../shared/types'
 
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024
@@ -115,11 +116,13 @@ export async function downloadImage(
   meta: { title?: string; pageUrl?: string } = {},
 ): Promise<SavedImage | null> {
   try {
+    assertPublicHttpUrl(url)
     const res = await fetch(url, {
       headers: { 'User-Agent': UA, Accept: 'image/*,*/*;q=0.8' },
       signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
       redirect: 'follow',
     })
+    if (res.url) assertPublicHttpUrl(res.url)
     if (!res.ok) return null
     const len = Number(res.headers.get('content-length') ?? 0)
     if (len > MAX_IMAGE_BYTES) return null

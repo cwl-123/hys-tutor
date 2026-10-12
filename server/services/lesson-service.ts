@@ -90,7 +90,7 @@ export async function getTopicStats(topicId: string): Promise<TopicStats> {
   }
 }
 
-// 删除课程（含题目与答题记录）；返回是否删除成功
+// 删除课程（含题目、答题记录、对话与历史版本）；返回是否删除成功
 export async function deleteLesson(lessonId: string): Promise<boolean> {
   const detail = await findLesson(lessonId)
   if (!detail) return false
@@ -98,6 +98,8 @@ export async function deleteLesson(lessonId: string): Promise<boolean> {
   await rm(`${lessonsDir}/${lessonId}.json`, { force: true })
   await rm(`${lessonsDir}/${lessonId}.questions.json`, { force: true })
   await rm(dataPath('topics', detail.topic.id, 'attempts', `${lessonId}.json`), { force: true })
+  await rm(dataPath('topics', detail.topic.id, 'lesson-chats', `${lessonId}.json`), { force: true })
+  await rm(dataPath('topics', detail.topic.id, 'lesson-versions', `${lessonId}.json`), { force: true })
   return true
 }
 

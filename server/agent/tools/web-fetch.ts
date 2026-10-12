@@ -1,5 +1,6 @@
 import { Readability } from '@mozilla/readability'
 import { JSDOM } from 'jsdom'
+import { assertPublicHttpUrl } from '../../ssrf'
 
 export interface FetchedPage {
   url: string
@@ -68,11 +69,14 @@ export function extractMainContent(html: string, url: string): { title: string; 
 }
 
 export async function fetchPage(url: string): Promise<FetchedPage> {
+  assertPublicHttpUrl(url)
   const res = await fetch(url, {
     headers: { 'User-Agent': UA },
     redirect: 'follow',
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   })
+  // 重定向后的最终地址也要过一遍私网检查（防 302 跳到内网）
+  if (res.url) assertPublicHttpUrl(res.url)
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const contentType = res.headers.get('content-type') ?? ''
   if (!contentType.includes('text/html') && !contentType.includes('text/plain')) {

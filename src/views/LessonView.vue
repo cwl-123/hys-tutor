@@ -266,9 +266,7 @@ async function startGeneration() {
   if (lessonId && !disposed) await router.replace(`/lesson/${lessonId}`)
 }
 
-onMounted(async () => {
-  window.addEventListener('scroll', onScroll, { passive: true })
-  document.addEventListener('click', onDocClick)
+async function boot() {
   try {
     if (isNew.value) {
       await startGeneration()
@@ -290,7 +288,25 @@ onMounted(async () => {
   } catch (err) {
     lessonStore.error = errMsg(err)
   }
+}
+
+onMounted(async () => {
+  window.addEventListener('scroll', onScroll, { passive: true })
+  document.addEventListener('click', onDocClick)
+  await boot()
 })
+
+// 组件复用时（/lesson/A → /lesson/B，如浏览器前进/后退）参数变化需重新加载；
+// 备课发起后 router.replace 到真实 id 时 store 里已是同一课，跳过避免重复挂接
+watch(
+  () => route.params.id,
+  (id, prev) => {
+    const sid = String(id)
+    if (!sid || sid === String(prev) || sid === 'new') return
+    if (sid === lessonStore.lesson?.id) return
+    void boot()
+  },
+)
 
 async function retry() {
   const lesson = lessonStore.lesson

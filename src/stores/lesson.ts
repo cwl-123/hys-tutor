@@ -185,42 +185,59 @@ export const useLessonStore = defineStore('lesson', () => {
     startedAt.value = Date.now()
     justCompleted.value = false
     let pendingLoad: Promise<void> | null = null
+    // 断线自动重连：备课要跑 2~5 分钟，期间网络抖动/服务重启不应误报「备课失败」
+    // （重连后服务端会回放已缓存阶段；服务端主动发的 error 事件不走这里，仍会正常展示失败）
+    const MAX_RECONNECTS = 5
+    let reconnects = 0
     try {
-      await getSse(
-        `/api/lessons/${lessonId}/progress`,
-        {
-          onEvent(event, data) {
-            if (event === 'stage') {
-              const e = data as { stage: string; detail?: unknown }
-              const p = stagePhase(e.stage)
-              if (p !== null) phase.value = Math.max(phase.value, p)
-              if (e.stage === 'write-delta') {
-                streamingContent.value += (e.detail as { text: string }).text
-                return
-              }
-              const label = stageLabel(e.stage, e.detail)
-              if (label) {
-                stages.value = [
-                  ...stages.value,
-                  { key: `${Date.now()}-${stages.value.length}`, label, ts: Date.now() },
-                ]
-              }
-            } else if (event === 'result') {
-              justCompleted.value = true
-              phase.value = LESSON_PHASES.length - 1
-              pendingLoad = load(lessonId)
-            } else if (event === 'error') {
-              error.value = (data as { message: string }).message
-            }
-          },
-        },
-        controller.signal,
-      )
-      if (pendingLoad) await pendingLoad
-    } catch (err) {
-      // 主动中断（重新挂接/离开页面）不算错误
-      if (!controller.signal.aborted) {
-        error.value = errMsg(err)
+      for (;;) {
+        try {
+          await getSse(
+            `/api/lessons/${lessonId}/progress`,
+            {
+              onEvent(event, data) {
+                if (event === 'stage') {
+                  const e = data as { stage: string; detail?: unknown }
+                  const p = stagePhase(e.stage)
+                  if (p !== null) phase.value = Math.max(phase.value, p)
+                  if (e.stage === 'write-delta') {
+                    streamingContent.value += (e.detail as { text: string }).text
+                    return
+                  }
+                  const label = stageLabel(e.stage, e.detail)
+                  if (label) {
+                    stages.value = [
+                      ...stages.value,
+                      { key: `${Date.now()}-${stages.value.length}`, label, ts: Date.now() },
+                    ]
+                  }
+                } else if (event === 'result') {
+                  justCompleted.value = true
+                  phase.value = LESSON_PHASES.length - 1
+                  pendingLoad = load(lessonId)
+                } else if (event === 'error') {
+                  error.value = (data as { message: string }).message
+                }
+              },
+            },
+            controller.signal,
+          )
+          if (pendingLoad) await pendingLoad
+          break
+        } catch (err) {
+          // 主动中断（重新挂接/离开页面）不算错误
+          if (controller.signal.aborted) break
+          reconnects++
+          if (reconnects > MAX_RECONNECTS) {
+            error.value = `连接多次中断，请刷新重试（${errMsg(err)}）`
+            break
+          }
+          // 重连会从头回放阶段与正文流，先清空已接收的半截内容避免重复
+          stages.value = preface ? [{ key: 'init', label: preface, ts: Date.now() }] : []
+          streamingContent.value = ''
+          await new Promise((r) => setTimeout(r, 2000))
+          if (controller.signal.aborted) break
+        }
       }
     } finally {
       if (attachAbort === controller) {

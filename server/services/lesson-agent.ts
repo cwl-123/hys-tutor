@@ -23,6 +23,7 @@ import {
   llmSelfCheckSchema,
   selfCheckPrompt,
   correctContentPrompt,
+  type LlmSelfCheck,
 } from '../llm/prompts/selfcheck'
 import { QUIZ_SYSTEM_PROMPT, llmQuizSchema, quizPrompt } from '../llm/prompts/quiz'
 import { TAUGHT_SYSTEM_PROMPT, llmTaughtSchema, taughtExtractPrompt } from '../llm/prompts/taught'
@@ -34,6 +35,7 @@ import { listTaught, recordTaught, taughtContextText } from './taught-service'
 import { listAttempts } from './attempt-service'
 import { MASTERY_UNLOCK_THRESHOLD } from '../../shared/types'
 import { errMsg } from '../../shared/error'
+import { partitionQuestionDrafts } from '../../shared/quiz-validate'
 import { sanitizeCitations, stripTrailingSourceBlock } from '../../shared/lesson-md'
 import type {
   ErrorReport,
@@ -407,14 +409,24 @@ export async function prepareLesson(
     onStage,
   )
 
-  // 5. 自查 + 出题
+  // 5. 自查 + 出题（出题做语义级结构校验：坏题不能进课件，否则客观题永远判不对）
   onStage({ stage: 'self-check' })
-  const check = await completeJson({
-    system: SELFCHECK_SYSTEM_PROMPT,
-    prompt: selfCheckPrompt(node, note, draft, outline.objectives),
-    schema: llmSelfCheckSchema,
-    temperature: 0.2,
-  })
+  let check: LlmSelfCheck | null = null
+  let quizDropReasons: string[] = []
+  for (let attempt = 0; attempt < 2; attempt++) {
+    check = await completeJson({
+      system: SELFCHECK_SYSTEM_PROMPT,
+      prompt: selfCheckPrompt(node, note, draft, outline.objectives),
+      schema: llmSelfCheckSchema,
+      temperature: 0.2,
+    })
+    quizDropReasons = partitionQuestionDrafts(check.questions).dropped
+    if (quizDropReasons.length === 0) break
+    onStage({ stage: 'self-check-retry', detail: { reasons: quizDropReasons } })
+  }
+  if (!check || quizDropReasons.length) {
+    throw new Error(`出题结构校验未通过：${quizDropReasons.join('；') || '未知原因'}`)
+  }
   const contentMd =
     check.needsCorrection && check.issues.length
       ? await completeText({
@@ -525,6 +537,9 @@ export async function reviseLesson(
         schema: llmSelfCheckSchema,
         temperature: 0.2,
       })
+      // 结构校验不通过的坏题不落地：抛给外层 catch，保留原有题目
+      const dropped = partitionQuestionDrafts(check.questions).dropped
+      if (dropped.length) throw new Error(`出题结构校验未通过：${dropped.join('；')}`)
       contentMd =
         check.needsCorrection && check.issues.length
           ? await completeText({
@@ -596,12 +611,22 @@ export async function regenerateQuestions(lessonId: string): Promise<QuestionSet
     ...attempts.flatMap((a) => a.questions.map((q) => q.prompt)),
   ]
 
-  const result = await completeJson({
-    system: QUIZ_SYSTEM_PROMPT,
-    prompt: quizPrompt(node, note, lesson.contentMd, [...new Set(avoidPrompts)]),
-    schema: llmQuizSchema,
-    temperature: 0.7,
-  })
+  // 结构校验失败重试一次；仍失败则报错（坏题不进题集，旧题集保持不变）
+  let result: { questions: LlmSelfCheck['questions'] } | null = null
+  let dropReasons: string[] = []
+  for (let attempt = 0; attempt < 2; attempt++) {
+    result = await completeJson({
+      system: QUIZ_SYSTEM_PROMPT,
+      prompt: quizPrompt(node, note, lesson.contentMd, [...new Set(avoidPrompts)]),
+      schema: llmQuizSchema,
+      temperature: 0.7,
+    })
+    dropReasons = partitionQuestionDrafts(result.questions).dropped
+    if (dropReasons.length === 0) break
+  }
+  if (!result || dropReasons.length) {
+    throw new Error(`出题结构校验未通过：${dropReasons.join('；') || '未知原因'}`)
+  }
   const questions: QuestionSet = {
     generatedAt: nowIso(),
     questions: result.questions.map<Question>((q, i) => ({

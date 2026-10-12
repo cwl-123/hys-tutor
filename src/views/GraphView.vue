@@ -106,6 +106,13 @@ onMounted(async () => {
   await store.loadTopic(topicId.value)
 })
 
+// 组件复用时（浏览器前进/后退、topic A → topic B 直达链接）参数变化需重新加载
+watch(topicId, async (id, prev) => {
+  if (!id || id === prev) return
+  selectedId.value = null
+  await store.loadTopic(id)
+})
+
 // 后台正在进行备课/优化的课程 → 工具栏提供「查看进度」入口（可随时离开再进来）
 const activeLesson = computed(
   () => store.lessons.find((l) => l.status !== 'generated' && l.status !== 'failed') ?? null,

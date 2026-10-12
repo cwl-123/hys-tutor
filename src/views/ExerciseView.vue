@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ArrowLeft, ArrowRight, TriangleAlert } from 'lucide-vue-next'
 import { useLessonStore } from '@/stores/lesson'
@@ -45,13 +45,24 @@ const reviewItems = computed<ReviewItem[]>(() => {
   return a.questions.map((q) => ({ q, record: a.records.find((r) => r.questionId === q.id) }))
 })
 
-onMounted(async () => {
+async function loadAll() {
+  answers.value = {}
+  error.value = null
+  activeIdx.value = 0
+  mode.value = 'answer'
   await lessonStore.load(lessonId.value)
   await lessonStore.loadAttempts(lessonId.value)
   if (attempts.value.length > 0) {
     activeIdx.value = attempts.value.length - 1
     mode.value = 'review'
   }
+}
+
+onMounted(loadAll)
+
+// 组件复用时（/exercise/A → /exercise/B）参数变化需重新加载
+watch(lessonId, (id, prev) => {
+  if (id && id !== prev) void loadAll()
 })
 
 function typeLabel(q: Question): string {

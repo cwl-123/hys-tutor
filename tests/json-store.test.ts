@@ -1,4 +1,4 @@
-import { mkdtemp, readdir } from 'node:fs/promises'
+import { mkdtemp, readdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -25,6 +25,15 @@ describe('json-store', () => {
     await writeJson(file, [1, 2, 3])
     const files = await readdir(dir)
     expect(files).toEqual(['x.json'])
+  })
+
+  it('JSON 损坏时备份 .bak 现场并回退 fallback', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'hys-repo-'))
+    const file = path.join(dir, 'broken.json')
+    await writeFile(file, '{oops 不是合法 JSON')
+    await expect(readJson(file, [])).resolves.toEqual([])
+    const files = await readdir(dir)
+    expect(files.some((f) => f.startsWith('broken.json.corrupt-') && f.endsWith('.bak'))).toBe(true)
   })
 
   it('newId 带前缀且唯一', () => {

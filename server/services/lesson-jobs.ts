@@ -20,6 +20,23 @@ interface Job {
 const jobsByLesson = new Map<string, Job>()
 const runningByTopic = new Map<string, Job>()
 
+// 任务级看门狗：LLM 调用挂起时（OpenAI SDK 默认超时约 10 分钟且无上限保证）
+// 不能让 runningByTopic 永远被占——超时后标记失败并释放，允许用户重新发起
+const JOB_TIMEOUT_MS = 10 * 60_000
+
+function armWatchdog(job: Job, onTimeout: () => Promise<void>): ReturnType<typeof setTimeout> {
+  return setTimeout(() => {
+    if (job.status !== 'running') return
+    job.status = 'failed'
+    job.error = '任务超时（超过 10 分钟无响应），已终止，请重新发起'
+    console.error(`[lesson-job] 看门狗超时 ${job.lessonId}`)
+    void onTimeout().catch(() => {})
+    if (runningByTopic.get(job.topicId) === job) runningByTopic.delete(job.topicId)
+    emit(job, { type: 'error', message: job.error })
+    setTimeout(() => jobsByLesson.delete(job.lessonId), 10 * 60_000)
+  }, JOB_TIMEOUT_MS)
+}
+
 const STAGE_TO_STATUS: Record<string, LessonStatus> = {
   schedule: 'researching',
   researching: 'researching',
@@ -86,6 +103,8 @@ export async function startLessonJob(
   // 必须落盘完成再返回：否则客户端拿到 lessonId 后立刻跳转/读取，会因文件尚未存在而报「课程不存在」
   await writeJson(lessonFile(topicId, lessonId), initial)
 
+  const watchdog = armWatchdog(job, () => patchLessonStatus(topicId, lessonId, 'failed', job.error))
+
   void (async () => {
     try {
       await prepareLesson(topicId, (e) => {
@@ -94,15 +113,19 @@ export async function startLessonJob(
         const status = STAGE_TO_STATUS[e.stage]
         if (status) void patchLessonStatus(topicId, lessonId, status).catch(() => {})
       }, { ...opts, lessonId })
+      // 看门狗已先判超时：结果丢弃，不再改状态（成品落盘由 prepareLesson 自己完成，不受影响）
+      if (job.status !== 'running') return
       job.status = 'done'
       emit(job, { type: 'result' })
     } catch (err) {
+      if (job.status !== 'running') return
       job.status = 'failed'
       job.error = errMsg(err)
       console.error(`[lesson-job] 备课失败 ${lessonId}:`, err)
       await patchLessonStatus(topicId, lessonId, 'failed', job.error).catch(() => {})
       emit(job, { type: 'error', message: job.error })
     } finally {
+      clearTimeout(watchdog)
       if (runningByTopic.get(topicId) === job) runningByTopic.delete(topicId)
       // 进度缓存保留 10 分钟供回连回放，之后释放
       setTimeout(() => jobsByLesson.delete(lessonId), 10 * 60_000)
@@ -141,6 +164,8 @@ export async function startReviseJob(
   runningByTopic.set(topicId, job)
   await patchLessonStatus(topicId, lessonId, 'revising')
 
+  const watchdog = armWatchdog(job, () => patchLessonStatus(topicId, lessonId, 'generated', job.error))
+
   void (async () => {
     try {
       await reviseLesson(lessonId, instruction, (e) => {
@@ -149,9 +174,11 @@ export async function startReviseJob(
         const status = STAGE_TO_STATUS[e.stage]
         if (status) void patchLessonStatus(topicId, lessonId, status).catch(() => {})
       })
+      if (job.status !== 'running') return
       job.status = 'done'
       emit(job, { type: 'result' })
     } catch (err) {
+      if (job.status !== 'running') return
       job.status = 'failed'
       job.error = errMsg(err)
       console.error(`[lesson-job] 优化失败 ${lessonId}:`, err)
@@ -159,6 +186,7 @@ export async function startReviseJob(
       await patchLessonStatus(topicId, lessonId, 'generated', job.error).catch(() => {})
       emit(job, { type: 'error', message: job.error })
     } finally {
+      clearTimeout(watchdog)
       if (runningByTopic.get(topicId) === job) runningByTopic.delete(topicId)
       setTimeout(() => jobsByLesson.delete(lessonId), 10 * 60_000)
     }

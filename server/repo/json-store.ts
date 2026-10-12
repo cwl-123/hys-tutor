@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 
@@ -12,9 +12,20 @@ export function dataPath(...parts: string[]): string {
 }
 
 export async function readJson<T>(file: string, fallback: T): Promise<T> {
+  let raw: string
   try {
-    return JSON.parse(await readFile(file, 'utf-8')) as T
+    raw = await readFile(file, 'utf-8')
   } catch {
+    return fallback // 文件不存在/不可读：正常回退
+  }
+  try {
+    return JSON.parse(raw) as T
+  } catch (err) {
+    // 文件损坏绝不能静默当「不存在」——否则下一次写入就用空数据覆盖掉历史。
+    // 备份损坏现场供人工恢复，并显式报错
+    const bak = `${file}.corrupt-${Date.now()}.bak`
+    await copyFile(file, bak).catch(() => {})
+    console.error(`[json-store] JSON 损坏：${file}（已备份到 ${bak}）`, err)
     return fallback
   }
 }
