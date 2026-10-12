@@ -12,7 +12,7 @@ import {
 import { runAgent, type AgentTool } from '../agent/loop'
 import { searchWeb } from '../agent/tools/web-search'
 import { fetchPage } from '../agent/tools/web-fetch'
-import { repairNodes, validateGraphNodes } from '../../shared/dag'
+import { repairNodes, validateGraphDensity, validateGraphNodes } from '../../shared/dag'
 import type { Graph, KnowledgeNode, Topic, TopicProfile } from '../../shared/types'
 
 const MIN_NODES = 15
@@ -151,6 +151,37 @@ async function runTopicResearch(
   return saved
 }
 
+// LLM 生成 DAG：校验（结构 + 密度）→ 修复 → 不合格带 hints 重试
+async function generateGraphNodes(
+  name: string,
+  researchBlock: string | undefined,
+  profile: TopicProfile | undefined,
+  onStage: (stage: string, detail?: unknown) => void,
+): Promise<KnowledgeNode[]> {
+  let nodes: KnowledgeNode[] = []
+  let hints: string | undefined
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const llm = await completeJson({
+      system: GRAPH_SYSTEM_PROMPT,
+      prompt: graphUserPrompt(name, researchBlock, hints, profile),
+      schema: llmGraphSchema,
+    })
+    nodes = repairNodes(toKnowledgeNodes(llm.nodes), MAX_NODES)
+
+    const issues = [...validateGraphNodes(nodes), ...validateGraphDensity(nodes)]
+    if (!issues.length && nodes.length >= MIN_NODES) break
+    hints = [
+      ...issues.map((i) => i.message),
+      nodes.length < MIN_NODES ? `知识点只有 ${nodes.length} 个，不足 ${MIN_NODES} 个` : '',
+    ]
+      .filter(Boolean)
+      .join('\n')
+    onStage('retrying', { attempt: attempt + 1, hints })
+  }
+  return nodes
+}
+
 // 开课主流程：Agent 联网调研 → LLM 生成 DAG → 校验 → 修复 → 不合格带 hints 重试一次
 export async function createTopic(
   name: string,
@@ -172,28 +203,7 @@ export async function createTopic(
   const researchBlock = research ? JSON.stringify(research, null, 2) : undefined
 
   onStage('generating')
-  let nodes: KnowledgeNode[] = []
-  let hints: string | undefined
-
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const llm = await completeJson({
-      system: GRAPH_SYSTEM_PROMPT,
-      prompt: graphUserPrompt(name, researchBlock, hints, topic.profile),
-      schema: llmGraphSchema,
-    })
-    nodes = repairNodes(toKnowledgeNodes(llm.nodes), MAX_NODES)
-
-    const issues = validateGraphNodes(nodes)
-    if (!issues.length && nodes.length >= MIN_NODES) break
-    hints = [
-      ...issues.map((i) => i.message),
-      nodes.length < MIN_NODES ? `知识点只有 ${nodes.length} 个，不足 ${MIN_NODES} 个` : '',
-    ]
-      .filter(Boolean)
-      .join('\n')
-    onStage('retrying', { attempt: attempt + 1, hints })
-  }
-
+  const nodes = await generateGraphNodes(name, researchBlock, topic.profile, onStage)
   const graph: Graph = { nodes, updatedAt: nowIso() }
 
   await writeJson(dataPath('topics', topic.id, 'topic.json'), topic)
@@ -203,6 +213,27 @@ export async function createTopic(
 
   onStage('done', { topicId: topic.id, nodeCount: nodes.length })
   return { topic, graph }
+}
+
+// 图谱恢复：复用已保存的开课调研重新生成 DAG（修复 deps 漏生成的散装坏图）。
+// 掌握分按 id 匹配保留，新节点 mastery=0。
+export async function regenerateGraph(
+  topicId: string,
+  onStage: (stage: string, detail?: unknown) => void = () => {},
+): Promise<Graph> {
+  const topic = await getTopic(topicId)
+  if (!topic) throw Object.assign(new Error('课题不存在'), { status: 404 })
+  const research = await readJson<TopicResearch | null>(topicResearchFile(topicId), null)
+  const researchBlock = research ? JSON.stringify(research, null, 2) : undefined
+  const old = (await getGraph(topicId))?.nodes ?? []
+  const masteryById = new Map(old.map((n) => [n.id, n.mastery]))
+
+  const nodes = (await generateGraphNodes(topic.name, researchBlock, topic.profile, onStage)).map(
+    (n) => ({ ...n, mastery: masteryById.get(n.id) ?? 0 }),
+  )
+  const graph: Graph = { nodes, updatedAt: nowIso() }
+  await writeJson(graphFile(topicId), graph)
+  return graph
 }
 
 // 更新学习偏好（讲解风格/当前程度/其他要求）：写回 topic.json 并同步 topics.json 索引；
@@ -224,15 +255,21 @@ export async function updateTopicProfile(topicId: string, profile: TopicProfile)
 }
 
 // 手动编辑保存：全量替换节点，服务端重新校验（无环、依赖存在、掌握分合法）
+// 掌握分不在此处接受客户端输入（领域规则：只有 mastery-service 能改掌握分且必写 MasteryLog），
+// 一律以服务端现有值为准；新增节点默认 0 分
 export async function saveGraph(topicId: string, nodes: KnowledgeNode[]): Promise<Graph> {
-  const issues = validateGraphNodes(nodes)
+  const current = await getGraph(topicId)
+  const masteryById = new Map((current?.nodes ?? []).map((n) => [n.id, n.mastery]))
+  const merged = nodes.map((n) => ({ ...n, mastery: masteryById.get(n.id) ?? 0 }))
+
+  const issues = validateGraphNodes(merged)
   if (issues.length) {
     throw Object.assign(new Error(issues.map((i) => i.message).join('；')), { status: 400 })
   }
-  if (nodes.length > MAX_NODES) {
+  if (merged.length > MAX_NODES) {
     throw Object.assign(new Error(`节点数超过上限 ${MAX_NODES}`), { status: 400 })
   }
-  const graph: Graph = { nodes, updatedAt: nowIso() }
+  const graph: Graph = { nodes: merged, updatedAt: nowIso() }
   await writeJson(graphFile(topicId), graph)
   return graph
 }

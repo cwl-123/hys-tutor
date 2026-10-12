@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { breakCycles, hasCycle, kahn, repairNodes, validateGraphNodes } from '../shared/dag'
+import { breakCycles, hasCycle, kahn, repairNodes, validateGraphDensity, validateGraphNodes } from '../shared/dag'
 
 describe('dag', () => {
   it('无环图通过校验', () => {
@@ -68,5 +68,25 @@ describe('dag', () => {
     expect(remaining).toEqual([])
     expect(order.indexOf('a')).toBeLessThan(order.indexOf('b'))
     expect(order.indexOf('b')).toBeLessThan(order.indexOf('c'))
+  })
+
+  it('密度校验：整图无 deps 的散装图被判不合格', () => {
+    const flat = Array.from({ length: 20 }, (_, i) => ({
+      id: `n${i}`,
+      name: `N${i}`,
+      description: '',
+      deps: [],
+      mastery: 0,
+      manualEdited: false,
+    }))
+    expect(validateGraphNodes(flat)).toEqual([])
+    expect(validateGraphDensity(flat)).toHaveLength(1)
+    expect(validateGraphDensity(flat)[0].code).toBe('few-edges')
+
+    const layered = flat.map((n, i) => ({
+      ...n,
+      deps: i === 0 ? [] : [`n${i - 1}`],
+    }))
+    expect(validateGraphDensity(layered)).toEqual([])
   })
 })

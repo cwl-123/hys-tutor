@@ -1,7 +1,7 @@
 import type { KnowledgeNode } from './types'
 
 export interface GraphIssue {
-  code: 'cycle' | 'missing-dep' | 'dup-id' | 'self-dep' | 'count' | 'mastery'
+  code: 'cycle' | 'missing-dep' | 'dup-id' | 'self-dep' | 'count' | 'mastery' | 'few-edges'
   message: string
 }
 
@@ -98,4 +98,19 @@ export function validateGraphNodes(nodes: KnowledgeNode[]): GraphIssue[] {
   }
   if (hasCycle(nodes)) issues.push({ code: 'cycle', message: '依赖关系存在环' })
   return issues
+}
+
+// 生成质量闸（仅用于 LLM 生成后的校验，手工编辑不强制）：
+// 模型偶尔整图漏掉 deps，schema 默认值会把缺失字段悄悄变成 []，
+// 产出一个零边"散装"图——排课退化成全部同时解锁、图谱变成一排平铺。
+// 经验值：正常图谱边数 ≥ 节点数的一半（实测 0.9~1.5 条/节点）。
+export function validateGraphDensity(nodes: KnowledgeNode[]): GraphIssue[] {
+  const edges = nodes.reduce((acc, n) => acc + n.deps.length, 0)
+  if (edges >= Math.ceil(nodes.length / 2)) return []
+  return [
+    {
+      code: 'few-edges',
+      message: `依赖边只有 ${edges} 条：除少数入门节点外，每个知识点都必须给出前置依赖 deps，构成有层次的学习路径`,
+    },
+  ]
 }
