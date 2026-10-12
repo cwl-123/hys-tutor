@@ -214,7 +214,7 @@ export type ResearchNote = z.infer<typeof researchNoteSchema>
 
 // ---------- 学习者偏好档案 ----------
 export const preferenceSourceSchema = z.object({
-  kind: z.enum(['manual', 'lesson-chat', 'lesson-revise', 'report']),
+  kind: z.enum(['manual', 'lesson-chat', 'lesson-revise', 'report', 'onboarding']),
   label: z.string().optional(), // 来源描述，如「双塔召回」课件对话
 })
 export type PreferenceSource = z.infer<typeof preferenceSourceSchema>

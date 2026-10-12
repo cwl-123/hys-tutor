@@ -20,6 +20,7 @@ import {
   handleUpdateLessonContent,
 } from './routes/lessons'
 import { handleCreateReport, handleListReports } from './routes/reports'
+import { handleOnboardingChat } from './routes/onboarding'
 import {
   handleCreatePreference,
   handleDeletePreference,
@@ -178,6 +179,12 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, next:
       if (req.method === 'PATCH') await handleUpdatePreference(req, res, prefMatch[1])
       else if (req.method === 'DELETE') await handleDeletePreference(req, res, prefMatch[1])
       else sendJson(res, 405, { error: 'Method Not Allowed' })
+      return
+    }
+
+    // POST /api/onboarding/chat — 开课对话（AI 引导理清学习方向）
+    if (url === '/onboarding/chat' && req.method === 'POST') {
+      await handleOnboardingChat(req, res)
       return
     }
 

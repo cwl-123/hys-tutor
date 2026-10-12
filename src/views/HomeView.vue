@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowRight, LoaderCircle } from 'lucide-vue-next'
+import { ArrowRight, LoaderCircle, Sparkles, Zap } from 'lucide-vue-next'
 import { useTopicStore } from '@/stores/topic'
-import { masteryLevel } from '@shared/types'
+import { masteryLevel, type Topic, type TopicProfile } from '@shared/types'
 import { fmtDate } from '@/utils/format'
 import { PROFILE_LEVELS, PROFILE_STYLES, pickOption } from '@/utils/topic-profile'
+import OnboardingChat from '@/components/OnboardingChat.vue'
 
 const store = useTopicStore()
 const router = useRouter()
@@ -18,6 +19,7 @@ const style = ref<string | null>(null)
 const level = ref<string | null>(null)
 const extra = ref('')
 const creating = ref(false)
+const mode = ref<'quick' | 'chat'>('quick')
 
 onMounted(async () => {
   await store.fetchTopics()
@@ -35,24 +37,32 @@ watch(
 )
 onUnmounted(() => window.clearInterval(pollTimer))
 
-async function createTopic() {
-  const name = topicName.value.trim()
-  if (!name || creating.value) return
+async function doCreate(name: string, profile?: TopicProfile): Promise<Topic | null> {
+  if (creating.value) return null
   creating.value = true
   try {
-    const topic = await store.createTopic(name, {
-      style: style.value ?? undefined,
-      level: level.value ?? undefined,
-      extra: extra.value.trim() || undefined,
-    })
-    if (topic) {
-      await router.push(`/topic/${topic.id}`)
-    } else {
-      topicName.value = name
-    }
+    const topic = await store.createTopic(name, profile)
+    if (topic) await router.push(`/topic/${topic.id}`)
+    return topic
   } finally {
     creating.value = false
   }
+}
+
+async function createTopic() {
+  const name = topicName.value.trim()
+  if (!name) return
+  const topic = await doCreate(name, {
+    style: style.value ?? undefined,
+    level: level.value ?? undefined,
+    extra: extra.value.trim() || undefined,
+  })
+  if (!topic) topicName.value = name
+}
+
+// 对话模式：确认提案卡后开课（与快速创建同一条生成管线）
+async function onChatCreate(payload: { name: string; profile: TopicProfile }) {
+  await doCreate(payload.name, payload.profile)
 }
 
 function fmtRelative(iso: string): string {
@@ -75,76 +85,108 @@ function fmtRelative(iso: string): string {
         </p>
       </div>
 
-      <form
-        class="create"
-        @submit.prevent="createTopic"
-      >
-        <input
-          v-model="topicName"
-          class="create__name"
-          type="text"
-          placeholder="想学什么？如：CTR/CVR 预估模型、Kubernetes 网络、期权定价…"
-          :disabled="creating"
-        >
-
-        <div class="create__guide">
-          <div class="guide-row">
-            <span class="guide-row__label">讲解风格</span>
-            <div class="chips">
-              <button
-                v-for="s in STYLES"
-                :key="s"
-                type="button"
-                class="chip"
-                :class="{ 'chip--on': style === s }"
-                :disabled="creating"
-                @click="style = pickOption(style, s)"
-              >
-                {{ s }}
-              </button>
-            </div>
-          </div>
-          <div class="guide-row">
-            <span class="guide-row__label">当前程度</span>
-            <div class="chips">
-              <button
-                v-for="l in LEVELS"
-                :key="l"
-                type="button"
-                class="chip"
-                :class="{ 'chip--on': level === l }"
-                :disabled="creating"
-                @click="level = pickOption(level, l)"
-              >
-                {{ l }}
-              </button>
-            </div>
-          </div>
-          <input
-            v-model="extra"
-            class="create__extra"
-            type="text"
-            placeholder="其他要求（可选）：如「多结合广告业务案例」「少讲数学多讲工程实现」…"
-            :disabled="creating"
-          >
-        </div>
-
-        <div class="create__footer">
-          <p class="create__hint">
-            以上选择会注入调研、图谱与每节课的生成，进入方向后可随时在「学习设置」中调整
-          </p>
+      <div class="create">
+        <div class="create__tabs">
           <button
-            class="create__submit"
-            type="submit"
-            :disabled="creating || !topicName.trim()"
+            type="button"
+            class="create__tab"
+            :class="{ 'create__tab--on': mode === 'quick' }"
+            :disabled="creating"
+            @click="mode = 'quick'"
           >
-            {{ creating ? 'AI 调研生成中…' : '开启学习方向' }}
-            <ArrowRight
-              v-if="!creating"
-              :size="16"
-            />
+            <Zap :size="14" />
+            快速创建
+          </button>
+          <button
+            type="button"
+            class="create__tab"
+            :class="{ 'create__tab--on': mode === 'chat' }"
+            :disabled="creating"
+            @click="mode = 'chat'"
+          >
+            <Sparkles :size="14" />
+            AI 帮我理清
           </button>
         </div>
+
+        <form
+          v-show="mode === 'quick'"
+          @submit.prevent="createTopic"
+        >
+          <input
+            v-model="topicName"
+            class="create__name"
+            type="text"
+            placeholder="想学什么？如：CTR/CVR 预估模型、Kubernetes 网络、期权定价…"
+            :disabled="creating"
+          >
+
+          <div class="create__guide">
+            <div class="guide-row">
+              <span class="guide-row__label">讲解风格</span>
+              <div class="chips">
+                <button
+                  v-for="s in STYLES"
+                  :key="s"
+                  type="button"
+                  class="chip"
+                  :class="{ 'chip--on': style === s }"
+                  :disabled="creating"
+                  @click="style = pickOption(style, s)"
+                >
+                  {{ s }}
+                </button>
+              </div>
+            </div>
+            <div class="guide-row">
+              <span class="guide-row__label">当前程度</span>
+              <div class="chips">
+                <button
+                  v-for="l in LEVELS"
+                  :key="l"
+                  type="button"
+                  class="chip"
+                  :class="{ 'chip--on': level === l }"
+                  :disabled="creating"
+                  @click="level = pickOption(level, l)"
+                >
+                  {{ l }}
+                </button>
+              </div>
+            </div>
+            <input
+              v-model="extra"
+              class="create__extra"
+              type="text"
+              placeholder="其他要求（可选）：如「多结合广告业务案例」「少讲数学多讲工程实现」…"
+              :disabled="creating"
+            >
+          </div>
+
+          <div class="create__footer">
+            <p class="create__hint">
+              以上选择会注入调研、图谱与每节课的生成，进入方向后可随时在「学习设置」中调整
+            </p>
+            <button
+              class="create__submit"
+              type="submit"
+              :disabled="creating || !topicName.trim()"
+            >
+              {{ creating ? 'AI 调研生成中…' : '开启学习方向' }}
+              <ArrowRight
+                v-if="!creating"
+                :size="16"
+              />
+            </button>
+          </div>
+        </form>
+
+        <OnboardingChat
+          v-show="mode === 'chat'"
+          :creating="creating"
+          @create="onChatCreate"
+        />
+
         <div
           v-if="store.stageText"
           class="create__progress"
@@ -165,7 +207,7 @@ function fmtRelative(iso: string): string {
         >
           {{ store.error }}
         </p>
-      </form>
+      </div>
     </section>
 
     <!-- 我的学习方向 -->
@@ -331,6 +373,7 @@ function fmtRelative(iso: string): string {
   box-shadow: var(--shadow-lg);
 }
 .create__name {
+  margin-top: 16px;
   width: 100%;
   font: inherit;
   font-size: 16px;
@@ -445,6 +488,39 @@ function fmtRelative(iso: string): string {
 /* 禁用态保留品牌色降饱和，避免「按钮坏了」的观感 */
 .create__submit:disabled {
   opacity: 0.45;
+  cursor: not-allowed;
+}
+.create__tabs {
+  display: flex;
+  gap: 6px;
+}
+.create__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 7px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--bg);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease);
+}
+.create__tab:hover:not(:disabled):not(.create__tab--on) {
+  border-color: var(--primary-soft);
+  color: var(--primary-hover);
+}
+.create__tab--on {
+  border-color: var(--primary);
+  background: var(--primary-bg);
+  color: var(--primary-hover);
+  box-shadow: 0 0 0 3px rgb(var(--primary-rgb) / 8%);
+}
+.create__tab:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
 }
 .create__progress {
