@@ -531,7 +531,7 @@ async function deleteLesson(lessonId: string) {
   align-items: center;
   flex-wrap: wrap;
   gap: 10px 12px;
-  padding: 10px 16px;
+  padding: 10px var(--page-pad);
   border-bottom: 1px solid var(--border);
 }
 .toolbar__home {

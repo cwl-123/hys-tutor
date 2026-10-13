@@ -102,8 +102,6 @@ const showSettings = ref(false)
   border-bottom: 1px solid var(--border);
 }
 .app-header__inner {
-  max-width: var(--page-max);
-  margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
