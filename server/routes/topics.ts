@@ -5,6 +5,7 @@ import { sendJson } from '../index'
 import { startSse } from '../sse'
 import {
   createTopic,
+  deleteTopic,
   getGraph,
   getTopic,
   listTopics,
@@ -13,6 +14,7 @@ import {
 } from '../services/graph-service'
 import { chatGraphEdit } from '../services/graph-chat-service'
 import { getTopicStats } from '../services/lesson-service'
+import { topicJobRunning } from '../services/lesson-jobs'
 import { knowledgeNodeSchema, topicProfileSchema } from '../../shared/types'
 
 const createTopicBodySchema = z.object({

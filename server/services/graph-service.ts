@@ -1,4 +1,4 @@
-import { readFile, readdir } from 'node:fs/promises'
+import { readFile, readdir, rm } from 'node:fs/promises'
 import { errMsg } from '../../shared/error'
 import { dataPath, newId, nowIso, readJson, writeJson } from '../repo/json-store'
 import { completeJson, getLLMModel } from '../llm/client'
@@ -252,6 +252,17 @@ export async function updateTopicProfile(topicId: string, profile: TopicProfile)
   const topics = await listTopics()
   await writeJson(topicsFile(), topics.map((t) => (t.id === topicId ? updated : t)))
   return updated
+}
+
+// 删除学习方向：连同其图谱/课程/掌握分/调研笔记等全部本地数据一起移除，并从索引摘除。
+// 课题不存在返回 false；运行中的备课任务由路由层拦截，避免删除后文件被重新写回。
+export async function deleteTopic(topicId: string): Promise<boolean> {
+  const topic = await getTopic(topicId)
+  if (!topic) return false
+  const topics = await listTopics()
+  await writeJson(topicsFile(), topics.filter((t) => t.id !== topicId))
+  await rm(dataPath('topics', topicId), { recursive: true, force: true })
+  return true
 }
 
 // 手动编辑保存：全量替换节点，服务端重新校验（无环、依赖存在、掌握分合法）

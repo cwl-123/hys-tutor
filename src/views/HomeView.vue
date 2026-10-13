@@ -323,8 +323,7 @@ async function onChatCreate(payload: { name: string; profile: TopicProfile }) {
 .hero__copy {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 32px;
+  gap: 44px;
   padding-right: 24px;
 }
 .hero__copy h1 {
@@ -388,7 +387,7 @@ async function onChatCreate(payload: { name: string; profile: TopicProfile }) {
   grid-column: 2 / -1;
   display: flex;
   flex-direction: column;
-  min-height: 480px;
+  min-height: 400px;
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   background: var(--bg);
@@ -449,6 +448,8 @@ async function onChatCreate(payload: { name: string; profile: TopicProfile }) {
 }
 .composer__body {
   flex: 1;
+  display: flex;
+  flex-direction: column;
   padding: 20px var(--card-pad) 24px;
 }
 .composer__body--chat {
@@ -483,6 +484,7 @@ async function onChatCreate(payload: { name: string; profile: TopicProfile }) {
 
 .fields {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 12px;
   margin-top: 20px;
@@ -557,14 +559,16 @@ async function onChatCreate(payload: { name: string; profile: TopicProfile }) {
   border-color: var(--border-strong);
 }
 .field--area {
-  align-items: start;
+  flex: 1;
+  align-items: stretch;
 }
 .field--area .field__label {
+  align-self: start;
   padding-top: 8px;
 }
 .field__textarea {
-  height: auto;
-  min-height: 104px;
+  height: 100%;
+  min-height: 96px;
   padding: 7px 10px;
   line-height: 1.65;
   resize: vertical;
