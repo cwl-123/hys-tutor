@@ -127,6 +127,19 @@ export const useTopicStore = defineStore('topic', () => {
     if (idx >= 0) topics.value[idx] = { ...topics.value[idx], profile: data.topic.profile }
   }
 
+  // 删除学习方向（连同其图谱/课程/掌握分等全部本地数据），成功后从首页列表移除
+  async function deleteTopic(id: string): Promise<void> {
+    const res = await fetch(`/api/topics/${id}`, { method: 'DELETE' })
+    const data = (await res.json()) as { ok?: boolean; error?: string }
+    if (!res.ok) throw new Error(data.error ?? `删除失败：${res.status}`)
+    topics.value = topics.value.filter((t) => t.id !== id)
+    if (topic.value?.id === id) {
+      topic.value = null
+      graph.value = null
+      lessons.value = []
+    }
+  }
+
   async function saveGraph(nextNodes: KnowledgeNode[]) {
     if (!topic.value) throw new Error('课题未加载')
     const res = await fetch(`/api/topics/${topic.value.id}/graph`, {
@@ -154,5 +167,6 @@ export const useTopicStore = defineStore('topic', () => {
     createTopic,
     updateProfile,
     saveGraph,
+    deleteTopic,
   }
 })

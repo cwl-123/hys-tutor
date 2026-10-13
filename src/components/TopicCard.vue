@@ -1,15 +1,37 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { ArrowRight, ArrowUpRight } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import { ArrowRight, ArrowUpRight, Trash2 } from 'lucide-vue-next'
 import type { TopicWithStats } from '@shared/api'
+import { errMsg } from '@shared/error'
+import { useTopicStore } from '@/stores/topic'
+import { showToast } from '@/utils/toast'
 import { fmtDate } from '@/utils/format'
 import { topicColor, topicInitial } from '@/utils/topic-color'
 
 // 首页「我的学习方向」卡片：专属色图标 + 名称 / 偏好标签 / 三项指标 / 三段掌握进度 / 底栏操作
 const props = defineProps<{ topic: TopicWithStats }>()
 
+const store = useTopicStore()
 const color = computed(() => topicColor(props.topic.id))
 const initial = computed(() => topicInitial(props.topic.name))
+
+// 删除二次确认：图标点一下进入确认态，再点「删除」才真正移除，避免误触
+const confirming = ref(false)
+const deleting = ref(false)
+
+async function remove() {
+  if (deleting.value) return
+  deleting.value = true
+  try {
+    await store.deleteTopic(props.topic.id)
+    showToast(`已删除学习方向「${props.topic.name}」`)
+  } catch (err) {
+    showToast(errMsg(err))
+    confirming.value = false
+  } finally {
+    deleting.value = false
+  }
+}
 
 // 三段进度条：绿 已掌握 / 黄 学习中 / 红 薄弱，其余为未开始（灰色底轨）
 const segments = computed(() => {
@@ -61,9 +83,20 @@ function fmtRelative(days: number): string {
         :title="topic.name"
       >{{ topic.name }}</span>
       <ArrowUpRight
+        v-if="!confirming"
         :size="15"
         class="card__arrow"
       />
+      <button
+        v-if="!confirming"
+        class="card__del"
+        type="button"
+        title="删除学习方向"
+        aria-label="删除学习方向"
+        @click.stop.prevent="confirming = true"
+      >
+        <Trash2 :size="14" />
+      </button>
     </div>
 
     <div class="card__tags">
@@ -127,21 +160,44 @@ function fmtRelative(days: number): string {
     </p>
 
     <div class="card__foot">
-      <span class="card__created">创建于 {{ fmtDate(topic.createdAt) }}</span>
-      <span
-        v-if="topic.stats.generatingLesson"
-        class="card__status"
-      ><span class="card__pulse" />课件生成中</span>
-      <RouterLink
-        v-else
-        class="card__cta"
-        :to="`/lesson/new?topic=${topic.id}`"
-        :title="topic.stats.lessonCount ? '由排课引擎自动选下一课' : '开始第一课'"
-        @click.stop
-      >
-        {{ topic.stats.lessonCount ? '继续学习' : '开始学习' }}
-        <ArrowRight :size="13" />
-      </RouterLink>
+      <template v-if="confirming">
+        <span class="card__confirm-text">删除该方向？课程与掌握度将一并清除</span>
+        <div class="card__confirm-actions">
+          <button
+            class="card__confirm-yes"
+            type="button"
+            :disabled="deleting"
+            @click.stop.prevent="remove"
+          >
+            {{ deleting ? '删除中…' : '删除' }}
+          </button>
+          <button
+            class="card__confirm-no"
+            type="button"
+            :disabled="deleting"
+            @click.stop.prevent="confirming = false"
+          >
+            取消
+          </button>
+        </div>
+      </template>
+      <template v-else>
+        <span class="card__created">创建于 {{ fmtDate(topic.createdAt) }}</span>
+        <span
+          v-if="topic.stats.generatingLesson"
+          class="card__status"
+        ><span class="card__pulse" />课件生成中</span>
+        <RouterLink
+          v-else
+          class="card__cta"
+          :to="`/lesson/new?topic=${topic.id}`"
+          :title="topic.stats.lessonCount ? '由排课引擎自动选下一课' : '开始第一课'"
+          @click.stop
+        >
+          {{ topic.stats.lessonCount ? '继续学习' : '开始学习' }}
+          <ArrowRight :size="13" />
+        </RouterLink>
+      </template>
     </div>
   </RouterLink>
 </template>
@@ -210,6 +266,31 @@ function fmtRelative(days: number): string {
 .card:hover .card__arrow {
   opacity: 1;
   transform: none;
+}
+.card__del {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
+}
+.card:hover .card__del {
+  opacity: 1;
+}
+.card__del:hover {
+  color: var(--mastery-red);
+  background: var(--bg-muted);
 }
 .card__tags {
   display: flex;
@@ -380,6 +461,47 @@ function fmtRelative(days: number): string {
   color: var(--amber-text);
   background: var(--amber-bg);
   box-shadow: inset 0 0 0 1px var(--amber-border);
+}
+.card__confirm-text {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+.card__confirm-actions {
+  flex: none;
+  display: flex;
+  gap: 6px;
+}
+.card__confirm-yes,
+.card__confirm-no {
+  height: 28px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12px;
+  border: none;
+  border-radius: 6px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.card__confirm-yes {
+  /* 固定深红：暗色下 --mastery-red 变亮，白字对比度不够 */
+  background: #dc2626;
+  color: #fff;
+}
+.card__confirm-yes:hover:not(:disabled) {
+  background: #b91c1c;
+}
+.card__confirm-yes:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.card__confirm-no {
+  background: var(--bg-muted);
+  color: var(--text);
+}
+.card__confirm-no:hover:not(:disabled) {
+  background: var(--border);
 }
 .card__pulse {
   width: 6px;

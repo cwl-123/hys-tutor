@@ -73,6 +73,17 @@ export async function handleTopics(
     return
   }
 
+  // DELETE /api/topics/:id — 删除学习方向（连同图谱/课程/掌握分等全部本地数据）
+  if (!sub && req.method === 'DELETE') {
+    if (topicJobRunning(topicId)) {
+      sendJson(res, 409, { error: '该方向正在备课，请等课件生成完成后再删除' })
+      return
+    }
+    const ok = await deleteTopic(topicId)
+    sendJson(res, ok ? 200 : 404, ok ? { ok: true } : { error: '课题不存在' })
+    return
+  }
+
   // GET /api/topics/:id/graph — 课题 + 图谱
   if (sub === 'graph' && req.method === 'GET') {
     const topic = await getTopic(topicId)
