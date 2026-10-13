@@ -81,26 +81,28 @@ function fmtRelative(days: number): string {
       >未设置偏好</span>
     </div>
 
-    <dl class="stats">
-      <div class="stat">
-        <dt>知识点</dt>
-        <dd>{{ topic.stats.nodeCount }}</dd>
-      </div>
-      <div class="stat">
-        <dt>课程</dt>
-        <dd>{{ topic.stats.lessonCount }}</dd>
-      </div>
-      <div class="stat">
-        <dt>最近学习</dt>
-        <dd :class="{ 'stat__none': !lastStudied }">
+    <div class="metrics">
+      <div class="metric">
+        <span class="metric__label">最近学习</span>
+        <span
+          class="metric__value"
+          :class="{ 'metric__value--none': !lastStudied }"
+        >
           <span
             v-if="isRecent"
-            class="stat__dot"
+            class="metric__dot"
             title="近一周有学习"
           />{{ lastStudied || '—' }}
-        </dd>
+        </span>
       </div>
-    </dl>
+      <div class="metric">
+        <span class="metric__label">已掌握</span>
+        <span class="metric__value">
+          {{ topic.stats.masteredCount }}
+          <span class="metric__sub">/ {{ topic.stats.nodeCount }}</span>
+        </span>
+      </div>
+    </div>
 
     <div
       class="mastery"
@@ -118,8 +120,11 @@ function fmtRelative(days: number): string {
           :style="{ width: `${seg.width}%` }"
         />
       </div>
-      <span class="mastery__text"><strong>{{ topic.stats.masteredCount }}</strong> / {{ topic.stats.nodeCount }} 已掌握</span>
     </div>
+
+    <p class="card__meta">
+      知识点 {{ topic.stats.nodeCount }} · 课程 {{ topic.stats.lessonCount }}
+    </p>
 
     <div class="card__foot">
       <span class="card__created">创建于 {{ fmtDate(topic.createdAt) }}</span>
@@ -215,42 +220,63 @@ function fmtRelative(days: number): string {
 .tag {
   display: inline-flex;
   align-items: center;
+  gap: 5px;
   height: 20px;
   padding: 0 8px;
   font-size: 11px;
+  color: var(--text-dim);
+  background: var(--bg-muted);
   border-radius: 5px;
   white-space: nowrap;
 }
-.tag--level {
-  color: var(--tag-level-text);
-  background: var(--tag-level-bg);
+.tag::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-faint);
 }
-.tag--style {
-  color: var(--tag-style-text);
-  background: var(--tag-style-bg);
+.tag--level::before {
+  background: var(--tag-level-dot);
+}
+.tag--style::before {
+  background: var(--tag-style-dot);
 }
 .tag--empty {
   color: var(--text-faint);
+  background: transparent;
   border: 1px dashed var(--border);
 }
-
-.stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin: 20px 0 0;
+.tag--empty::before {
+  display: none;
 }
-.stat + .stat {
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.metric + .metric {
   padding-left: 16px;
   border-left: 1px solid var(--border);
 }
-.stat dt {
+.metric__label {
   font-size: 11px;
   line-height: 16px;
   color: var(--text-faint);
 }
-.stat dd {
-  margin: 4px 0 0;
-  font-size: 18px;
+.metric__value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 20px;
   line-height: 24px;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -258,26 +284,26 @@ function fmtRelative(days: number): string {
   color: var(--text);
   white-space: nowrap;
 }
-.stat__dot {
-  display: inline-block;
+.metric__sub {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+.metric__value--none {
+  color: var(--text-faint);
+  font-weight: 400;
+}
+.metric__dot {
+  align-self: center;
   width: 6px;
   height: 6px;
-  margin-right: 7px;
-  vertical-align: 3px;
   border-radius: 50%;
   background: var(--mastery-green);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--mastery-green) 18%, transparent);
 }
-.stat dd.stat__none {
-  color: var(--text-faint);
-  font-weight: 400;
-}
 
 .mastery {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 20px;
+  margin: 12px 0 0;
 }
 .mastery__bar {
   display: flex;
@@ -306,15 +332,11 @@ function fmtRelative(days: number): string {
 .mastery__seg--red {
   background: var(--mastery-red);
 }
-.mastery__text {
-  flex: none;
+.card__meta {
+  margin: 10px 0 20px;
   font-size: 12px;
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
-}
-.mastery__text strong {
-  font-weight: 600;
-  color: var(--text);
 }
 
 .card__foot {
@@ -325,10 +347,6 @@ function fmtRelative(days: number): string {
   height: 52px;
   margin-top: auto;
   border-top: 1px solid var(--border);
-}
-/* 中间区块与底栏的固定间距；margin-top:auto 让同一行卡片底栏对齐 */
-.mastery {
-  margin-bottom: 20px;
 }
 .card__created {
   font-size: 12px;

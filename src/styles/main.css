@@ -23,11 +23,9 @@
   --primary-border: #cdcdf6;
   --primary-soft: #a9a9ee;
 
-  /* 标签色：难度（蓝）/ 风格（紫），淡底无描边便于区分信息属性 */
-  --tag-level-bg: #eef2ff;
-  --tag-level-text: #4f52d4;
-  --tag-style-bg: #f5f3ff;
-  --tag-style-text: #7c3aed;
+  /* 标签分类点色：难度（蓝）/ 风格（紫），仅用于极小的前置圆点，保持克制 */
+  --tag-level-dot: #6366f1;
+  --tag-style-dot: #a855f7;
 
   /* 语义色 */
   --mastery-red: #ef4444;
@@ -284,10 +282,8 @@ html[data-theme='dark'] {
   --primary-border: #343466;
   --primary-soft: #4d4da8;
 
-  --tag-level-bg: #1b2136;
-  --tag-level-text: #aeb6fb;
-  --tag-style-bg: #221a37;
-  --tag-style-text: #c9b8fa;
+  --tag-level-dot: #818cf8;
+  --tag-style-dot: #c084fc;
 
   --mastery-red: #f87171;
   --mastery-yellow: #fbbf24;
