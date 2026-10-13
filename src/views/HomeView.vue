@@ -680,7 +680,7 @@ async function onChatCreate(payload: { name: string; profile: TopicProfile }) {
 }
 .topics__head h2 {
   margin: 0;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text);
 }

@@ -129,11 +129,12 @@ function fmtRelative(days: number): string {
         </span>
       </div>
       <div class="metric">
+        <span class="metric__label">知识点</span>
+        <span class="metric__value">{{ topic.stats.nodeCount }}</span>
+      </div>
+      <div class="metric">
         <span class="metric__label">已掌握</span>
-        <span class="metric__value">
-          {{ topic.stats.masteredCount }}
-          <span class="metric__sub">/ {{ topic.stats.nodeCount }}</span>
-        </span>
+        <span class="metric__value">{{ topic.stats.masteredCount }}</span>
       </div>
     </div>
 
@@ -154,10 +155,6 @@ function fmtRelative(days: number): string {
         />
       </div>
     </div>
-
-    <p class="card__meta">
-      知识点 {{ topic.stats.nodeCount }} · 课程 {{ topic.stats.lessonCount }}
-    </p>
 
     <div class="card__foot">
       <template v-if="confirming">
@@ -323,9 +320,9 @@ function fmtRelative(days: number): string {
 
 .metrics {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  margin-top: 20px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
 }
 .metric {
   display: flex;
@@ -334,7 +331,7 @@ function fmtRelative(days: number): string {
   min-width: 0;
 }
 .metric + .metric {
-  padding-left: 16px;
+  padding-left: 14px;
   border-left: 1px solid var(--border);
 }
 .metric__label {
@@ -354,11 +351,6 @@ function fmtRelative(days: number): string {
   color: var(--text);
   white-space: nowrap;
 }
-.metric__sub {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-dim);
-}
 .metric__value--none {
   color: var(--text-faint);
   font-weight: 400;
@@ -373,7 +365,7 @@ function fmtRelative(days: number): string {
 }
 
 .mastery {
-  margin: 12px 0 0;
+  margin: 12px 0 16px;
 }
 .mastery__bar {
   display: flex;
@@ -401,12 +393,6 @@ function fmtRelative(days: number): string {
 }
 .mastery__seg--red {
   background: var(--mastery-red);
-}
-.card__meta {
-  margin: 10px 0 20px;
-  font-size: 12px;
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
 }
 
 .card__foot {
