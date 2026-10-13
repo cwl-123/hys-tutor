@@ -6,6 +6,7 @@ import {
   ArrowRight,
   CircleCheckBig,
   Ellipsis,
+  Info,
   MessageSquare,
   Pencil,
   Sparkles,
@@ -470,6 +471,22 @@ onUnmounted(() => {
       ref="articleEl"
       class="lesson"
     >
+      <div
+        v-if="lessonStore.reusedExisting"
+        class="lesson__done-banner lesson__done-banner--info"
+      >
+        <span class="lesson__done-text">
+          <Info :size="15" />
+          该知识点的课件已存在，已直接为你打开，无需重复备课
+        </span>
+        <button
+          class="lesson__done-close"
+          title="关闭"
+          @click="lessonStore.reusedExisting = false"
+        >
+          <X :size="15" />
+        </button>
+      </div>
       <div
         v-if="lessonStore.justCompleted"
         class="lesson__done-banner"
@@ -953,6 +970,18 @@ onUnmounted(() => {
   color: var(--green-hover);
   font-size: 14px;
   font-weight: 600;
+}
+.lesson__done-banner--info {
+  background: var(--primary-bg);
+  border-color: var(--primary-soft);
+  color: var(--primary-strong);
+  font-weight: 500;
+}
+.lesson__done-banner--info .lesson__done-close {
+  color: var(--primary-strong);
+}
+.lesson__done-banner--info .lesson__done-close:hover {
+  background: var(--primary-soft);
 }
 .lesson__done-text {
   display: inline-flex;

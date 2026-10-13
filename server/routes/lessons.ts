@@ -31,8 +31,8 @@ export async function handleCreateLesson(
 ): Promise<void> {
   const body = (await readBody<{ nodeId?: string }>(req)) as { nodeId?: string }
   try {
-    const { lessonId, reused } = await startLessonJob(topicId, { nodeId: body.nodeId || undefined })
-    sendJson(res, 200, { lessonId, reused })
+    const { lessonId, reused, existing } = await startLessonJob(topicId, { nodeId: body.nodeId || undefined })
+    sendJson(res, 200, { lessonId, reused, existing })
   } catch (err) {
     sendJson(res, 500, { error: errMsg(err) })
   }

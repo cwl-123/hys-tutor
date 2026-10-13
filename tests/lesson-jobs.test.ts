@@ -27,6 +27,7 @@ vi.mock('../server/services/lesson-agent', () => ({
 }))
 
 const { startLessonJob } = await import('../server/services/lesson-jobs')
+const { writeJson, dataPath } = await import('../server/repo/json-store')
 
 describe('startLessonJob', () => {
   it('把预分配的 lessonId 传给 prepareLesson，正文不会写到随机新文件', async () => {
@@ -49,5 +50,34 @@ describe('startLessonJob', () => {
     const second = await startLessonJob('t_reuse', { nodeId: 'n1' })
     expect(second.reused).toBe(true)
     expect(second.lessonId).toBe(first.lessonId)
+  })
+
+  it('自动排课的落点已有课件时复用该课件，不新建任务', async () => {
+    // 造一个单节点图谱：排课必然选中 n1
+    await writeJson(dataPath('topics', 't_existing', 'graph.json'), {
+      nodes: [{ id: 'n1', name: '节点一', description: '', deps: [], mastery: 0 }],
+      updatedAt: new Date().toISOString(),
+    })
+    await writeJson(dataPath('topics', 't_existing', 'lessons', 'l_exist.json'), {
+      id: 'l_exist',
+      topicId: 't_existing',
+      nodeIds: ['n1'],
+      scheduleReason: 'r',
+      masterySnapshot: {},
+      injectedReports: [],
+      researchNoteIds: [],
+      sources: [],
+      contentMd: '# 已有课件',
+      status: 'generated',
+      createdAt: new Date().toISOString(),
+    })
+
+    prepareCalls.length = 0
+    const { lessonId, reused, existing } = await startLessonJob('t_existing')
+    expect(existing).toBe(true)
+    expect(reused).toBe(true)
+    expect(lessonId).toBe('l_exist')
+    // 没有新建备课任务
+    expect(prepareCalls.length).toBe(0)
   })
 })

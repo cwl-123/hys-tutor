@@ -124,6 +124,8 @@ export const useLessonStore = defineStore('lesson', () => {
   const startedAt = ref<number | null>(null)
   // 本次挂接的进度流以「完成」收尾（用于生成完成后的显式提示）
   const justCompleted = ref(false)
+  // 本次「继续学习」直接复用了该知识点已有课件（未新建课程）
+  const reusedExisting = ref(false)
 
   const topic = ref<Topic | null>(null)
   const lesson = ref<Lesson | null>(null)
@@ -142,6 +144,7 @@ export const useLessonStore = defineStore('lesson', () => {
     phase.value = 0
     startedAt.value = null
     justCompleted.value = false
+    reusedExisting.value = false
   }
 
   // 发起后台备课任务并挂接进度；离开页面再回来可重新 attach 回放
@@ -157,9 +160,23 @@ export const useLessonStore = defineStore('lesson', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(nodeId ? { nodeId } : {}),
       })
-      const data = (await res.json()) as { lessonId?: string; reused?: boolean; error?: string }
+      const data = (await res.json()) as {
+        lessonId?: string
+        reused?: boolean
+        existing?: boolean
+        error?: string
+      }
       if (!res.ok || !data.lessonId) {
         throw new Error(data.error ?? `发起备课失败：${res.status}`)
+      }
+      // 排出的知识点已有课件：不新建课程，直接进入该课件学习
+      if (data.existing) {
+        generating.value = false
+        startedAt.value = null
+        stages.value = []
+        reusedExisting.value = true
+        await load(data.lessonId)
+        return data.lessonId
       }
       const preface = data.reused ? '检测到该方向已有在途备课任务，直接挂接其进度' : ''
       await attach(data.lessonId, preface)
@@ -348,6 +365,7 @@ export const useLessonStore = defineStore('lesson', () => {
     phase,
     startedAt,
     justCompleted,
+    reusedExisting,
     topic,
     lesson,
     questions,

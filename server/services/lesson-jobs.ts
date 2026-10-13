@@ -1,5 +1,6 @@
 import { dataPath, nowIso, readJson, withLock, writeJson } from '../repo/json-store'
 import { errMsg } from '../../shared/error'
+import { scheduleNext } from '../../shared/scheduler'
 import { prepareLesson, reviseLesson, type StageEvent } from './lesson-agent'
 import type { Lesson, LessonStatus } from '../../shared/types'
 
@@ -73,13 +74,36 @@ function emit(job: Job, ev: Parameters<JobListener>[0]) {
   for (const l of [...job.listeners]) l(ev)
 }
 
+// 自动排课落点：排出的知识点若已有生成完成的课件，返回该课件 id（供「继续学习」直接复用）
+async function findScheduledReusableLesson(topicId: string): Promise<string | null> {
+  const [{ getGraph }, { listLessons }] = await Promise.all([
+    import('./graph-service'),
+    import('./lesson-service'),
+  ])
+  const graph = await getGraph(topicId)
+  if (!graph) return null
+  const sched = scheduleNext(graph.nodes)
+  if (!sched.nodeId) return null
+  const hit = (await listLessons(topicId)).find(
+    (l) => l.status === 'generated' && l.nodeIds.includes(sched.nodeId!),
+  )
+  return hit?.id ?? null
+}
+
 // 发起备课任务；同课题已有在途任务则复用
+// existing=true 表示未新建任务，而是复用了该知识点已有的课件（前端据此直接进入学习）
 export async function startLessonJob(
   topicId: string,
   opts: { nodeId?: string; lessonId?: string } = {},
-): Promise<{ lessonId: string; reused: boolean }> {
-  const existing = runningByTopic.get(topicId)
-  if (existing) return { lessonId: existing.lessonId, reused: true }
+): Promise<{ lessonId: string; reused: boolean; existing: boolean }> {
+  const running = runningByTopic.get(topicId)
+  if (running) return { lessonId: running.lessonId, reused: true, existing: false }
+
+  // 未指定知识点（排课引擎自动选题）：该知识点已有课件时直接复用，避免重复备课
+  if (!opts.nodeId) {
+    const reusable = await findScheduledReusableLesson(topicId)
+    if (reusable) return { lessonId: reusable, reused: true, existing: true }
+  }
 
   const lessonId = opts.lessonId ?? `l_${Math.random().toString(36).slice(2, 10)}`
   const job: Job = { topicId, lessonId, stages: [], status: 'running', listeners: new Set() }
@@ -132,7 +156,7 @@ export async function startLessonJob(
     }
   })()
 
-  return { lessonId, reused: false }
+  return { lessonId, reused: false, existing: false }
 }
 
 export interface AttachResult {
