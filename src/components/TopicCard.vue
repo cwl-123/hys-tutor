@@ -220,7 +220,6 @@ function fmtRelative(days: number): string {
 .tag {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
   height: 20px;
   padding: 0 8px;
   font-size: 11px;
@@ -229,26 +228,16 @@ function fmtRelative(days: number): string {
   border-radius: 5px;
   white-space: nowrap;
 }
-.tag::before {
-  content: '';
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--text-faint);
+.tag--level {
+  color: var(--tag-level-text);
 }
-.tag--level::before {
-  background: var(--tag-level-dot);
-}
-.tag--style::before {
-  background: var(--tag-style-dot);
+.tag--style {
+  color: var(--tag-style-text);
 }
 .tag--empty {
   color: var(--text-faint);
   background: transparent;
   border: 1px dashed var(--border);
-}
-.tag--empty::before {
-  display: none;
 }
 
 .metrics {
