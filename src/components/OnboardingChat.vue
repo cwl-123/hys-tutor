@@ -201,13 +201,13 @@ const activeQuickReplies = () => {
           </button>
         </div>
       </div>
-      <input
+      <textarea
         v-model="pExtra"
         class="ob-proposal__extra"
-        type="text"
-        placeholder="额外要求（可选）"
+        rows="1"
+        placeholder="额外要求（可选），可写多行"
         :disabled="creating"
-      >
+      />
       <div class="ob-proposal__foot">
         <span class="ob-proposal__hint">也可以继续聊，提案会随对话更新</span>
         <button
@@ -264,7 +264,7 @@ const activeQuickReplies = () => {
 }
 .ob__list {
   flex: 1;
-  min-height: 180px;
+  min-height: 260px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -424,6 +424,9 @@ const activeQuickReplies = () => {
   font: inherit;
   font-size: 12px;
   padding: 7px 12px;
+  min-height: 72px;
+  line-height: 1.65;
+  resize: vertical;
   border: 1px dashed var(--border);
   border-radius: var(--r-sm);
   background: var(--bg);

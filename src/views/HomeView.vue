@@ -180,15 +180,15 @@ async function onChatCreate(payload: { name: string; profile: TopicProfile }) {
                   </button>
                 </div>
               </div>
-              <div class="field">
+              <div class="field field--area">
                 <span class="field__label">补充要求</span>
-                <input
+                <textarea
                   v-model="extra"
-                  class="field__input"
-                  type="text"
-                  placeholder="可选，如「多结合广告业务案例」「少讲数学多讲工程实现」"
+                  class="field__input field__textarea"
+                  rows="1"
+                  placeholder="可选，如「多结合广告业务案例」「少讲数学多讲工程实现」，可写多行"
                   :disabled="creating"
-                >
+                />
               </div>
             </div>
           </div>
@@ -317,7 +317,7 @@ async function onChatCreate(payload: { name: string; profile: TopicProfile }) {
 
 /* ---------- Hero ---------- */
 .hero {
-  padding: 88px 0 96px;
+  padding: 88px 0 56px;
   align-items: stretch;
 }
 .hero__copy {
@@ -388,6 +388,7 @@ async function onChatCreate(payload: { name: string; profile: TopicProfile }) {
   grid-column: 2 / -1;
   display: flex;
   flex-direction: column;
+  min-height: 480px;
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   background: var(--bg);
@@ -554,6 +555,19 @@ async function onChatCreate(payload: { name: string; profile: TopicProfile }) {
 }
 .field__input:hover:not(:disabled) {
   border-color: var(--border-strong);
+}
+.field--area {
+  align-items: start;
+}
+.field--area .field__label {
+  padding-top: 8px;
+}
+.field__textarea {
+  height: auto;
+  min-height: 104px;
+  padding: 7px 10px;
+  line-height: 1.65;
+  resize: vertical;
 }
 
 .composer__foot {
