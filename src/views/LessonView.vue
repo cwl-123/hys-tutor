@@ -198,12 +198,6 @@ const isInterrupted = computed(
     lessonStore.lesson.status !== 'failed' &&
     !lessonStore.error,
 )
-// 占位原因（如「备课任务已创建…」）没有展示价值，仅在选题完成后才显示
-const scheduleReason = computed(() => {
-  const r = lessonStore.lesson?.scheduleReason?.trim() ?? ''
-  return r && !r.endsWith('…') ? r : ''
-})
-
 // ---------- 进度视图 ----------
 const phases = LESSON_PHASES
 const progressPercent = computed(() =>
@@ -501,12 +495,6 @@ onUnmounted(() => {
           <span>{{ lessonStore.topic?.name }}</span>
         </div>
         <h1>{{ nodeName }}</h1>
-        <p
-          v-if="scheduleReason"
-          class="lesson__reason"
-        >
-          为什么这节课讲这个：{{ scheduleReason }}
-        </p>
         <div
           v-if="lessonStore.lesson.objectives?.length"
           class="lesson__goals"
@@ -1001,14 +989,6 @@ onUnmounted(() => {
   gap: 3px;
   color: var(--primary-strong);
   text-decoration: none;
-}
-.lesson__reason {
-  font-size: 13px;
-  color: var(--text-secondary);
-  background: var(--primary-bg);
-  border-left: 3px solid var(--primary);
-  padding: 10px 14px;
-  border-radius: 0 var(--r-sm) var(--r-sm) 0;
 }
 .lesson__goals {
   display: flex;
