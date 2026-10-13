@@ -23,6 +23,12 @@
   --primary-border: #cdcdf6;
   --primary-soft: #a9a9ee;
 
+  /* 标签色：难度（蓝）/ 风格（紫），淡底无描边便于区分信息属性 */
+  --tag-level-bg: #eef2ff;
+  --tag-level-text: #4f52d4;
+  --tag-style-bg: #f5f3ff;
+  --tag-style-text: #7c3aed;
+
   /* 语义色 */
   --mastery-red: #ef4444;
   --mastery-yellow: #f59e0b;
@@ -262,9 +268,9 @@ html[data-theme='dark'] {
   --bg-subtle: #151b23;
   --bg-muted: #1c242e;
   --text: #e8edf3;
-  --text-secondary: #b9c2cd;
-  --text-dim: #8b95a3;
-  --text-faint: #626c7a;
+  --text-secondary: #c3cbd6;
+  --text-dim: #a2adbc;
+  --text-faint: #7d8797;
   --border: #262e39;
   --border-strong: #36404d;
 
@@ -277,6 +283,11 @@ html[data-theme='dark'] {
   --primary-bg-strong: #222247;
   --primary-border: #343466;
   --primary-soft: #4d4da8;
+
+  --tag-level-bg: #1b2136;
+  --tag-level-text: #aeb6fb;
+  --tag-style-bg: #221a37;
+  --tag-style-text: #c9b8fa;
 
   --mastery-red: #f87171;
   --mastery-yellow: #fbbf24;

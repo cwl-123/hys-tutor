@@ -69,11 +69,11 @@ function fmtRelative(days: number): string {
     <div class="card__tags">
       <span
         v-if="topic.profile?.level"
-        class="tag"
+        class="tag tag--level"
       >{{ topic.profile.level }}</span>
       <span
         v-if="topic.profile?.style"
-        class="tag"
+        class="tag tag--style"
       >{{ topic.profile.style }}</span>
       <span
         v-if="!topic.profile?.level && !topic.profile?.style"
@@ -216,16 +216,22 @@ function fmtRelative(days: number): string {
   display: inline-flex;
   align-items: center;
   height: 20px;
-  padding: 0 7px;
+  padding: 0 8px;
   font-size: 11px;
-  color: var(--text-dim);
-  border: 1px solid var(--border);
   border-radius: 5px;
   white-space: nowrap;
 }
+.tag--level {
+  color: var(--tag-level-text);
+  background: var(--tag-level-bg);
+}
+.tag--style {
+  color: var(--tag-style-text);
+  background: var(--tag-style-bg);
+}
 .tag--empty {
   color: var(--text-faint);
-  border-style: dashed;
+  border: 1px dashed var(--border);
 }
 
 .stats {
@@ -277,16 +283,18 @@ function fmtRelative(days: number): string {
   display: flex;
   flex: 1;
   gap: 2px;
-  height: 4px;
-  border-radius: 2px;
+  height: 6px;
+  padding: 1px;
+  border-radius: 999px;
   background: var(--bg-muted);
+  box-shadow: inset 0 0 0 1px var(--border);
   overflow: hidden;
 }
 .mastery__bar i {
   flex: none;
-  min-width: 3px;
+  min-width: 6px;
   height: 100%;
-  border-radius: 2px;
+  border-radius: 999px;
   transition: width var(--dur) var(--ease);
 }
 .mastery__seg--green {
