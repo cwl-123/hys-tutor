@@ -485,13 +485,21 @@ const activeQuickReplies = () => {
   font: inherit;
   font-size: 13px;
   padding: 9px 14px;
+  color: var(--text);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
+  background: var(--bg);
   transition:
     border-color var(--dur-fast) var(--ease),
     box-shadow var(--dur-fast) var(--ease);
 }
-.ob__inputbox input:focus {
+.ob__inputbox input::placeholder {
+  color: var(--text-dim);
+}
+.ob__inputbox input:hover:not(:disabled) {
+  border-color: var(--border-strong);
+}
+.ob__inputbox:focus-within input {
   outline: none;
   border-color: var(--primary);
   box-shadow: var(--ring-primary);
@@ -504,12 +512,23 @@ const activeQuickReplies = () => {
   padding: 9px 18px;
   border: none;
   border-radius: var(--r-md);
-  background: var(--text);
-  color: var(--bg);
+  background: var(--primary-btn);
+  color: #fff;
   cursor: pointer;
+  box-shadow: 0 2px 10px rgb(var(--primary-rgb) / 32%);
+  transition:
+    background var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    opacity var(--dur-fast) var(--ease);
+}
+.ob__send:hover:not(:disabled) {
+  background: var(--primary-btn-hover);
+  box-shadow: 0 4px 16px rgb(var(--primary-rgb) / 44%);
 }
 .ob__send:disabled {
-  opacity: 0.4;
+  background: var(--bg-muted);
+  color: var(--text-faint);
+  box-shadow: inset 0 0 0 1px var(--border);
   cursor: not-allowed;
 }
 </style>

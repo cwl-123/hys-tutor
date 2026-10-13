@@ -129,7 +129,6 @@ async function onChatCreate(payload: { name: string; profile: TopicProfile }) {
               AI 帮我理清
             </button>
           </div>
-          <span class="composer__head-hint">新建学习方向</span>
         </div>
 
         <form
@@ -398,14 +397,9 @@ async function onChatCreate(payload: { name: string; profile: TopicProfile }) {
 .composer__head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   height: 52px;
   padding: 0 var(--card-pad) 0 12px;
   border-bottom: 1px solid var(--border);
-}
-.composer__head-hint {
-  font-size: 12px;
-  color: var(--text-faint);
 }
 .seg {
   display: inline-flex;
