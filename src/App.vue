@@ -98,9 +98,7 @@ const showSettings = ref(false)
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
-  background: color-mix(in srgb, var(--bg) 82%, transparent);
-  backdrop-filter: saturate(180%) blur(12px);
-  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
 .app-header__inner {

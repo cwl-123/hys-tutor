@@ -476,14 +476,6 @@ onUnmounted(() => {
       ref="articleEl"
       class="lesson"
     >
-      <!-- 阅读进度条（顶部固定） -->
-      <div
-        class="read-progress"
-        aria-hidden="true"
-      >
-        <i :style="{ width: `${readPercent}%` }" />
-      </div>
-
       <div
         v-if="lessonStore.justCompleted"
         class="lesson__done-banner"
@@ -1198,24 +1190,6 @@ onUnmounted(() => {
   display: flex;
   justify-content: center;
   gap: 10px;
-}
-
-/* ---------- 阅读进度 ---------- */
-.read-progress {
-  position: fixed;
-  top: var(--header-h);
-  left: 0;
-  right: 0;
-  height: 3px;
-  z-index: var(--z-sticky);
-  background: transparent;
-  pointer-events: none;
-}
-.read-progress i {
-  display: block;
-  height: 100%;
-  background: var(--primary);
-  transition: width 0.15s linear;
 }
 
 /* ---------- 「⋯」更多菜单 ---------- */
