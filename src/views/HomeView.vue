@@ -456,6 +456,10 @@ async function onChatCreate(payload: { name: string; profile: TopicProfile }) {
   flex: 1;
   padding: 20px var(--card-pad) 24px;
 }
+.composer__body--chat {
+  display: flex;
+  flex-direction: column;
+}
 .composer__body--chat :deep(.ob) {
   margin-top: 0;
 }

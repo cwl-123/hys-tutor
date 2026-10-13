@@ -257,11 +257,14 @@ const activeQuickReplies = () => {
 .ob {
   margin-top: 16px;
   display: flex;
+  flex: 1;
+  min-height: 0;
   flex-direction: column;
   gap: 10px;
 }
 .ob__list {
-  height: 300px;
+  flex: 1;
+  min-height: 180px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
