@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { Attempt, Lesson, LessonImage, Question, Topic } from '@shared/types'
+import type { Attempt, Highlight, Lesson, LessonImage, Question, Topic } from '@shared/types'
 import { errMsg } from '@shared/error'
 import { getSse } from '@/utils/sse'
 import { showNewPreferences } from '@/utils/toast'
@@ -132,6 +132,7 @@ export const useLessonStore = defineStore('lesson', () => {
   const questions = ref<Question[]>([])
   const questionsGeneratedAt = ref<string | undefined>(undefined)
   const attempts = ref<Attempt[]>([])
+  const highlights = ref<Highlight[]>([])
 
   function reset() {
     stages.value = []
@@ -141,6 +142,7 @@ export const useLessonStore = defineStore('lesson', () => {
     questions.value = []
     questionsGeneratedAt.value = undefined
     attempts.value = []
+    highlights.value = []
     phase.value = 0
     startedAt.value = null
     justCompleted.value = false
@@ -291,6 +293,51 @@ export const useLessonStore = defineStore('lesson', () => {
     questionsGeneratedAt.value = data.questions?.generatedAt
   }
 
+  // 该课全部划线（正文绿标 + 划线本面板）
+  async function loadHighlights(lessonId: string) {
+    const res = await fetch(`/api/lessons/${lessonId}/highlights`)
+    const data = (await res.json()) as { highlights?: Highlight[]; error?: string }
+    if (!res.ok) {
+      error.value = data.error ?? `加载划线失败：${res.status}`
+      return
+    }
+    highlights.value = data.highlights ?? []
+  }
+
+  // 新增划线；成功后就地追加，失败抛错由调用方提示
+  async function addHighlight(input: {
+    heading: string | null
+    text: string
+    occurrence: number
+  }): Promise<void> {
+    const id = lesson.value?.id
+    if (!id) throw new Error('课程未加载')
+    const res = await fetch(`/api/lessons/${id}/highlights`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    })
+    const data = (await res.json()) as { highlight?: Highlight; error?: string }
+    if (!res.ok || !data.highlight) throw new Error(data.error ?? `划线失败：${res.status}`)
+    if (!highlights.value.some((h) => h.id === data.highlight!.id)) {
+      highlights.value = [...highlights.value, data.highlight]
+    }
+  }
+
+  // 删除划线（乐观移除，失败回滚）
+  async function removeHighlight(highlightId: string): Promise<void> {
+    const id = lesson.value?.id
+    if (!id) return
+    const prev = highlights.value
+    highlights.value = prev.filter((h) => h.id !== highlightId)
+    const res = await fetch(`/api/lessons/${id}/highlights/${highlightId}`, { method: 'DELETE' })
+    if (!res.ok) {
+      highlights.value = prev
+      const data = (await res.json().catch(() => ({}))) as { error?: string }
+      throw new Error(data.error ?? `删除划线失败：${res.status}`)
+    }
+  }
+
   // 该课全部测验记录（含题目快照与批改结果）
   async function loadAttempts(lessonId: string) {
     const res = await fetch(`/api/lessons/${lessonId}/attempts`)
@@ -371,12 +418,16 @@ export const useLessonStore = defineStore('lesson', () => {
     questions,
     questionsGeneratedAt,
     attempts,
+    highlights,
     generate,
     attach,
     detach,
     revise,
     load,
     loadAttempts,
+    loadHighlights,
+    addHighlight,
+    removeHighlight,
     regenerate,
     reset,
     saveContent,

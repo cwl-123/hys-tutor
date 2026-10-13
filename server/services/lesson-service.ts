@@ -102,6 +102,7 @@ export async function deleteLesson(lessonId: string): Promise<boolean> {
   await rm(dataPath('topics', detail.topic.id, 'attempts', `${lessonId}.json`), { force: true })
   await rm(dataPath('topics', detail.topic.id, 'lesson-chats', `${lessonId}.json`), { force: true })
   await rm(dataPath('topics', detail.topic.id, 'lesson-versions', `${lessonId}.json`), { force: true })
+  await rm(dataPath('topics', detail.topic.id, 'highlights', `${lessonId}.json`), { force: true })
   return true
 }
 

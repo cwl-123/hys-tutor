@@ -180,6 +180,27 @@ export const reportInputSchema = z.object({
 })
 export type ReportInput = z.infer<typeof reportInputSchema>
 
+// ---------- 课件划线（学习者标注重点/好句，绿色高亮，可查看） ----------
+// 以「章节标题 + 划线文字 + 同章节内第几次出现」为锚点，重渲染/编辑正文后仍能重新定位
+export const highlightSchema = z.object({
+  id: z.string(),
+  lessonId: z.string(),
+  nodeId: z.string().optional(),
+  heading: z.string().nullable(), // 所属章节标题（null = 前言）
+  text: z.string().min(1).max(2000),
+  occurrence: z.number().int().min(0).default(0), // 同章节内第几次出现（0 起）
+  createdAt: z.string(),
+})
+export type Highlight = z.infer<typeof highlightSchema>
+
+// POST /api/lessons/:lid/highlights 入参（lessonId 取自路径）
+export const highlightInputSchema = z.object({
+  heading: z.string().nullable().optional(),
+  text: z.string().min(1).max(2000),
+  occurrence: z.number().int().min(0).optional(),
+})
+export type HighlightInput = z.infer<typeof highlightInputSchema>
+
 // ---------- 研究笔记（备课 Agent 产出，按知识点缓存） ----------
 export const researchSourceSchema = z.object({
   title: z.string(),

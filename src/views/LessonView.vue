@@ -6,10 +6,12 @@ import {
   ArrowRight,
   CircleCheckBig,
   Ellipsis,
+  Highlighter,
   Info,
   MessageSquare,
   Pencil,
   Sparkles,
+  Trash2,
   X,
 } from 'lucide-vue-next'
 import { useLessonStore, LESSON_PHASES } from '@/stores/lesson'
@@ -20,6 +22,7 @@ import LessonChatPanel from '@/components/LessonChatPanel.vue'
 import { parseSections, replaceMermaidBlock } from '@shared/lesson-md'
 import type { LessonQuote } from '@shared/lesson-chat'
 import { errMsg } from '@shared/error'
+import { showToast } from '@/utils/toast'
 
 const route = useRoute()
 const router = useRouter()
@@ -37,6 +40,39 @@ const opError = ref<string | null>(null)
 function onQuote(quote: LessonQuote) {
   chatOpen.value = true
   quoteRequest.value = { ...quote, nonce: Date.now() }
+}
+
+// ---------- 课件划线 ----------
+const hlPanelOpen = ref(false)
+
+async function onAddHighlight(payload: { heading: string | null; text: string; occurrence: number }) {
+  try {
+    await lessonStore.addHighlight(payload)
+    showToast('已划线，可在右侧「我的划线」查看')
+  } catch (err) {
+    showToast(errMsg(err))
+  }
+}
+
+async function onRemoveHighlight(id: string) {
+  try {
+    await lessonStore.removeHighlight(id)
+  } catch (err) {
+    showToast(errMsg(err))
+  }
+}
+
+// 从划线本跳转到正文对应位置，并短暂高亮闪一下
+async function jumpToHighlight(id: string) {
+  await nextTick()
+  const mark = articleEl.value?.querySelector<HTMLElement>(`mark.lesson-hl[data-hl-id="${id}"]`)
+  if (!mark) {
+    showToast('正文未找到该划线（可能正文已改动），仅作记录保留')
+    return
+  }
+  mark.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  mark.classList.add('lesson-hl--flash')
+  window.setTimeout(() => mark.classList.remove('lesson-hl--flash'), 1200)
 }
 
 // ---------- Mermaid 图表编辑 ----------
@@ -120,6 +156,10 @@ function openRevise() {
   menuOpen.value = false
   reviseOpen.value = true
 }
+function openHighlights() {
+  menuOpen.value = false
+  hlPanelOpen.value = true
+}
 
 // ---------- 目录 / 阅读进度 / 悬浮练习入口 ----------
 const tocItems = computed(() =>
@@ -188,6 +228,7 @@ watch(isGenerated, async (v) => {
   if (v) {
     await nextTick()
     onScroll()
+    if (lessonStore.lesson) void lessonStore.loadHighlights(lessonStore.lesson.id)
   }
 })
 // 记录存在但既未生成完成、又已不在生成中（例如服务重启把任务丢了）
@@ -588,6 +629,13 @@ onUnmounted(() => {
                   <Sparkles :size="13" />
                   AI 优化本课
                 </button>
+                <button
+                  role="menuitem"
+                  @click="openHighlights"
+                >
+                  <Highlighter :size="13" />
+                  我的划线（{{ lessonStore.highlights.length }}）
+                </button>
               </div>
             </div>
             <span
@@ -628,8 +676,11 @@ onUnmounted(() => {
         v-else
         :content="lessonStore.lesson.contentMd"
         :cite-sources="lessonStore.lesson.sources"
+        :highlights="lessonStore.highlights"
         @quote="onQuote"
         @edit-mermaid="openMermaidEdit"
+        @add-highlight="onAddHighlight"
+        @remove-highlight="onRemoveHighlight"
       />
 
       <section
@@ -684,7 +735,7 @@ onUnmounted(() => {
 
       <!-- 右侧目录（宽屏固定，窄屏/对话打开时自动隐藏） -->
       <nav
-        v-if="tocItems.length >= 2 && !chatOpen"
+        v-if="tocItems.length >= 2 && !chatOpen && !hlPanelOpen"
         class="toc"
         aria-label="本课目录"
       >
@@ -712,6 +763,57 @@ onUnmounted(() => {
         去随堂练习（{{ lessonStore.questions.length }} 题）
         <ArrowRight :size="15" />
       </RouterLink>
+
+      <!-- 我的划线：集中回看课件里标绿的重点/好句 -->
+      <aside
+        v-if="hlPanelOpen && !editing"
+        class="hl-panel"
+      >
+        <div class="hl-panel__head">
+          <span class="hl-panel__title">
+            <Highlighter :size="14" />
+            我的划线（{{ lessonStore.highlights.length }}）
+          </span>
+          <button
+            class="hl-panel__close"
+            title="关闭"
+            @click="hlPanelOpen = false"
+          >
+            <X :size="15" />
+          </button>
+        </div>
+        <p
+          v-if="!lessonStore.highlights.length"
+          class="hl-panel__empty"
+        >
+          选中正文里重点或写得好的句子，点「划线」即可标绿，之后可在这里集中回看。
+        </p>
+        <ul
+          v-else
+          class="hl-panel__list"
+        >
+          <li
+            v-for="h in lessonStore.highlights"
+            :key="h.id"
+          >
+            <button
+              class="hl-panel__item"
+              :title="h.heading || '前言'"
+              @click="jumpToHighlight(h.id)"
+            >
+              <span class="hl-panel__quote">{{ h.text }}</span>
+              <span class="hl-panel__meta">{{ h.heading || '前言' }}</span>
+            </button>
+            <button
+              class="hl-panel__del"
+              title="删除这条划线"
+              @click="onRemoveHighlight(h.id)"
+            >
+              <Trash2 :size="13" />
+            </button>
+          </li>
+        </ul>
+      </aside>
     </article>
 
     <div
@@ -1295,6 +1397,120 @@ onUnmounted(() => {
 @media (max-width: 1360px) {
   .toc {
     display: none;
+  }
+}
+
+/* ---------- 我的划线面板 ---------- */
+.hl-panel {
+  position: fixed;
+  right: 28px;
+  top: calc(var(--header-h) + 48px);
+  width: 280px;
+  max-height: calc(100vh - var(--header-h) - 80px);
+  overflow-y: auto;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--bg);
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-drawer);
+}
+.hl-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.hl-panel__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.hl-panel__close {
+  display: inline-flex;
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 3px;
+  border-radius: var(--r-sm);
+}
+.hl-panel__close:hover {
+  background: var(--bg-muted);
+  color: var(--text);
+}
+.hl-panel__empty {
+  margin: 6px 0;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--text-dim);
+}
+.hl-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hl-panel__list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+.hl-panel__item {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font: inherit;
+  padding: 7px 9px;
+  border: 1px solid var(--green-border);
+  border-left: 3px solid var(--mastery-green);
+  border-radius: var(--r-sm);
+  background: var(--green-bg);
+  cursor: pointer;
+}
+.hl-panel__item:hover {
+  background: var(--green-border);
+}
+.hl-panel__quote {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text);
+}
+.hl-panel__meta {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hl-panel__del {
+  flex: none;
+  display: inline-flex;
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 5px;
+  border-radius: var(--r-sm);
+}
+.hl-panel__del:hover {
+  color: var(--mastery-red);
+  background: var(--bg-muted);
+}
+@media (max-width: 1360px) {
+  .hl-panel {
+    right: 16px;
   }
 }
 

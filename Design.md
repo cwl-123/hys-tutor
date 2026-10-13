@@ -249,6 +249,21 @@ data/topics/<topicId>/
 - 课件正文统一引用 `/api/topics/<tid>/assets/<file>`（hash 文件名可长期缓存）；原图 URL 记入清单与 lesson.images 供图注来源
 - 下载校验魔数（拒 SVG 防脚本，图示走 Mermaid），单图 ≤5MB；文件名白名单防路径穿越
 
+### 3.10 highlights/<lessonId>.json — 课件划线（按课程）
+```jsonc
+[{
+  "id": "hl_ab12",
+  "lessonId": "l_001",
+  "nodeId": "n_fm",                     // 归属知识点
+  "heading": "梯度下降",                 // 所属章节标题（null = 前言）
+  "text": "学习率决定步长",              // 划线原文
+  "occurrence": 0,                      // 同章节内第几次出现（0 起），重定位用
+  "createdAt": "..."
+}]
+```
+- 锚点用「章节 + 文字 + 出现次序」描述：正文重渲染/编辑后在前端重新定位包裹 `<mark class="lesson-hl">`；定位不到仅不画绿标，记录保留
+- 删除课件时一并清除；删除学习方向时随 `data/topics/<tid>/` 整体清除
+
 ### 掌握分算法规则（mastery-service，MVP 版）
 - 客观题：答对 +20，答错 -8（clamp 到 0~100）；每题满分 20
 - 简答题：`delta = round((score - 0.2) * 25)`，即 0.2 分及格线（答出点东西就不扣分），满分 +20、0.7 分 +12、零分 -5
@@ -276,6 +291,9 @@ data/topics/<topicId>/
 | GET | /api/topics/:id/mastery-log | 掌握分变更历史 |
 | POST | /api/reports | 报错标记（课程划词 / 题目） |
 | GET | /api/topics/:id/reports | 报错记录列表 |
+| GET | /api/lessons/:id/highlights | 该课全部划线（正文绿标 + 划线本面板） |
+| POST | /api/lessons/:id/highlights | 新增一条划线（锚点：章节 + 文字 + 出现次序；同锚点去重） |
+| DELETE | /api/lessons/:id/highlights/:hid | 删除一条划线 |
 
 前端路由：`/` 学习方向列表（HomeView）、`/topic/:id` 图谱、`/lesson/new?topic=:id` 备课、`/lesson/:id` 课程、`/lesson/:id/exercise` 练习。
 

@@ -19,6 +19,11 @@ import {
   handleUndoLessonChat,
   handleUpdateLessonContent,
 } from './routes/lessons'
+import {
+  handleCreateHighlight,
+  handleDeleteHighlight,
+  handleListHighlights,
+} from './routes/highlights'
 import { handleCreateReport, handleListReports } from './routes/reports'
 import { handleOnboardingChat } from './routes/onboarding'
 import {
@@ -103,6 +108,22 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, next:
     const deleteMatch = url.match(/^\/lessons\/([^/]+)$/)
     if (deleteMatch && req.method === 'DELETE') {
       await handleDeleteLesson(req, res, deleteMatch[1])
+      return
+    }
+
+    // GET/POST /api/lessons/:lid/highlights — 课件划线列表 / 新增；DELETE .../:hid — 删除
+    const highlightItemMatch = url.match(/^\/lessons\/([^/]+)\/highlights\/([^/]+)$/)
+    if (highlightItemMatch && req.method === 'DELETE') {
+      await handleDeleteHighlight(req, res, highlightItemMatch[1], highlightItemMatch[2])
+      return
+    }
+    const highlightsMatch = url.match(/^\/lessons\/([^/]+)\/highlights$/)
+    if (highlightsMatch && req.method === 'GET') {
+      await handleListHighlights(req, res, highlightsMatch[1])
+      return
+    }
+    if (highlightsMatch && req.method === 'POST') {
+      await handleCreateHighlight(req, res, highlightsMatch[1])
       return
     }
 

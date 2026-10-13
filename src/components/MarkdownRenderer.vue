@@ -3,6 +3,7 @@ import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import MarkdownIt from 'markdown-it'
 import markdownKatex from '@traptitech/markdown-it-katex'
 import { renderMermaid } from '@/utils/mermaid-render'
+import { applyHighlights, unwrapHighlights, type HighlightAnchor } from '@/utils/highlight-dom'
 import 'katex/dist/katex.min.css'
 
 // MarkdownIt 规则配置是确定性的，全应用共享单例（否则一页 20+ 实例各自重建）
@@ -74,6 +75,8 @@ const props = defineProps<{
   editable?: boolean
   // 参考来源（供正文 [n] 引用标记 hover 显示标题预览）
   citeSources?: { idx: number; title: string; url?: string }[]
+  // 本节划线锚点（绿色高亮）；区块由父组件按章节传入
+  highlights?: HighlightAnchor[]
 }>()
 const emit = defineEmits<{ (e: 'edit-mermaid', code: string): void }>()
 
@@ -98,8 +101,11 @@ function mountMermaid(pre: HTMLPreElement, code: string, svg: string) {
 
 // 过期增强任务丢弃：内容快速变化时多轮 enhance 交错，旧轮次不得再操作 DOM
 let enhanceRun = 0
+// 划线有独立的轮次计数（与代码/引用增强互不干扰）
+let hlRun = 0
 onUnmounted(() => {
   enhanceRun++
+  hlRun++
 })
 
 // Shiki/Mermaid 都是异步的：先渲染普通 <pre><code>，挂载后逐块替换
@@ -175,10 +181,26 @@ async function enhanceCitations() {
   }
 }
 
+// 划线：先清除旧绿标再按锚点重画（增删划线时可只重跑这一步）
+async function applyHighlightsRun() {
+  const run = ++hlRun
+  await nextTick()
+  const root = container.value
+  if (!root || run !== hlRun) return
+  unwrapHighlights(root)
+  if (props.highlights?.length) applyHighlights(root, props.highlights)
+}
+
 watch(html, () => {
   void enhanceCodeBlocks()
   void enhanceCitations()
+  void applyHighlightsRun()
 }, { immediate: true })
+// 仅划线变化（增删）时正文 html 不变，需单独触发重绘
+watch(
+  () => props.highlights,
+  () => void applyHighlightsRun(),
+)
 </script>
 
 <template>
@@ -351,5 +373,37 @@ html[data-theme='dark'] .md-body :deep(.shiki span) {
 }
 .md-body :deep(.mermaid-diagram:hover .mermaid-edit-btn) {
   opacity: 1;
+}
+/* 课程划线：绿色标注重点/好句，可点击查看与删除 */
+.md-body :deep(.lesson-hl) {
+  background: var(--green-bg);
+  color: inherit;
+  border-radius: 2px;
+  padding: 1px 0;
+  box-shadow: inset 0 -2px 0 var(--mastery-green);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+.md-body :deep(.lesson-hl:hover) {
+  background: var(--green-border);
+}
+/* 从划线本跳转过来时闪一下，便于定位 */
+.md-body :deep(.lesson-hl--flash) {
+  animation: lesson-hl-flash 1.2s ease;
+}
+@keyframes lesson-hl-flash {
+  0% {
+    box-shadow:
+      inset 0 -2px 0 var(--mastery-green),
+      0 0 0 0 var(--mastery-green);
+  }
+  60% {
+    box-shadow:
+      inset 0 -2px 0 var(--mastery-green),
+      0 0 0 6px transparent;
+  }
+  100% {
+    box-shadow: inset 0 -2px 0 var(--mastery-green);
+  }
 }
 </style>
