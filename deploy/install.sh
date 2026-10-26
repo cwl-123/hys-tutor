@@ -33,7 +33,7 @@ echo "[2/8] 创建运行用户与目录"
 id hys >/dev/null 2>&1 || useradd --system --home "$APP_DIR" --shell /usr/sbin/nologin hys
 mkdir -p "$APP_DIR" "$DATA_DIR/data" /var/www/certbot /var/backups/hys-tutor
 chown -R hys:hys "$DATA_DIR"
-chmod 700 /var/backups/hys-tutor
+chmod 700 "$DATA_DIR" /var/backups/hys-tutor
 
 echo "[3/8] 同步代码（保留远端 .env / data / node_modules）"
 rsync -a --delete \
