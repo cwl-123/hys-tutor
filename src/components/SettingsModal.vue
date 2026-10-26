@@ -24,6 +24,7 @@ const error = ref<string | null>(null)
 
 // 检索状态以服务端实际 env 为准：两家都配 / 只配一家 / 都没配，页面文案不能一律说「已配置」
 const searchHint = computed(() => {
+  if (error.value) return '暂时无法获取检索配置状态，请稍后重试。'
   const s = info.value?.search
   if (!s) return '平台搜索服务配置状态加载中…'
   if (s.tavily.hasKey && s.bocha.hasKey) return '平台已配置 Tavily + 博查双路搜索。'
