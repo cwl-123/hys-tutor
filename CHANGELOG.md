@@ -2,6 +2,10 @@
 
 版本记录：每次改动提交 git 并在此追加「版本 + 日期 + 功能总结」+ 分点细节。
 
+## v0.42.5 - 2026-10-26 Nginx 配置去掉对系统 proxy_params 的依赖
+
+1. 登录/注册/API 反代头改为显式配置，Ubuntu 上即使没有 `/etc/nginx/proxy_params` 也能通过 `nginx -t`
+
 ## v0.42.4 - 2026-10-26 systemd 强制生产模式，避免漏配环境变量
 
 1. systemd 单元显式设置 `NODE_ENV=production` 与 `TZ=Asia/Shanghai`；即使 env 文件漏配，公网服务也不会进入免登录模式
