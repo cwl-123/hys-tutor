@@ -43,7 +43,7 @@ vi /etc/hys-tutor.env
 # 必填：
 #   LLM_API_KEY=sk-...
 #   LLM_BASE_URL=https://api.deepseek.com/v1
-#   LLM_MODEL=deepseek-v4-pro
+#   LLM_MODEL=deepseek-flash
 #   BOOTSTRAP_INVITE_CODE=一次性随机串
 #   APP_ORIGIN=https://tutor.example.com
 # 可选：TAVILY_API_KEY / BOCHA_API_KEY（不配也能生成，但研究质量下降）
