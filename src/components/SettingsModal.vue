@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { X } from 'lucide-vue-next'
 import { applyTheme, themePref } from '@/utils/theme'
 import type { ThemePref } from '@/utils/theme'
@@ -21,6 +21,17 @@ interface PlatformSettings {
 
 const info = ref<PlatformSettings | null>(null)
 const error = ref<string | null>(null)
+
+// 检索状态以服务端实际 env 为准：两家都配 / 只配一家 / 都没配，页面文案不能一律说「已配置」
+const searchHint = computed(() => {
+  const s = info.value?.search
+  if (!s) return '平台搜索服务配置状态加载中…'
+  if (s.tavily.hasKey && s.bocha.hasKey) return '平台已配置 Tavily + 博查双路搜索。'
+  if (s.tavily.hasKey || s.bocha.hasKey) {
+    return `平台当前只配置了${s.tavily.hasKey ? ' Tavily' : '博查'}，检索覆盖有限。`
+  }
+  return '平台尚未配置搜索服务，课程将主要依赖模型自有知识，来源标注可能不完整；如需联网检索请联系管理员。'
+})
 
 watch(
   () => props.open,
@@ -107,8 +118,8 @@ watch(
       <section class="block">
         <h3>联网检索</h3>
         <p class="muted">
-          备课需要联网检索公开资料，平台已配置搜索服务；检索失败时课程会退化为模型自有知识，
-          并在来源中标注。
+          备课需要联网检索公开资料。
+          {{ searchHint }}
         </p>
         <p
           v-if="info"

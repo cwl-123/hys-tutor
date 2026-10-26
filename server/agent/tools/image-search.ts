@@ -90,7 +90,7 @@ async function bochaImages(query: string, max: number, apiKey: string): Promise<
 export async function searchImages(query: string, maxPerProvider = 6): Promise<ImageResult[]> {
   const keys = resolveSearchKeys(getSettings())
   if (!keys.tavilyKey && !keys.bochaKey) {
-    throw new Error('未配置搜索 API Key：请在「设置」中填写 Tavily / 博查 Key（或用 .env）')
+    throw new Error('未配置搜索 API Key：请在服务端环境变量配置 TAVILY_API_KEY / BOCHA_API_KEY')
   }
   const [tavily, bocha] = await Promise.allSettled([
     tavilyImages(query, maxPerProvider, keys.tavilyKey),

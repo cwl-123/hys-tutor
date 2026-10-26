@@ -57,11 +57,15 @@ if [ ! -f /etc/hys-tutor.env ]; then
   sed -i "s|^APP_ORIGIN=.*|APP_ORIGIN=https://$DOMAIN|" /etc/hys-tutor.env
   echo "已生成 /etc/hys-tutor.env，请填入 LLM_API_KEY / BOOTSTRAP_INVITE_CODE 后重跑本脚本。"
   echo "至少需要：LLM_API_KEY、BOOTSTRAP_INVITE_CODE（首次注册用，之后删除）。"
+  echo "强烈建议同时填 TAVILY_API_KEY / BOCHA_API_KEY：不配也能生成课程，但备课无法联网检索，质量会明显下降。"
   exit 0
 fi
 chmod 600 /etc/hys-tutor.env
 if ! grep -q '^LLM_API_KEY=.\+' /etc/hys-tutor.env; then
   echo "警告：/etc/hys-tutor.env 还没有 LLM_API_KEY，登录后生成课程会失败。" >&2
+fi
+if ! grep -qE '^(TAVILY_API_KEY|BOCHA_API_KEY)=.+' /etc/hys-tutor.env; then
+  echo "警告：/etc/hys-tutor.env 未配置 TAVILY_API_KEY / BOCHA_API_KEY，备课将无法联网检索，课程只能依赖模型自有知识。" >&2
 fi
 if ! grep -q '^BOOTSTRAP_INVITE_CODE=.\+' /etc/hys-tutor.env; then
   echo "提示：BOOTSTRAP_INVITE_CODE 为空，暂时无法注册第一个管理员；填好后重启 hys-tutor。" >&2

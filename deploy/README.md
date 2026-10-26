@@ -46,7 +46,7 @@ vi /etc/hys-tutor.env
 #   LLM_MODEL=deepseek-flash
 #   BOOTSTRAP_INVITE_CODE=一次性随机串
 #   APP_ORIGIN=https://tutor.example.com
-# 可选：TAVILY_API_KEY / BOCHA_API_KEY（不配也能生成，但研究质量下降）
+# 强烈建议：TAVILY_API_KEY / BOCHA_API_KEY（备课联网研究用；两家都不配时课程退化为模型自有知识，设置页会显示「未配置」）
 ```
 
 然后重跑：

@@ -91,7 +91,7 @@ export function routeProviders(query: string): { primary: SearchProvider; second
 export async function searchWeb(query: string, maxPerProvider = 5): Promise<SearchResult[]> {
   const keys = resolveSearchKeys(getSettings())
   if (!keys.tavilyKey && !keys.bochaKey) {
-    throw new Error('未配置搜索 API Key：请在「设置」中填写 Tavily / 博查 Key（或用 .env）')
+    throw new Error('未配置搜索 API Key：请在服务端环境变量配置 TAVILY_API_KEY / BOCHA_API_KEY')
   }
   const { primary, secondary } = routeProviders(query)
   const run = (p: SearchProvider) =>

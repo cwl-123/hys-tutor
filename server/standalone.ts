@@ -111,7 +111,12 @@ const server = createServer((req, res) => {
   })
 })
 
-// 仅监听本机回环：/api/settings 会返回真实 API key，严禁暴露到局域网
+// 搜索 key 缺失不阻塞启动（课程仍能生成），但要留下明确线索，避免设置页「未配置」被当成 bug
+if (process.env.NODE_ENV === 'production' && !process.env.TAVILY_API_KEY && !process.env.BOCHA_API_KEY) {
+  console.warn('[search] 未配置 TAVILY_API_KEY / BOCHA_API_KEY：备课无法联网检索，课程将依赖模型自有知识')
+}
+
+// 仅监听本机回环：公网由 Nginx 反代到 127.0.0.1，避免服务直连 0.0.0.0
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`hys-tutor serving on http://127.0.0.1:${PORT}`)
 })
