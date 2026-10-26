@@ -423,19 +423,31 @@ export async function prepareLesson(
   onStage({ stage: 'self-check' })
   let check: LlmSelfCheck | null = null
   let quizDropReasons: string[] = []
-  for (let attempt = 0; attempt < 2; attempt++) {
+  let quizValid: LlmSelfCheck['questions'] = []
+  for (let attempt = 0; attempt < 3; attempt++) {
     check = await completeJson({
       system: SELFCHECK_SYSTEM_PROMPT,
-      prompt: selfCheckPrompt(node, note, draft, outline.objectives),
+      prompt: selfCheckPrompt(node, note, draft, outline.objectives, quizDropReasons),
       schema: llmSelfCheckSchema,
       temperature: 0.2,
     })
-    quizDropReasons = partitionQuestionDrafts(check.questions).dropped
+    const part = partitionQuestionDrafts(check.questions)
+    quizValid = part.valid
+    quizDropReasons = part.dropped
     if (quizDropReasons.length === 0) break
     onStage({ stage: 'self-check-retry', detail: { reasons: quizDropReasons } })
   }
-  if (!check || quizDropReasons.length) {
-    throw new Error(`出题结构校验未通过：${quizDropReasons.join('；') || '未知原因'}`)
+  if (!check) throw new Error('出题失败：模型未返回自查结果')
+  if (quizDropReasons.length) {
+    // 个别题结构不合法不该废掉整节课（正文已生成）：够 3 题就用合法题继续，坏题不入库
+    if (quizValid.length < 3) {
+      throw new Error(`出题结构校验未通过：${quizDropReasons.join('；')}`)
+    }
+    console.warn('[self-check] 剔除坏题后继续（未中断备课）', {
+      dropped: quizDropReasons,
+      kept: quizValid.length,
+    })
+    check = { ...check, questions: quizValid }
   }
   const contentMd =
     check.needsCorrection && check.issues.length
@@ -541,15 +553,28 @@ export async function reviseLesson(
   let questions: QuestionSet | null = null
   if (node && note) {
     try {
-      const check = await completeJson({
-        system: SELFCHECK_SYSTEM_PROMPT,
-        prompt: selfCheckPrompt(node, note, revised, lesson.objectives ?? []),
-        schema: llmSelfCheckSchema,
-        temperature: 0.2,
-      })
-      // 结构校验不通过的坏题不落地：抛给外层 catch，保留原有题目
-      const dropped = partitionQuestionDrafts(check.questions).dropped
-      if (dropped.length) throw new Error(`出题结构校验未通过：${dropped.join('；')}`)
+      let check: LlmSelfCheck | null = null
+      let dropped: string[] = []
+      let valid: LlmSelfCheck['questions'] = []
+      for (let attempt = 0; attempt < 3; attempt++) {
+        check = await completeJson({
+          system: SELFCHECK_SYSTEM_PROMPT,
+          prompt: selfCheckPrompt(node, note, revised, lesson.objectives ?? [], dropped),
+          schema: llmSelfCheckSchema,
+          temperature: 0.2,
+        })
+        const part = partitionQuestionDrafts(check.questions)
+        valid = part.valid
+        dropped = part.dropped
+        if (dropped.length === 0) break
+      }
+      if (!check) throw new Error('出题失败：模型未返回自查结果')
+      // 结构校验不通过的坏题不落地：够 3 题就用合法题继续，否则抛给外层 catch 保留原有题目
+      if (dropped.length) {
+        if (valid.length < 3) throw new Error(`出题结构校验未通过：${dropped.join('；')}`)
+        console.warn('[self-check] 优化课件时剔除坏题后继续', { dropped, kept: valid.length })
+        check = { ...check, questions: valid }
+      }
       contentMd =
         check.needsCorrection && check.issues.length
           ? await completeText({

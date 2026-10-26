@@ -57,12 +57,17 @@ export function selfCheckPrompt(
   note: ResearchNote,
   contentMd: string,
   objectives: string[] = [],
+  previousIssues: string[] = [],
 ): string {
   const objectivesBlock = objectives.length
     ? `\n本课学习目标：\n${objectives.map((o, i) => `${i + 1}. ${o}`).join('\n')}\n`
     : ''
+  // 上一轮题目被结构校验剔除的原因，逐条回灌：不喂反馈的话模型往往原样重复同一个错误
+  const retryBlock = previousIssues.length
+    ? `\n⚠️ 上一轮出题有以下结构问题（本次必须修正，否则整节课作废）：\n${previousIssues.map((r) => `- ${r}`).join('\n')}\n注意：short 题必须给 referenceAnswer（参考答案要点），single 题的 answer 必须是选项字母，judge 题的 answer 只能是「对」或「错」。\n`
+    : ''
   return `质检以下课程并出 5 道课末题。
-
+${retryBlock}
 目标知识点：${node.name}
 ${objectivesBlock}
 研究笔记（事实依据）：
@@ -83,7 +88,17 @@ CONTENT>>>
    - short：referenceAnswer 给参考答案要点，explanation 给评分要点
 4. 题目难度匹配 15 分钟微课，题干自包含（不依赖课程正文才能读懂）；5 道题考察角度错开，不互相重复
 
-输出 JSON（不要输出 correctedContent，修正正文由后续步骤单独处理）：{"issues": ["位置：问题"], "needsCorrection": false, "questions": [{"type": "single", "prompt": "...", "options": ["A...","B...","C...","D..."], "answer": "B", "explanation": "..."}, ...共 5 题]}`
+输出 JSON（不要输出 correctedContent，修正正文由后续步骤单独处理）。
+questions 必须严格是这个形状，三种题型的必填字段一个都不能少（共 5 题 = 2 single + 2 judge + 1 short）：
+{
+  "issues": ["位置：问题"],
+  "needsCorrection": false,
+  "questions": [
+    {"type": "single", "prompt": "...", "options": ["选项1", "选项2", "选项3", "选项4"], "answer": "B", "explanation": "..."},
+    {"type": "judge", "prompt": "...", "answer": "对", "explanation": "..."},
+    {"type": "short", "prompt": "...", "referenceAnswer": "参考答案要点（必填，不能为空，不要写成 answer 字段）", "explanation": "评分要点"}
+  ]
+}`
 }
 
 // 修正正文：长 markdown 走纯文本通道，避免塞进 JSON 导致转义损坏（Design 约定）
