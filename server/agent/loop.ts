@@ -23,6 +23,8 @@ export interface RunAgentOptions {
   maxRounds?: number
   toolTimeoutMs?: number
   toolResultMaxChars?: number
+  /** 循环结束时若该工具仍未被调用，强制再要一轮并指定该 function（用于「必须落成结果」的收尾工具） */
+  requireTool?: string
   onEvent?: (e: AgentEvent) => void
 }
 
@@ -75,6 +77,37 @@ export async function runAgent(opts: RunAgentOptions): Promise<string> {
     { role: 'system', content: opts.system },
     { role: 'user', content: opts.prompt },
   ]
+  const calledTools = new Set<string>()
+  let finalContent = ''
+
+  // 单次工具调用：统一在这里发事件、记消息，主循环与强制收尾共用
+  const runToolCall = async (
+    call: OpenAI.Chat.Completions.ChatCompletionMessageFunctionToolCall,
+  ): Promise<void> => {
+    const tool = byName.get(call.function.name)
+    const args = safeParseArgs(call.function.arguments)
+    let ok = true
+    let resultText: string
+    if (!tool) {
+      ok = false
+      resultText = `未知工具：${call.function.name}`
+    } else {
+      calledTools.add(tool.name)
+      opts.onEvent?.({ type: 'tool_call', name: tool.name, args })
+      try {
+        const result = await withTimeout(tool.execute(args), toolTimeoutMs, tool.name)
+        resultText = truncate(
+          typeof result === 'string' ? result : JSON.stringify(result, null, 2),
+          resultMaxChars,
+        )
+      } catch (err) {
+        ok = false
+        resultText = `工具执行失败：${errMsg(err)}`
+      }
+    }
+    opts.onEvent?.({ type: 'tool_result', name: call.function.name, ok, preview: resultText.slice(0, 200) })
+    messages.push({ role: 'tool', tool_call_id: call.id, content: resultText })
+  }
 
   for (let round = 1; round <= maxRounds; round++) {
     opts.onEvent?.({ type: 'round', round })
@@ -99,32 +132,44 @@ export async function runAgent(opts: RunAgentOptions): Promise<string> {
       (c): c is OpenAI.Chat.Completions.ChatCompletionMessageFunctionToolCall => c.type === 'function',
     )
     if (calls.length === 0) {
-      const content = msg.content ?? ''
-      opts.onEvent?.({ type: 'final', content })
-      return content
+      finalContent = msg.content ?? ''
+      break
     }
 
-    for (const call of calls) {
-      const tool = byName.get(call.function.name)
-      const args = safeParseArgs(call.function.arguments)
-      let ok = true
-      let resultText: string
-      if (!tool) {
-        ok = false
-        resultText = `未知工具：${call.function.name}`
-      } else {
-        opts.onEvent?.({ type: 'tool_call', name: tool.name, args })
-        try {
-          const result = await withTimeout(tool.execute(args), toolTimeoutMs, tool.name)
-          resultText = truncate(typeof result === 'string' ? result : JSON.stringify(result, null, 2), resultMaxChars)
-        } catch (err) {
-          ok = false
-          resultText = `工具执行失败：${errMsg(err)}`
-        }
-      }
-      opts.onEvent?.({ type: 'tool_result', name: call.function.name, ok, preview: resultText.slice(0, 200) })
-      messages.push({ role: 'tool', tool_call_id: call.id, content: resultText })
+    for (const call of calls) await runToolCall(call)
+  }
+
+  // 必需工具漏调（flash 常见：研究做完却忘了 save_research_note，导致整节课报废）：
+  // 强制指定 function 再要一轮，已有对话上下文都在，模型只需把内容落成笔记
+  const required = opts.requireTool
+  if (required && !calledTools.has(required) && byName.has(required)) {
+    const model = getLLMModel()
+    const res = await llm.chat.completions.create({
+      model,
+      messages,
+      tools,
+      tool_choice: { type: 'function', function: { name: required } },
+    })
+    recordLlmUsage({
+      model,
+      tokensIn: res.usage?.prompt_tokens ?? 0,
+      tokensOut: res.usage?.completion_tokens ?? 0,
+      status: 'ok',
+    })
+    const msg = res.choices[0]?.message
+    if (msg) {
+      messages.push(msg)
+      const calls = (msg.tool_calls ?? []).filter(
+        (c): c is OpenAI.Chat.Completions.ChatCompletionMessageFunctionToolCall => c.type === 'function',
+      )
+      for (const call of calls) await runToolCall(call)
+      finalContent = finalContent || msg.content || ''
     }
+  }
+
+  if (finalContent) {
+    opts.onEvent?.({ type: 'final', content: finalContent })
+    return finalContent
   }
 
   // 轮次耗尽：不带工具强制收尾

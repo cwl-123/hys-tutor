@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { KnowledgeNode, ResearchNote } from '../../../shared/types'
+import { QUESTION_FIELD_CHECKLIST, QUESTION_OUTPUT_SAMPLE } from './question-format'
 
 export const llmQuestionDraftSchema = z.object({
   type: z.enum(['single', 'judge', 'short']),
@@ -89,16 +90,14 @@ CONTENT>>>
 4. 题目难度匹配 15 分钟微课，题干自包含（不依赖课程正文才能读懂）；5 道题考察角度错开，不互相重复
 
 输出 JSON（不要输出 correctedContent，修正正文由后续步骤单独处理）。
-questions 必须严格是这个形状，三种题型的必填字段一个都不能少（共 5 题 = 2 single + 2 judge + 1 short）：
+questions 共 5 题 = 2 single + 2 judge + 1 short，严格按下面的形状与顺序，三种题型的必填字段一个都不能少：
 {
   "issues": ["位置：问题"],
   "needsCorrection": false,
-  "questions": [
-    {"type": "single", "prompt": "...", "options": ["选项1", "选项2", "选项3", "选项4"], "answer": "B", "explanation": "..."},
-    {"type": "judge", "prompt": "...", "answer": "对", "explanation": "..."},
-    {"type": "short", "prompt": "...", "referenceAnswer": "参考答案要点（必填，不能为空，不要写成 answer 字段）", "explanation": "评分要点"}
-  ]
-}`
+  "questions": ${QUESTION_OUTPUT_SAMPLE}
+}
+
+${QUESTION_FIELD_CHECKLIST}`
 }
 
 // 修正正文：长 markdown 走纯文本通道，避免塞进 JSON 导致转义损坏（Design 约定）

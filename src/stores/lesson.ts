@@ -94,6 +94,7 @@ function stagePhase(stage: string): number | null {
     case 'outline-done':
       return 2
     case 'write':
+    case 'write-retry':
     case 'write-delta':
       return 3
     case 'self-check':

@@ -173,7 +173,9 @@ export async function startLessonJob(
       if (job.status !== 'running') return
       job.status = 'failed'
       job.error = errMsg(err)
-      console.error(`[lesson-job] 备课失败 ${lessonId}:`, err)
+      // 带上失败阶段：线上只看错误文本很难判断是研究、写作还是出题挂的
+      const stage = [...job.stages].reverse().find((s) => s.stage !== 'write-delta')?.stage ?? '未知'
+      console.error(`[lesson-job] 备课失败 ${lessonId}（阶段：${stage}）:`, err)
       await patchLessonStatus(topicId, lessonId, 'failed', job.error).catch(() => {})
       emit(job, { type: 'error', message: job.error })
     } finally {

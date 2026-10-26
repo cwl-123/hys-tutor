@@ -276,6 +276,9 @@ async function runResearch(
     system: RESEARCH_SYSTEM_PROMPT,
     prompt: researchUserPrompt(topicName, node, existing),
     tools,
+    // 研究做完了却没调用 save_research_note 是 flash 的高频失误：
+    // 强制收尾一轮把已有上下文落成笔记，别让整节课作废
+    requireTool: 'save_research_note',
     onEvent: (e) => {
       if (e.type === 'tool_call') onStage({ stage: 'research-tool', detail: { tool: e.name, args: e.args } })
       else if (e.type === 'tool_result' && !e.ok) onStage({ stage: 'research-tool-failed', detail: { tool: e.name, preview: e.preview } })
@@ -287,7 +290,7 @@ async function runResearch(
   return note
 }
 
-async function streamWriteLesson(system: string, prompt: string, onStage: StageFn): Promise<string> {
+async function streamWriteOnce(system: string, prompt: string, onStage: StageFn): Promise<string> {
   const model = getLLMModel()
   const stream = await getLLM().chat.completions.create({
     model,
@@ -316,6 +319,20 @@ async function streamWriteLesson(system: string, prompt: string, onStage: StageF
   recordLlmUsage({ model, tokensIn, tokensOut, status: 'ok' })
   if (!content.trim()) throw new Error('写作阶段未产出内容')
   return content
+}
+
+// 写作重试一次：空输出（provider 偶发空流）不该让前面 3 分钟的研究白费。
+// 重试那次不重复推流，成功后一次性补一条 delta，避免页面出现两遍草稿。
+async function streamWriteLesson(system: string, prompt: string, onStage: StageFn): Promise<string> {
+  try {
+    return await streamWriteOnce(system, prompt, onStage)
+  } catch (err) {
+    if (!(err instanceof Error) || err.message !== '写作阶段未产出内容') throw err
+    onStage({ stage: 'write-retry', detail: { reason: err.message } })
+    const content = await streamWriteOnce(system, prompt, () => {})
+    onStage({ stage: 'write-delta', detail: { text: content } })
+    return content
+  }
 }
 
 // 归档本课用过的案例（供后续课程避免重复）；失败不影响备课
@@ -646,25 +663,28 @@ export async function regenerateQuestions(lessonId: string): Promise<QuestionSet
     ...attempts.flatMap((a) => a.questions.map((q) => q.prompt)),
   ]
 
-  // 结构校验失败重试一次；仍失败则报错（坏题不进题集，旧题集保持不变）
-  let result: { questions: LlmSelfCheck['questions'] } | null = null
+  // 结构校验失败带原因重试；仍有坏题时只要合法题 ≥3 道就用合法题（坏题不入库）
+  let valid: LlmSelfCheck['questions'] = []
   let dropReasons: string[] = []
-  for (let attempt = 0; attempt < 2; attempt++) {
-    result = await completeJson({
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const result = await completeJson({
       system: QUIZ_SYSTEM_PROMPT,
-      prompt: quizPrompt(node, note, lesson.contentMd, [...new Set(avoidPrompts)]),
+      prompt: quizPrompt(node, note, lesson.contentMd, [...new Set(avoidPrompts)], dropReasons),
       schema: llmQuizSchema,
       temperature: 0.7,
     })
-    dropReasons = partitionQuestionDrafts(result.questions).dropped
+    const part = partitionQuestionDrafts(result.questions)
+    valid = part.valid
+    dropReasons = part.dropped
     if (dropReasons.length === 0) break
   }
-  if (!result || dropReasons.length) {
-    throw new Error(`出题结构校验未通过：${dropReasons.join('；') || '未知原因'}`)
+  if (dropReasons.length) {
+    if (valid.length < 3) throw new Error(`出题结构校验未通过：${dropReasons.join('；')}`)
+    console.warn('[quiz] 剔除坏题后继续', { dropped: dropReasons, kept: valid.length })
   }
   const questions: QuestionSet = {
     generatedAt: nowIso(),
-    questions: result.questions.map<Question>((q, i) => ({
+    questions: valid.map<Question>((q, i) => ({
       id: `q_${i + 1}`,
       nodeId: node.id,
       type: q.type,

@@ -80,27 +80,80 @@ export function repairJson(raw: string): string {
   return out
 }
 
+// 从 start 起按括号配对找第一个完整 JSON 值的结尾（跳过字符串内容与转义）；
+// 找不到返回 -1。用于切掉模型在完整 JSON 后面多吐的碎片。
+export function findJsonEnd(text: string, start: number): number {
+  let depth = 0
+  let inStr = false
+  for (let i = start; i < text.length; i++) {
+    const c = text[i]
+    if (inStr) {
+      if (c === '\\') i++
+      else if (c === '"') inStr = false
+      continue
+    }
+    if (c === '"') inStr = true
+    else if (c === '{' || c === '[') depth++
+    else if (c === '}' || c === ']') {
+      depth--
+      if (depth === 0) return i
+    }
+  }
+  return -1
+}
+
 // 从 LLM 文本中抠出 JSON（容忍代码围栏和前后废话；二次尝试修复未转义引号）
 export function extractJson(text: string): unknown {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/)
   const raw = fenced ? fenced[1] : text
   const start = raw.search(/[{[]/)
   if (start < 0) throw new Error('LLM 输出中未找到 JSON')
-  const end = Math.max(raw.lastIndexOf('}'), raw.lastIndexOf(']'))
-  if (end <= start) throw new Error('LLM 输出的 JSON 不完整')
-  const slice = raw.slice(start, end + 1)
-  try {
-    return JSON.parse(slice)
-  } catch (err) {
+  // 首选取「第一个括号配平的位置」：模型常在完整 JSON 后面续吐一段碎片
+  // （如 "]}, ], \"teachingNotes\""），用 lastIndexOf 会把尾巴一起切进来导致整轮报废
+  const balanced = findJsonEnd(raw, start)
+  const candidates: string[] = []
+  if (balanced > start) candidates.push(raw.slice(start, balanced + 1))
+  const lastEnd = Math.max(raw.lastIndexOf('}'), raw.lastIndexOf(']'))
+  if (lastEnd > start && lastEnd !== balanced) candidates.push(raw.slice(start, lastEnd + 1))
+  if (candidates.length === 0) throw new Error('LLM 输出的 JSON 不完整')
+
+  let firstErr: unknown
+  for (const slice of candidates) {
     try {
-      return JSON.parse(repairJson(slice))
-    } catch {
-      throw err
+      return JSON.parse(slice)
+    } catch (err) {
+      firstErr ??= err
+      try {
+        return JSON.parse(repairJson(slice))
+      } catch {
+        // 尝试下一个切法
+      }
     }
   }
+  throw firstErr instanceof Error ? firstErr : new Error('LLM 输出的 JSON 无法解析')
 }
 
-// 单轮 JSON 完成：输出经 zod 校验，失败带错误信息重试一次
+// zod 报错压成一行人话：英文 issue 对模型没用，字段路径 + 期望才管用
+export function formatZodIssues(err: unknown): string {
+  if (!(err instanceof z.ZodError)) return errMsg(err)
+  return err.issues
+    .slice(0, 6)
+    .map((i) => `${i.path.join('.') || '(根)'}：${i.message}`)
+    .join('；')
+}
+
+// JSON 模式（response_format=json_object）能力缓存：null=未探测
+let jsonModeCapability: boolean | null = null
+
+// provider 不支持 response_format 时会回 400；只在参数被拒时降级，其余错误照抛
+function isUnsupportedParamError(err: unknown): boolean {
+  const e = err as { status?: number; message?: string; error?: { message?: string } }
+  const msg = `${e?.message ?? ''} ${e?.error?.message ?? ''}`.toLowerCase()
+  const aboutParam = msg.includes('response_format') || msg.includes('json_object') || msg.includes('json mode')
+  return aboutParam && (e?.status === 400 || e?.status === 422 || e?.status === 404 || e?.status === undefined)
+}
+
+// 单轮 JSON 完成：输出经 zod 校验，失败带错误信息重试（共 3 次）
 export async function completeJson<T>(opts: {
   system: string
   prompt: string
@@ -113,13 +166,31 @@ export async function completeJson<T>(opts: {
     { role: 'user', content: opts.prompt },
   ]
   let lastErr: unknown
-  for (let attempt = 0; attempt < 3; attempt++) {
+  let attempt = 0
+  while (attempt < 3) {
     const model = getLLMModel()
-    const res = await llm.chat.completions.create({
-      model,
-      messages,
-      temperature: opts.temperature ?? 0.3,
-    })
+    const wantJsonMode = process.env.LLM_JSON_MODE !== '0' && jsonModeCapability !== false
+    let res: OpenAI.Chat.Completions.ChatCompletion
+    try {
+      res = await llm.chat.completions.create({
+        model,
+        messages,
+        temperature: opts.temperature ?? 0.3,
+        // 强约束成 JSON：模型少吐一句解释，就少一类「JSON 里混碎片」的报废
+        ...(wantJsonMode ? { response_format: { type: 'json_object' as const } } : {}),
+      })
+      if (wantJsonMode) jsonModeCapability = true
+    } catch (err) {
+      if (wantJsonMode && isUnsupportedParamError(err)) {
+        jsonModeCapability = false
+        console.warn('[completeJson] provider 不支持 response_format，降级为纯文本 JSON 解析', {
+          message: errMsg(err),
+        })
+        continue // 不计入重试次数，同一轮换普通模式再来一次
+      }
+      throw err
+    }
+    attempt++
     recordLlmUsage({
       model,
       tokensIn: res.usage?.prompt_tokens ?? 0,
@@ -128,21 +199,22 @@ export async function completeJson<T>(opts: {
     })
     const text = res.choices[0]?.message?.content ?? ''
     try {
+      if (!text.trim()) throw new Error('模型返回空内容')
       return opts.schema.parse(extractJson(text))
     } catch (err) {
       lastErr = err
       // 排障关键：记录模型实际返回（截断），否则线上只剩"未找到 JSON"无从排查
       console.error('[completeJson] 输出校验失败', {
-        attempt: attempt + 1,
+        attempt,
         finishReason: res.choices[0]?.finish_reason,
         contentLen: text.length,
         contentPreview: text.slice(0, 500),
         error: errMsg(err),
       })
-      messages.push({ role: 'assistant', content: text })
+      messages.push({ role: 'assistant', content: text || '（空）' })
       messages.push({
         role: 'user',
-        content: `输出校验失败：${errMsg(err)}。请重新输出，只输出合法 JSON，不要任何解释；字符串值内部严禁出现未转义的英文双引号（引用词句用「」）。`,
+        content: `输出校验失败：${formatZodIssues(err) || errMsg(err)}。请修正后重新输出完整 JSON，只输出 JSON 不要解释；字符串值内部严禁出现未转义的英文双引号（引用词句用「」）。`,
       })
     }
   }
@@ -150,28 +222,33 @@ export async function completeJson<T>(opts: {
 }
 
 // 单轮纯文本完成：用于长 markdown 生成（不经 JSON，避免长文本转义损坏）
+// 空输出重试一次：provider 偶发返回空 content，不该让整节课作废
 export async function completeText(opts: {
   system: string
   prompt: string
   temperature?: number
 }): Promise<string> {
   const llm = getLLM()
-  const model = getLLMModel()
-  const res = await llm.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: opts.system },
-      { role: 'user', content: opts.prompt },
-    ],
-    temperature: opts.temperature ?? 0.5,
-  })
-  recordLlmUsage({
-    model,
-    tokensIn: res.usage?.prompt_tokens ?? 0,
-    tokensOut: res.usage?.completion_tokens ?? 0,
-    status: 'ok',
-  })
-  const text = res.choices[0]?.message?.content ?? ''
-  if (!text.trim()) throw new Error('LLM 未返回内容')
-  return text
+  const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+    { role: 'system', content: opts.system },
+    { role: 'user', content: opts.prompt },
+  ]
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const model = getLLMModel()
+    const res = await llm.chat.completions.create({
+      model,
+      messages,
+      temperature: opts.temperature ?? 0.5,
+    })
+    recordLlmUsage({
+      model,
+      tokensIn: res.usage?.prompt_tokens ?? 0,
+      tokensOut: res.usage?.completion_tokens ?? 0,
+      status: 'ok',
+    })
+    const text = res.choices[0]?.message?.content ?? ''
+    if (text.trim()) return text
+    console.warn('[completeText] 模型返回空内容', { attempt, finishReason: res.choices[0]?.finish_reason })
+  }
+  throw new Error('LLM 未返回内容')
 }
