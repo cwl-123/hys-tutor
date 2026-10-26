@@ -35,7 +35,7 @@
 - 安全：请求体 2MB 上限、SSRF 解析后 IP 校验 + 手动逐跳重定向、CSP/安全响应头、5xx 不泄露内部错误。
 - 前端：`/login`、`/register`、`/change-password`、`/terms`、`/privacy`、`/admin`；路由守卫、顶栏用户/退出/额度、AI 生成标识、只读设置弹窗。
 - 部署：`deploy/install.sh`、`deploy/nginx-*.conf`、`deploy/hys-tutor.service`、`deploy/backup.*`、`deploy/README.md`；旧数据迁移 `scripts/migrate-user-data.mjs`。
-- 测试：171+ 单测通过，新增 `tests/auth.test.ts`（注册/邀请码/登录/会话/禁用/配额/隔离）与 `tests/ssrf.test.ts`；`pnpm typecheck && pnpm lint && pnpm test && pnpm build` 全绿。
+- 测试：177 个单测通过，新增 `tests/auth.test.ts`（注册/邀请码/登录/会话/禁用/配额/隔离）、`tests/ssrf.test.ts`（私网/重定向）与 `tests/feedback.test.ts`（提交/管理员查看）；`pnpm typecheck && pnpm lint && pnpm test && pnpm build` 全绿。
 
 
 ---
