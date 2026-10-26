@@ -60,6 +60,11 @@ describe('extractJson：JSON 后面多吐碎片', () => {
     expect(extractJson('[1, {"a": 2}] 后面是废话')).toEqual([1, { a: 2 }])
   })
 
+  it('正文先出现 [1] 引用标记时不误切', () => {
+    const raw = '来源 [1] 如下：{"focus": "x", "n": [1, 2]}'
+    expect(extractJson(raw)).toEqual({ focus: 'x', n: [1, 2] })
+  })
+
   it('findJsonEnd 定位首个配平结尾', () => {
     const text = '前缀 {"a": [1, 2]} 尾巴'
     const start = text.indexOf('{')

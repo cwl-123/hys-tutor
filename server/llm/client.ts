@@ -106,30 +106,54 @@ export function findJsonEnd(text: string, start: number): number {
 export function extractJson(text: string): unknown {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/)
   const raw = fenced ? fenced[1] : text
-  const start = raw.search(/[{[]/)
-  if (start < 0) throw new Error('LLM 输出中未找到 JSON')
-  // 首选取「第一个括号配平的位置」：模型常在完整 JSON 后面续吐一段碎片
-  // （如 "]}, ], \"teachingNotes\""），用 lastIndexOf 会把尾巴一起切进来导致整轮报废
-  const balanced = findJsonEnd(raw, start)
+  const starts: number[] = []
+  const firstBracket = raw.search(/[{[]/)
+  if (firstBracket < 0) throw new Error('LLM 输出中未找到 JSON')
+  starts.push(firstBracket)
+  // 正文里先出现了 [1] 这类引用标记时，真正的对象在后面
+  const firstBrace = raw.indexOf('{')
+  if (firstBrace > firstBracket) starts.push(firstBrace)
+
   const candidates: string[] = []
-  if (balanced > start) candidates.push(raw.slice(start, balanced + 1))
   const lastEnd = Math.max(raw.lastIndexOf('}'), raw.lastIndexOf(']'))
-  if (lastEnd > start && lastEnd !== balanced) candidates.push(raw.slice(start, lastEnd + 1))
+  for (const start of starts) {
+    // 首选取「括号配平的位置」：模型常在完整 JSON 后面续吐一段碎片
+    // （如 "]}, ], \"teachingNotes\""），用 lastIndexOf 会把尾巴一起切进来导致整轮报废
+    const balanced = findJsonEnd(raw, start)
+    if (balanced > start) candidates.push(raw.slice(start, balanced + 1))
+    if (lastEnd > start && lastEnd !== balanced) candidates.push(raw.slice(start, lastEnd + 1))
+  }
   if (candidates.length === 0) throw new Error('LLM 输出的 JSON 不完整')
 
   let firstErr: unknown
+  let primitive: unknown
+  let hasPrimitive = false
+  let best: { value: unknown; len: number } | null = null
   for (const slice of candidates) {
+    let parsed: unknown
     try {
-      return JSON.parse(slice)
+      parsed = JSON.parse(slice)
     } catch (err) {
       firstErr ??= err
       try {
-        return JSON.parse(repairJson(slice))
+        parsed = JSON.parse(repairJson(slice))
       } catch {
-        // 尝试下一个切法
+        continue // 尝试下一个切法
       }
     }
+    // 解析成数字/字符串说明切错位置了（切到了 "[1]" 这类引用），留作兜底继续找
+    if (parsed === null || typeof parsed !== 'object') {
+      if (!hasPrimitive) {
+        primitive = parsed
+        hasPrimitive = true
+      }
+      continue
+    }
+    // 多个起点都能解析时取最长的：完整 JSON 一定比正文里的 [1] 长
+    if (!best || slice.length > best.len) best = { value: parsed, len: slice.length }
   }
+  if (best) return best.value
+  if (hasPrimitive) return primitive
   throw firstErr instanceof Error ? firstErr : new Error('LLM 输出的 JSON 无法解析')
 }
 

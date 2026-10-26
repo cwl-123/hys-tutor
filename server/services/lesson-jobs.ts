@@ -29,14 +29,16 @@ function topicKey(userId: string, topicId: string): string {
 }
 
 // 任务级看门狗：LLM 调用挂起时（OpenAI SDK 默认超时约 10 分钟且无上限保证）
-// 不能让 runningByTopic 永远被占——超时后标记失败并释放，允许用户重新发起
-const JOB_TIMEOUT_MS = 10 * 60_000
+// 不能让 runningByTopic 永远被占——超时后标记失败并释放，允许用户重新发起。
+// 15 分钟而非 10 分钟：provider 慢的时候研究 4~8 轮工具调用 + 大纲/写作重试就可能逼近 10 分钟，
+// 慢不等于坏，砍掉等于把「能出课」的成功变成「超时」的失败。
+const JOB_TIMEOUT_MS = 15 * 60_000
 
 function armWatchdog(job: Job, onTimeout: () => Promise<void>): ReturnType<typeof setTimeout> {
   return setTimeout(() => {
     if (job.status !== 'running') return
     job.status = 'failed'
-    job.error = '任务超时（超过 10 分钟无响应），已终止，请重新发起'
+    job.error = '任务超时（超过 15 分钟无响应），已终止，请重新发起'
     console.error(`[lesson-job] 看门狗超时 ${job.lessonId}`)
     void onTimeout().catch(() => {})
     if (runningByTopic.get(topicKey(job.userId, job.topicId)) === job) {
