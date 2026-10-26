@@ -13,6 +13,7 @@ import {
   handleRegister,
 } from './routes/auth'
 import {
+  handleAdminFeedback,
   handleAdminInvites,
   handleAdminResetPassword,
   handleAdminStats,
@@ -20,6 +21,7 @@ import {
   handleAdminUsers,
 } from './routes/admin'
 import { handleGraphChat, handleTopics } from './routes/topics'
+import { handleCreateFeedback } from './routes/feedback'
 import {
   handleApplyLessonChat,
   handleCreateLesson,
@@ -129,7 +131,17 @@ async function routeApi(req: IncomingMessage, res: ServerResponse, next: Next) {
       return
     }
 
+    // ---- 反馈 ----
+    if (req.method === 'POST' && url === '/feedback') {
+      await handleCreateFeedback(req, res)
+      return
+    }
+
     // ---- 管理端 ----
+    if (req.method === 'GET' && url === '/admin/feedback') {
+      await handleAdminFeedback(req, res)
+      return
+    }
     if (req.method === 'GET' && url === '/admin/users') {
       await handleAdminUsers(req, res)
       return

@@ -70,6 +70,54 @@ export async function handleAdminInvites(req: IncomingMessage, res: ServerRespon
   sendJson(res, 200, { invites })
 }
 
+export interface AdminFeedbackRow {
+  id: string
+  nickname: string | null
+  kind: string
+  page: string | null
+  body: string
+  contact: string | null
+  status: string
+  createdAt: string
+}
+
+export async function handleAdminFeedback(
+  req: IncomingMessage,
+  res: ServerResponse,
+): Promise<void> {
+  requireAdmin(req)
+  const rows = getDb()
+    .prepare(
+      `SELECT f.id, u.nickname, f.kind, f.page, f.body, f.contact, f.status, f.created_at
+       FROM feedback f LEFT JOIN users u ON u.id = f.user_id
+       ORDER BY f.created_at DESC LIMIT 100`,
+    )
+    .all() as Array<{
+    id: string
+    nickname: string | null
+    kind: string
+    page: string | null
+    body: string
+    contact: string | null
+    status: string
+    created_at: string
+  }>
+  sendJson(res, 200, {
+    feedback: rows.map(
+      (r): AdminFeedbackRow => ({
+        id: r.id,
+        nickname: r.nickname,
+        kind: r.kind,
+        page: r.page,
+        body: r.body,
+        contact: r.contact,
+        status: r.status,
+        createdAt: r.created_at,
+      }),
+    ),
+  })
+}
+
 export async function handleAdminStats(req: IncomingMessage, res: ServerResponse): Promise<void> {
   requireAdmin(req)
   const userCount = getDb().prepare('SELECT COUNT(*) AS n FROM users').get() as { n: number }

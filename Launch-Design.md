@@ -28,7 +28,8 @@
 - 认证：`server/db.ts` + `server/auth/*` + `/api/auth/{register,login,logout,me,password}`；单次邀请码、scrypt 密码、30 天滚动会话、5 会话上限、临时密码强制改密。
 - 冷启动：第一个注册用户自动成为管理员；`BOOTSTRAP_INVITE_CODE` 解决「没有管理员就发不了邀请码」的死锁，注册成功后应从 env 删除。
 - 隔离：`AsyncLocalStorage` + `dataPath()` 自动落到 `data/users/<uid>/`；备课后台任务与看门狗都显式 `runAsUser`，避免脱离请求上下文后写错目录。
-- 管理：`/api/admin/{users,invites,stats}` + 前端 `/admin`（生成邀请码、禁用/恢复、重置临时密码、今日花费）。
+- 管理：`/api/admin/{users,invites,stats,feedback}` + 前端 `/admin`（生成邀请码、禁用/恢复、重置临时密码、今日花费、用户反馈列表）。
+- 反馈：登录用户页脚「反馈」→ `POST /api/feedback` 落 SQLite；管理员在 `/admin` 查看最近 100 条。
 - 配额：每日动作配额用「检查并占用」（`consumeQuota`）避免长任务并发穿透；全站日预算熔断；登录/注册/改密进程内限流 + Nginx 双层限流。
 - 密钥：`settings-service` 只读 env；`GET /api/settings` 不再返回 key/baseUrl；本机配置导入默认 404。
 - 安全：请求体 2MB 上限、SSRF 解析后 IP 校验 + 手动逐跳重定向、CSP/安全响应头、5xx 不泄露内部错误。

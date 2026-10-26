@@ -11,6 +11,17 @@ interface AdminUser {
   lastLoginAt: string | null
 }
 
+interface FeedbackRow {
+  id: string
+  nickname: string | null
+  kind: string
+  page: string | null
+  body: string
+  contact: string | null
+  status: string
+  createdAt: string
+}
+
 interface Stats {
   users: number
   activeSessions: number
@@ -18,6 +29,7 @@ interface Stats {
 }
 
 const users = ref<AdminUser[]>([])
+const feedback = ref<FeedbackRow[]>([])
 const stats = ref<Stats | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
@@ -50,12 +62,14 @@ async function reload(): Promise<void> {
   loading.value = true
   error.value = null
   try {
-    const [u, s] = await Promise.all([
+    const [u, s, f] = await Promise.all([
       request<{ users: AdminUser[] }>('/api/admin/users'),
       request<Stats>('/api/admin/stats'),
+      request<{ feedback: FeedbackRow[] }>('/api/admin/feedback'),
     ])
     users.value = u.users
     stats.value = s
+    feedback.value = f.feedback
   } catch (err) {
     error.value = errMsg(err)
   } finally {
@@ -119,6 +133,12 @@ async function resetPassword(user: AdminUser): Promise<void> {
   } catch (err) {
     alert(errMsg(err))
   }
+}
+
+function kindLabel(kind: string): string {
+  return (
+    { bug: '功能异常', content: '内容有误', suggestion: '改进建议', other: '其他' }[kind] ?? kind
+  )
 }
 
 function fmt(ts: string | null): string {
@@ -212,6 +232,40 @@ onMounted(reload)
           >
             复制
           </button>
+        </li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h2>
+        用户反馈 <small class="count">{{ feedback.length }}</small>
+      </h2>
+      <p
+        v-if="!feedback.length"
+        class="empty"
+      >
+        暂无反馈
+      </p>
+      <ul
+        v-else
+        class="feedback-list"
+      >
+        <li
+          v-for="item in feedback"
+          :key="item.id"
+        >
+          <div class="feedback-list__head">
+            <strong>{{ kindLabel(item.kind) }}</strong>
+            <span>{{ item.nickname ?? '已注销用户' }} · {{ fmt(item.createdAt) }}</span>
+          </div>
+          <p>{{ item.body }}</p>
+          <div
+            v-if="item.page || item.contact"
+            class="feedback-list__meta"
+          >
+            <span v-if="item.page">页面：{{ item.page }}</span>
+            <span v-if="item.contact">联系：{{ item.contact }}</span>
+          </div>
         </li>
       </ul>
     </section>
@@ -412,5 +466,54 @@ onMounted(reload)
   background: none;
   border: none;
   cursor: pointer;
+}
+.count {
+  margin-left: 6px;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 400;
+}
+.empty {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.feedback-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.feedback-list li {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-muted);
+}
+.feedback-list__head {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  font-size: 12px;
+}
+.feedback-list__head span {
+  color: var(--text-dim);
+}
+.feedback-list p {
+  margin: 0;
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+.feedback-list__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 6px;
+  color: var(--text-dim);
+  font-size: 11px;
 }
 </style>

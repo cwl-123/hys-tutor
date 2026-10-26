@@ -3,12 +3,14 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Heart, LogOut, Settings, Shield } from 'lucide-vue-next'
 import SettingsModal from '@/components/SettingsModal.vue'
+import FeedbackDialog from '@/components/FeedbackDialog.vue'
 import ToastHost from '@/components/ToastHost.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
 const showSettings = ref(false)
+const showFeedback = ref(false)
 
 const lessonQuota = computed(() => auth.usage?.actions.lesson ?? null)
 
@@ -128,6 +130,13 @@ async function logout(): Promise<void> {
     <footer class="app-footer">
       <span>课程与批改内容由 AI 生成，仅供参考，请自行核实。</span>
       <span class="app-footer__links">
+        <button
+          v-if="auth.user"
+          class="app-footer__feedback"
+          @click="showFeedback = true"
+        >
+          反馈
+        </button>
         <RouterLink to="/terms">用户协议</RouterLink>
         <RouterLink to="/privacy">隐私政策</RouterLink>
       </span>
@@ -135,6 +144,10 @@ async function logout(): Promise<void> {
     <SettingsModal
       :open="showSettings"
       @close="showSettings = false"
+    />
+    <FeedbackDialog
+      :open="showFeedback"
+      @close="showFeedback = false"
     />
     <ToastHost />
   </div>
@@ -245,10 +258,17 @@ async function logout(): Promise<void> {
   display: inline-flex;
   gap: 12px;
 }
-.app-footer a {
+.app-footer a,
+.app-footer__feedback {
+  padding: 0;
+  border: 0;
   color: inherit;
+  font: inherit;
   text-decoration: none;
+  background: transparent;
+  cursor: pointer;
 }
+.app-footer__feedback:hover,
 .app-footer a:hover {
   color: var(--text);
 }
