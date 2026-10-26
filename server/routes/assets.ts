@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import path from 'node:path'
-import { sendJson } from '../index'
+import { sendJson } from '../http'
 import { ASSET_MIME, isSafeAssetName, readAsset } from '../services/asset-store'
 
 // GET/HEAD /api/topics/:tid/assets/:file — 课件配图静态资源（文件名含内容哈希，可长期缓存）

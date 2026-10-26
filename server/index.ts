@@ -1,6 +1,24 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { errMsg } from '../shared/error'
+import { HttpError, statusOf, messageOf, QuotaError } from './auth/errors'
+import { assertSameOrigin, isPublicApi } from './auth/middleware'
+import { requireSession } from './auth/session'
+import { runAsUser } from './repo/context'
+import { sendJson } from './http'
 import { healthRoute } from './routes/health'
+import {
+  handleChangePassword,
+  handleLogin,
+  handleLogout,
+  handleMe,
+  handleRegister,
+} from './routes/auth'
+import {
+  handleAdminInvites,
+  handleAdminResetPassword,
+  handleAdminStats,
+  handleAdminUser,
+  handleAdminUsers,
+} from './routes/admin'
 import { handleGraphChat, handleTopics } from './routes/topics'
 import {
   handleApplyLessonChat,
@@ -42,11 +60,95 @@ import {
 
 type Next = (err?: unknown) => void
 
-// 极简路由分发：url 已被 vite middleware 剥掉 /api 前缀
+// 所有 /api 请求的统一入口：同源校验 → 公开路由直接分发 / 受保护路由先建会话上下文
 export async function handleApi(req: IncomingMessage, res: ServerResponse, next: Next) {
+  const url = (req.url ?? '/').split('?')[0]
+  try {
+    assertSameOrigin(req)
+    if (isPublicApi(url)) {
+      await routeApi(req, res, next)
+      return
+    }
+    const user = requireSession(req)
+    if (
+      user.mustChangePassword &&
+      url !== '/auth/password' &&
+      url !== '/auth/me' &&
+      url !== '/auth/logout'
+    ) {
+      throw new HttpError(403, '请先修改临时密码')
+    }
+    await runAsUser(user.id, () => routeApi(req, res, next))
+  } catch (err) {
+    sendError(res, err)
+  }
+}
+
+function sendError(res: ServerResponse, err: unknown): void {
+  if (res.headersSent) {
+    res.end()
+    return
+  }
+  const status = statusOf(err)
+  if (status >= 500) console.error('[api]', err)
+  if (err instanceof QuotaError) {
+    res.setHeader('Retry-After', String(err.retryAfterSeconds))
+  }
+  // 5xx 不回传内部错误细节（可能含路径、SQL、上游响应）
+  sendJson(res, status, { error: status >= 500 ? '服务器内部错误' : messageOf(err) })
+}
+
+// 极简路由分发：url 已被 vite middleware 剥掉 /api 前缀
+async function routeApi(req: IncomingMessage, res: ServerResponse, next: Next) {
   const url = (req.url ?? '/').split('?')[0]
 
   try {
+    // ---- 认证 ----
+    if (req.method === 'POST' && url === '/auth/register') {
+      await handleRegister(req, res)
+      return
+    }
+    if (req.method === 'POST' && url === '/auth/login') {
+      await handleLogin(req, res)
+      return
+    }
+    if (req.method === 'POST' && url === '/auth/logout') {
+      await handleLogout(req, res)
+      return
+    }
+    if (req.method === 'GET' && url === '/auth/me') {
+      await handleMe(req, res)
+      return
+    }
+    if (req.method === 'POST' && url === '/auth/password') {
+      await handleChangePassword(req, res)
+      return
+    }
+
+    // ---- 管理端 ----
+    if (req.method === 'GET' && url === '/admin/users') {
+      await handleAdminUsers(req, res)
+      return
+    }
+    if (req.method === 'POST' && url === '/admin/invites') {
+      await handleAdminInvites(req, res)
+      return
+    }
+    if (req.method === 'GET' && url === '/admin/stats') {
+      await handleAdminStats(req, res)
+      return
+    }
+    const adminResetMatch = url.match(/^\/admin\/users\/([^/]+)\/reset-password$/)
+    if (req.method === 'POST' && adminResetMatch) {
+      await handleAdminResetPassword(req, res, adminResetMatch[1])
+      return
+    }
+    const adminUserMatch = url.match(/^\/admin\/users\/([^/]+)$/)
+    if (req.method === 'PATCH' && adminUserMatch) {
+      await handleAdminUser(req, res, adminUserMatch[1])
+      return
+    }
+
     if (req.method === 'GET' && url === '/health') {
       healthRoute(req, res)
       return
@@ -237,16 +339,8 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, next:
 
     next()
   } catch (err) {
-    if (res.headersSent) {
-      res.end()
-      return
-    }
-    sendJson(res, 500, { error: errMsg(err) })
+    sendError(res, err)
   }
 }
 
-export function sendJson(res: ServerResponse, status: number, body: unknown): void {
-  res.statusCode = status
-  res.setHeader('Content-Type', 'application/json; charset=utf-8')
-  res.end(JSON.stringify(body))
-}
+export { sendJson } from './http'

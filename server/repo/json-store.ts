@@ -1,14 +1,30 @@
 import { copyFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
+import { currentUserId, safeUserId } from './context'
 
 // 数据目录：默认 <cwd>/data，可用 HYS_DATA_DIR 覆盖（测试隔离用）
 export const DATA_DIR = process.env.HYS_DATA_DIR
   ? path.resolve(process.env.HYS_DATA_DIR)
   : path.resolve(process.cwd(), 'data')
 
+// 显式按用户拼路径：注册等还没有请求上下文的场景用
+export function userDataPath(userId: string, ...parts: string[]): string {
+  return path.join(DATA_DIR, 'users', safeUserId(userId), ...parts)
+}
+
+// 请求链路默认入口：自动带当前用户维度，service 层不用感知多租户
 export function dataPath(...parts: string[]): string {
-  return path.join(DATA_DIR, ...parts)
+  return userDataPath(currentUserId(), ...parts)
+}
+
+// 全局非用户数据（研究缓存、公告等）
+export function globalPath(...parts: string[]): string {
+  return path.join(DATA_DIR, 'global', ...parts)
+}
+
+export async function ensureUserDir(userId: string): Promise<void> {
+  await mkdir(userDataPath(userId, 'topics'), { recursive: true })
 }
 
 export async function readJson<T>(file: string, fallback: T): Promise<T> {

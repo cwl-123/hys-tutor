@@ -1,0 +1,9 @@
+[Unit]
+Description=hys-tutor backup
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+EnvironmentFile=-/etc/hys-tutor-backup.env
+ExecStart=/opt/hys-tutor/deploy/backup.sh

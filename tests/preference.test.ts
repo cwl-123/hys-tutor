@@ -21,13 +21,13 @@ const {
   safeExtractPreferences,
   updatePreference,
 } = await import('../server/services/preference-service')
-const { writeJson } = await import('../server/repo/json-store')
+const { writeJson, dataPath } = await import('../server/repo/json-store')
 
 const SOURCE = { kind: 'lesson-chat' as const, label: '测试来源' }
 
 beforeEach(async () => {
   completeJson.mockReset()
-  await writeJson(path.join(dataDir, 'preferences.json'), [])
+  await writeJson(dataPath('preferences.json'), [])
 })
 
 describe('偏好 CRUD', () => {
@@ -106,7 +106,7 @@ describe('extractPreferences', () => {
       source: { kind: 'manual' as const },
       createdAt: new Date().toISOString(),
     }))
-    await writeJson(path.join(dataDir, 'preferences.json'), prefs)
+    await writeJson(dataPath('preferences.json'), prefs)
     completeJson.mockResolvedValue({ ops: [{ action: 'add', text: '新偏好' }] })
     const changed = await extractPreferences('再来一条', SOURCE)
     expect(changed).toEqual([])

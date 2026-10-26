@@ -15,13 +15,13 @@ vi.mock('../server/llm/client', () => ({
 const { getTopic, listTopics, updateTopicProfile } = await import(
   '../server/services/graph-service'
 )
-const { writeJson } = await import('../server/repo/json-store')
+const { writeJson, dataPath } = await import('../server/repo/json-store')
 
 const TOPIC = { id: 't_1', name: '测试课题', createdAt: '2026-01-01T00:00:00.000Z' }
 
 beforeEach(async () => {
-  await writeJson(path.join(dataDir, 'topics', TOPIC.id, 'topic.json'), TOPIC)
-  await writeJson(path.join(dataDir, 'topics.json'), [TOPIC])
+  await writeJson(dataPath('topics', TOPIC.id, 'topic.json'), TOPIC)
+  await writeJson(dataPath('topics.json'), [TOPIC])
 })
 
 describe('updateTopicProfile', () => {

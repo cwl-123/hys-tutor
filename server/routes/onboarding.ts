@@ -1,8 +1,11 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { z } from 'zod'
 import { errMsg } from '../../shared/error'
-import { sendJson } from '../index'
-import { readBody } from './topics'
+import { sendJson } from '../http'
+import { readBody } from '../http'
+import { currentUserId } from '../repo/context'
+import { consumeQuota } from '../services/quota-service'
+import { statusOf } from '../auth/errors'
 import { chatOnboarding } from '../services/onboarding-service'
 
 const onboardingChatBodySchema = z.object({
@@ -28,9 +31,12 @@ export async function handleOnboardingChat(
     return
   }
   try {
+    const userId = currentUserId()
+    consumeQuota(userId, 'chat')
     const result = await chatOnboarding(body.data.messages)
     sendJson(res, 200, result)
   } catch (err) {
-    sendJson(res, 500, { error: errMsg(err) })
+    const status = statusOf(err)
+    sendJson(res, status, { error: status >= 500 ? '服务器内部错误' : errMsg(err) })
   }
 }

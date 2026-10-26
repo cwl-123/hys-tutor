@@ -1,10 +1,10 @@
 // 课件配图素材库：按课题落到 data/topics/<tid>/assets/，内容哈希命名天然去重
 // 课件正文统一引用 /api/topics/<tid>/assets/<file>，原图直链记入 assets.json 供图注来源
 import { createHash } from 'node:crypto'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { dataPath, nowIso, readJson, writeJson } from '../repo/json-store'
-import { assertPublicHttpUrl } from '../ssrf'
+import { safeFetch } from '../ssrf'
 import type { LessonImage } from '../../shared/types'
 
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024
@@ -47,6 +47,25 @@ export function manifestFile(topicId: string): string {
 }
 
 // 素材文件名只允许简单字符，防路径穿越
+async function dirSize(dir: string): Promise<number> {
+  let total = 0
+  let entries
+  try {
+    entries = await readdir(dir, { withFileTypes: true })
+  } catch {
+    return 0
+  }
+  for (const e of entries) {
+    const p = path.join(dir, e.name)
+    try {
+      total += e.isDirectory() ? await dirSize(p) : (await stat(p)).size
+    } catch {
+      // 文件在统计过程中被删除，忽略
+    }
+  }
+  return total
+}
+
 export function isSafeAssetName(file: string): boolean {
   return /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(file) && !file.includes('..')
 }
@@ -92,6 +111,9 @@ export async function saveImageBuffer(
   if (buf.length === 0 || buf.length > MAX_IMAGE_BYTES) return null
   const ext = detectImageExt(buf)
   if (!ext) return null
+  // 每用户总存储上限（图片是主要占用）；超限静默失败，调用方保留外链/剔除
+  const maxUserBytes = Number(process.env.MAX_USER_STORAGE_MB || 500) * 1024 * 1024
+  if (maxUserBytes > 0 && (await dirSize(dataPath())) + buf.length > maxUserBytes) return null
   const file = `${createHash('sha256').update(buf).digest('hex').slice(0, 16)}${ext}`
   await mkdir(assetsDir(topicId), { recursive: true })
   await writeFile(path.join(assetsDir(topicId), file), buf)
@@ -116,13 +138,10 @@ export async function downloadImage(
   meta: { title?: string; pageUrl?: string } = {},
 ): Promise<SavedImage | null> {
   try {
-    assertPublicHttpUrl(url)
-    const res = await fetch(url, {
+    const res = await safeFetch(url, {
       headers: { 'User-Agent': UA, Accept: 'image/*,*/*;q=0.8' },
       signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
-      redirect: 'follow',
     })
-    if (res.url) assertPublicHttpUrl(res.url)
     if (!res.ok) return null
     const len = Number(res.headers.get('content-length') ?? 0)
     if (len > MAX_IMAGE_BYTES) return null

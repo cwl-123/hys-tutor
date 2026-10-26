@@ -130,6 +130,9 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll, true))
     @mouseup="onMouseUp"
     @click="onRootClick"
   >
+    <p class="lesson-body__ai-note">
+      本课由 AI 生成，可能存在事实错误或过时信息，请结合来源自行核实。
+    </p>
     <section
       v-for="(s, i) in sections"
       :key="i"
@@ -201,6 +204,15 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll, true))
 </template>
 
 <style scoped>
+.lesson-body__ai-note {
+  margin: 0 0 14px;
+  padding: 7px 10px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-dim);
+  background: var(--bg-muted);
+  border-radius: 6px;
+}
 .lesson-body {
   position: relative;
 }

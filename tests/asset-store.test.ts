@@ -7,6 +7,7 @@ import type * as AssetStoreModule from '../server/services/asset-store'
 // DATA_DIR 在 json-store 导入时绑定，必须先设 HYS_DATA_DIR 再动态导入
 let store: typeof AssetStoreModule
 let dataDir: string
+let dataPath: typeof import('../server/repo/json-store').dataPath
 
 function png(content = 'fake-png'): Buffer {
   return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from(content)])
@@ -16,6 +17,7 @@ beforeAll(async () => {
   dataDir = await mkdtemp(path.join(tmpdir(), 'hys-assets-'))
   process.env.HYS_DATA_DIR = dataDir
   store = await import('../server/services/asset-store')
+  dataPath = (await import('../server/repo/json-store')).dataPath
 })
 
 afterAll(() => {
@@ -65,7 +67,7 @@ describe('saveImageBuffer', () => {
     expect(b!.file).toBe(a!.file) // 同内容同文件
     expect(b!.meta.originUrl).toBe('https://x/1.png') // 来源不被空 meta 覆盖
 
-    const files = await readdir(path.join(dataDir, 'topics', topicId, 'assets'))
+    const files = await readdir(dataPath('topics', topicId, 'assets'))
     expect(files).toEqual([a!.file])
     const manifest = await store.readManifest(topicId)
     expect(manifest[a!.file].pageUrl).toBe('https://x/p')
@@ -177,6 +179,6 @@ describe('localizeImages', () => {
     expect(buf!.equals(png('read-me'))).toBe(true)
     await expect(store.readAsset(topicId, '../graph.json')).resolves.toBeNull()
     expect(await store.readAsset(topicId, 'no-such.png')).toBeNull()
-    expect((await stat(path.join(dataDir, 'topics', topicId, 'assets', saved!.file))).size).toBeGreaterThan(0)
+    expect((await stat(dataPath('topics', topicId, 'assets', saved!.file))).size).toBeGreaterThan(0)
   })
 })

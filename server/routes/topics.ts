@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { z } from 'zod'
 import { errMsg } from '../../shared/error'
-import { sendJson } from '../index'
+import { readBody, sendJson } from '../http'
 import { startSse } from '../sse'
 import {
   createTopic,
@@ -16,17 +16,14 @@ import { chatGraphEdit } from '../services/graph-chat-service'
 import { getTopicStats } from '../services/lesson-service'
 import { topicJobRunning } from '../services/lesson-jobs'
 import { knowledgeNodeSchema, topicProfileSchema } from '../../shared/types'
+import { currentUserId } from '../repo/context'
+import { assertGlobalBudget, consumeQuota } from '../services/quota-service'
+import { statusOf } from '../auth/errors'
 
 const createTopicBodySchema = z.object({
   name: z.string().min(1).max(100),
   profile: topicProfileSchema.optional(),
 })
-
-export async function readBody<T>(req: IncomingMessage): Promise<T> {
-  const chunks: Buffer[] = []
-  for await (const c of req) chunks.push(c as Buffer)
-  return JSON.parse(Buffer.concat(chunks).toString('utf-8') || '{}') as T
-}
 
 const saveGraphBodySchema = z.object({
   nodes: z.array(knowledgeNodeSchema),
@@ -56,9 +53,21 @@ export async function handleTopics(
       return
     }
     const { name, profile } = body.data
+    const userId = currentUserId()
+    assertGlobalBudget()
+    const existing = await listTopics()
+    if (existing.length >= Number(process.env.MAX_TOPICS_PER_USER || 30)) {
+      sendJson(res, 400, { error: '学习方向数量已达上限，请先删除不用的方向' })
+      return
+    }
+    consumeQuota(userId, 'topic')
     const send = startSse(res)
     try {
-      const result = await createTopic(name, (stage, detail) => send('stage', { stage, detail }), profile)
+      const result = await createTopic(
+        name,
+        (stage, detail) => send('stage', { stage, detail }),
+        profile,
+      )
       send('result', result)
     } catch (err) {
       send('error', { message: errMsg(err) })
@@ -156,10 +165,12 @@ export async function handleGraphChat(
     return
   }
   try {
+    const userId = currentUserId()
+    consumeQuota(userId, 'chat')
     const result = await chatGraphEdit(topicId, body.data.message, body.data.history)
     sendJson(res, 200, result)
   } catch (err) {
-    const status = (err as { status?: number }).status ?? 500
-    sendJson(res, status, { error: errMsg(err) })
+    const status = statusOf(err)
+    sendJson(res, status, { error: status >= 500 ? '服务器内部错误' : errMsg(err) })
   }
 }

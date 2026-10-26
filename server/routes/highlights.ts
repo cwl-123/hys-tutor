@@ -1,9 +1,9 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { sendJson } from '../index'
+import { sendJson } from '../http'
 import { addHighlight, listHighlights, removeHighlight } from '../services/highlight-service'
 import { findLesson } from '../services/lesson-service'
 import { highlightInputSchema } from '../../shared/types'
-import { readBody } from './topics'
+import { readBody } from '../http'
 
 // GET /api/lessons/:lid/highlights — 该课全部划线
 export async function handleListHighlights(

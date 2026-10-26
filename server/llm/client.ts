@@ -1,9 +1,10 @@
 import OpenAI from 'openai'
 import { z } from 'zod'
 import { resolveLlm } from '../services/settings-service'
+import { recordLlmUsage } from '../services/quota-service'
 import { errMsg } from '../../shared/error'
 
-// 配置优先级：页面设置的激活模型源 > .env
+// 配置优先级：.env 平台配置（公网版不再支持页面设置）
 export interface ResolvedLlmConfig {
   apiKey: string
   baseUrl?: string
@@ -19,17 +20,25 @@ let cached: { sig: string; client: OpenAI } | null = null
 
 export function getLLM(): OpenAI {
   const cfg = resolveLlmConfig()
-  if (!cfg.apiKey) throw new Error('缺少 LLM API Key：请在页面设置或 .env 中配置')
+  if (!cfg.apiKey) throw new Error('缺少 LLM API Key：请在服务端 .env 中配置')
   const sig = `${cfg.baseUrl ?? ''}|${cfg.apiKey}`
   if (!cached || cached.sig !== sig) {
-    cached = { sig, client: new OpenAI({ apiKey: cfg.apiKey, baseURL: cfg.baseUrl }) }
+    cached = {
+      sig,
+      client: new OpenAI({
+        apiKey: cfg.apiKey,
+        baseURL: cfg.baseUrl,
+        timeout: Number(process.env.LLM_TIMEOUT_MS || 120_000),
+        maxRetries: Number(process.env.LLM_MAX_RETRIES || 2),
+      }),
+    }
   }
   return cached.client
 }
 
 export function getLLMModel(): string {
   const model = resolveLlmConfig().model
-  if (!model) throw new Error('缺少 LLM 模型：请在页面设置或 .env 中配置')
+  if (!model) throw new Error('缺少 LLM 模型：请在服务端 .env 中配置')
   return model
 }
 
@@ -105,10 +114,17 @@ export async function completeJson<T>(opts: {
   ]
   let lastErr: unknown
   for (let attempt = 0; attempt < 3; attempt++) {
+    const model = getLLMModel()
     const res = await llm.chat.completions.create({
-      model: getLLMModel(),
+      model,
       messages,
       temperature: opts.temperature ?? 0.3,
+    })
+    recordLlmUsage({
+      model,
+      tokensIn: res.usage?.prompt_tokens ?? 0,
+      tokensOut: res.usage?.completion_tokens ?? 0,
+      status: 'ok',
     })
     const text = res.choices[0]?.message?.content ?? ''
     try {
@@ -140,13 +156,20 @@ export async function completeText(opts: {
   temperature?: number
 }): Promise<string> {
   const llm = getLLM()
+  const model = getLLMModel()
   const res = await llm.chat.completions.create({
-    model: getLLMModel(),
+    model,
     messages: [
       { role: 'system', content: opts.system },
       { role: 'user', content: opts.prompt },
     ],
     temperature: opts.temperature ?? 0.5,
+  })
+  recordLlmUsage({
+    model,
+    tokensIn: res.usage?.prompt_tokens ?? 0,
+    tokensOut: res.usage?.completion_tokens ?? 0,
+    status: 'ok',
   })
   const text = res.choices[0]?.message?.content ?? ''
   if (!text.trim()) throw new Error('LLM 未返回内容')

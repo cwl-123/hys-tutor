@@ -1,13 +1,13 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { z } from 'zod'
-import { sendJson } from '../index'
+import { sendJson } from '../http'
 import {
   addPreference,
   listPreferences,
   removePreference,
   updatePreference,
 } from '../services/preference-service'
-import { readBody } from './topics'
+import { readBody } from '../http'
 
 const textBodySchema = z.object({ text: z.string().min(1).max(200) })
 

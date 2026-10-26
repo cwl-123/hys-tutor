@@ -1,6 +1,7 @@
 import type OpenAI from 'openai'
 import { getLLM, getLLMModel } from '../llm/client'
 import { errMsg } from '../../shared/error'
+import { recordLlmUsage } from '../services/quota-service'
 
 export interface AgentTool {
   name: string
@@ -77,11 +78,18 @@ export async function runAgent(opts: RunAgentOptions): Promise<string> {
 
   for (let round = 1; round <= maxRounds; round++) {
     opts.onEvent?.({ type: 'round', round })
+    const model = getLLMModel()
     const res = await llm.chat.completions.create({
-      model: getLLMModel(),
+      model,
       messages,
       tools: tools.length > 0 ? tools : undefined,
       temperature: 0.3,
+    })
+    recordLlmUsage({
+      model,
+      tokensIn: res.usage?.prompt_tokens ?? 0,
+      tokensOut: res.usage?.completion_tokens ?? 0,
+      status: 'ok',
     })
     const msg = res.choices[0]?.message
     if (!msg) throw new Error('LLM 未返回内容')
@@ -120,7 +128,14 @@ export async function runAgent(opts: RunAgentOptions): Promise<string> {
   }
 
   // 轮次耗尽：不带工具强制收尾
-  const res = await llm.chat.completions.create({ model: getLLMModel(), messages })
+  const model = getLLMModel()
+  const res = await llm.chat.completions.create({ model, messages })
+  recordLlmUsage({
+    model,
+    tokensIn: res.usage?.prompt_tokens ?? 0,
+    tokensOut: res.usage?.completion_tokens ?? 0,
+    status: 'ok',
+  })
   const content = res.choices[0]?.message?.content ?? ''
   opts.onEvent?.({ type: 'final', content })
   return content

@@ -1,0 +1,25 @@
+[Unit]
+Description=hys-tutor AI tutor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hys
+Group=hys
+WorkingDirectory=/opt/hys-tutor
+EnvironmentFile=/etc/hys-tutor.env
+ExecStart=/usr/bin/node /opt/hys-tutor/dist-server/standalone.js
+Restart=always
+RestartSec=3
+TimeoutStopSec=20
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/hys-tutor
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

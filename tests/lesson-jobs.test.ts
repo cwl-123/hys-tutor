@@ -40,7 +40,7 @@ describe('startLessonJob', () => {
     expect(prepareCalls[0].opts).toEqual({ nodeId: 'n1', lessonId })
 
     // 占位记录必须在 startLessonJob 返回前就已落盘（否则客户端跳转读取会报「课程不存在」）
-    const file = path.join(dataDir, 'topics', 't_lessonid', 'lessons', `${lessonId}.json`)
+    const file = dataPath('topics', 't_lessonid', 'lessons', `${lessonId}.json`)
     const raw = JSON.parse(await readFile(file, 'utf-8')) as { id: string }
     expect(raw.id).toBe(lessonId)
   })

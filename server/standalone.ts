@@ -4,6 +4,16 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { errMsg } from '../shared/error'
 import { handleApi } from './index'
+import { getDb, dbFilePath } from './db'
+
+// 启动即跑迁移：失败直接退出，让 systemd/launchd 重启并暴露问题
+try {
+  getDb()
+  console.log(`[db] ready: ${dbFilePath()}`)
+} catch (err) {
+  console.error('[db] 初始化失败', err)
+  process.exit(1)
+}
 
 const DIST = path.resolve(process.cwd(), 'dist')
 const PORT = Number(process.env.PORT || 5180)
@@ -28,7 +38,11 @@ async function sendFile(res: ServerResponse, file: string, status = 200): Promis
   const ext = path.extname(file)
   res.statusCode = status
   res.setHeader('Content-Type', MIME[ext] ?? 'application/octet-stream')
-  res.setHeader('Cache-Control', ext === '.html' ? 'no-cache' : 'public, max-age=86400')
+  const immutable = !ext.endsWith('.html') && /-[A-Za-z0-9_-]{8,}\.[a-z0-9]+$/.test(file)
+  res.setHeader(
+    'Cache-Control',
+    ext === '.html' ? 'no-cache' : immutable ? 'public, max-age=31536000, immutable' : 'public, max-age=86400',
+  )
   res.end(body)
 }
 
@@ -36,7 +50,8 @@ async function serveStatic(req: IncomingMessage, res: ServerResponse): Promise<v
   const pathname = decodeURIComponent(new URL(req.url ?? '/', 'http://localhost').pathname)
   const relative = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '')
   const file = path.normalize(path.join(DIST, relative))
-  if (!file.startsWith(DIST)) {
+  const rel = path.relative(DIST, file)
+  if (rel.startsWith('..') || path.isAbsolute(rel)) {
     res.statusCode = 403
     res.end('forbidden')
     return
@@ -63,6 +78,15 @@ process.on('unhandledRejection', (err) => {
 })
 
 const server = createServer((req, res) => {
+  // 安全响应头：Nginx 也会配一份，这里保证直连/本地部署同样生效
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('X-Frame-Options', 'DENY')
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; media-src 'self' https:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+  )
   const url = req.url ?? '/'
   if (url === '/api' || url.startsWith('/api/')) {
     req.url = url.slice(4) || '/'

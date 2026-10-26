@@ -1,96 +1,61 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { z } from 'zod'
-import { sendJson } from '../index'
-import {
-  getSettings,
-  resolveLlm,
-  updateSettings,
-} from '../services/settings-service'
+import { sendJson, readBody } from '../http'
+import { resolveLlm } from '../services/settings-service'
 import { findCandidate, listImportCandidates } from '../services/import-service'
-import { readBody } from './topics'
 
-// 当前生效配置 + 模型源列表 + 搜索 key（本机单用户应用，key 直返前端用于回填编辑）
+// 公网模式：只告诉前端「平台用什么模型」，绝不回传 key / baseUrl
 function view() {
-  const s = getSettings()
   const eff = resolveLlm()
   return {
-    providers: s.providers.map((p) => ({
-      id: p.id,
-      name: p.name,
-      baseUrl: p.baseUrl ?? '',
-      model: p.model,
-      apiKey: p.apiKey ?? '',
-      hasKey: !!p.apiKey,
-    })),
-    activeProviderId: s.activeProviderId ?? '',
+    mode: 'platform',
     effective: {
       model: eff.model,
-      baseUrl: eff.baseUrl ?? '',
       providerName: eff.providerName,
-      source: eff.source,
     },
     search: {
-      tavily: {
-        apiKey: s.search?.tavilyKey || process.env.TAVILY_API_KEY || '',
-        hasKey: !!(s.search?.tavilyKey || process.env.TAVILY_API_KEY),
-      },
-      bocha: {
-        apiKey: s.search?.bochaKey || process.env.BOCHA_API_KEY || '',
-        hasKey: !!(s.search?.bochaKey || process.env.BOCHA_API_KEY),
-      },
+      tavily: { hasKey: !!process.env.TAVILY_API_KEY },
+      bocha: { hasKey: !!process.env.BOCHA_API_KEY },
     },
   }
 }
 
-// GET /api/settings
 export async function handleGetSettings(_req: IncomingMessage, res: ServerResponse): Promise<void> {
   sendJson(res, 200, view())
 }
 
-const updateSettingsSchema = z.object({
-  providers: z
-    .array(
-      z.object({
-        id: z.string().optional(),
-        name: z.string().min(1).max(50),
-        baseUrl: z.string().max(500).optional(),
-        model: z.string().min(1).max(200),
-        apiKey: z.string().max(500).optional(),
-      }),
-    )
-    .optional(),
-  activeProviderId: z.string().nullable().optional(),
-  search: z
-    .object({
-      tavilyKey: z.string().max(500).optional(),
-      bochaKey: z.string().max(500).optional(),
-    })
-    .optional(),
-})
-
-// PATCH /api/settings — 整体保存模型源列表 + 激活源（apiKey 留空 = 保持原 key）
+// 公网模式下页面改模型配置一律 403；本地开发也默认关闭
 export async function handleUpdateSettings(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const body = updateSettingsSchema.safeParse(await readBody(req))
-  if (!body.success) {
-    sendJson(res, 400, { error: body.error.issues.map((i) => i.message).join('；') })
-    return
-  }
-  await updateSettings(body.data)
-  sendJson(res, 200, view())
+  await readBody(req)
+  sendJson(res, 403, { error: '公网版模型配置由服务端统一管理，不支持页面修改' })
 }
 
-// GET /api/settings/import-candidates — 扫描本机 AI 工具配置（key 脱敏，仅预览）
+function localSettingsAllowed(): boolean {
+  return process.env.HYS_LOCAL_SETTINGS === '1'
+}
+
+// 扫描服务器本机 AI 工具配置：公网环境是明确的 key 泄漏面，默认 404
 export async function handleListImportCandidates(
   _req: IncomingMessage,
   res: ServerResponse,
 ): Promise<void> {
+  if (!localSettingsAllowed()) {
+    sendJson(res, 404, { error: 'Not found' })
+    return
+  }
   sendJson(res, 200, { candidates: listImportCandidates() })
 }
 
 const importSchema = z.object({ id: z.string().min(1).max(200) })
 
-// POST /api/settings/import — 用户确认后导入：服务端重新读配置文件取真实 key，不经过前端
-export async function handleImportCandidate(req: IncomingMessage, res: ServerResponse): Promise<void> {
+export async function handleImportCandidate(
+  req: IncomingMessage,
+  res: ServerResponse,
+): Promise<void> {
+  if (!localSettingsAllowed()) {
+    sendJson(res, 404, { error: 'Not found' })
+    return
+  }
   const body = importSchema.safeParse(await readBody(req))
   if (!body.success) {
     sendJson(res, 400, { error: '缺少要导入的配置 id' })
@@ -101,24 +66,5 @@ export async function handleImportCandidate(req: IncomingMessage, res: ServerRes
     sendJson(res, 404, { error: '未找到该配置，可能已被修改或删除' })
     return
   }
-  if (!c.model) {
-    sendJson(res, 400, { error: '该配置未指定模型，请用「添加模型源」手动填写' })
-    return
-  }
-  const s = getSettings()
-  const dup = s.providers.some((p) => (p.baseUrl ?? '') === (c.baseUrl ?? '') && p.model === c.model)
-  if (!dup) {
-    await updateSettings({
-      providers: [
-        ...s.providers.map((p) => ({
-          id: p.id,
-          name: p.name,
-          baseUrl: p.baseUrl,
-          model: p.model,
-        })),
-        { name: c.name, baseUrl: c.baseUrl, model: c.model, apiKey: c.apiKey },
-      ],
-    })
-  }
-  sendJson(res, 200, view())
+  sendJson(res, 403, { error: '公网版不支持从本机配置导入模型' })
 }

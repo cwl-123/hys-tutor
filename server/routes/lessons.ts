@@ -1,11 +1,17 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { z } from 'zod'
-import { sendJson } from '../index'
+import { readBody, sendJson } from '../http'
 import { startSse } from '../sse'
 import { newId, nowIso } from '../repo/json-store'
 import { errMsg } from '../../shared/error'
 import { startLessonJob, attachLesson, subscribeJob, startReviseJob } from '../services/lesson-jobs'
-import { deleteLesson, findLesson, getLessonDetail, listLessons, stripQuestions } from '../services/lesson-service'
+import {
+  deleteLesson,
+  findLesson,
+  getLessonDetail,
+  listLessons,
+  stripQuestions,
+} from '../services/lesson-service'
 import { gradeObjective, gradeShort } from '../services/grading-service'
 import { applyMasteryChanges, type ApplyEntry } from '../services/mastery-service'
 import { appendAttempt, listAttempts } from '../services/attempt-service'
@@ -20,7 +26,9 @@ import {
 } from '../services/lesson-chat-service'
 import type { SubmitResult } from '../../shared/api'
 import type { AnswerRecord, Attempt, Question } from '../../shared/types'
-import { readBody } from './topics'
+import { currentUserId } from '../repo/context'
+import { consumeQuota } from '../services/quota-service'
+import { statusOf } from '../auth/errors'
 
 // POST /api/topics/:id/lessons — 发起后台备课任务，立即返回 lessonId
 // body.nodeId 可选：用户指定知识点（面板「学这个知识点」）；缺省走排课引擎
@@ -31,10 +39,13 @@ export async function handleCreateLesson(
 ): Promise<void> {
   const body = (await readBody<{ nodeId?: string }>(req)) as { nodeId?: string }
   try {
-    const { lessonId, reused, existing } = await startLessonJob(topicId, { nodeId: body.nodeId || undefined })
+    const { lessonId, reused, existing } = await startLessonJob(topicId, {
+      nodeId: body.nodeId || undefined,
+    })
     sendJson(res, 200, { lessonId, reused, existing })
   } catch (err) {
-    sendJson(res, 500, { error: errMsg(err) })
+    const status = statusOf(err)
+    sendJson(res, status, { error: status >= 500 ? '服务器内部错误' : errMsg(err) })
   }
 }
 
@@ -81,7 +92,9 @@ export async function handleLessonProgress(
   if (lesson.status === 'generated') {
     send('result', { lessonId })
   } else {
-    send('error', { message: lesson.status === 'failed' ? '上次备课失败，可重新发起' : '备课已中断，可重新发起' })
+    send('error', {
+      message: lesson.status === 'failed' ? '上次备课失败，可重新发起' : '备课已中断，可重新发起',
+    })
   }
   res.end()
 }
@@ -176,7 +189,12 @@ export async function handleSubmitLesson(
     for (const r of dup.records) {
       if (r.result) results[r.questionId] = r.result
       const q = qByIdDup.get(r.questionId)
-      if (q) revealed[q.id] = { answer: q.answer, referenceAnswer: q.referenceAnswer, explanation: q.explanation }
+      if (q)
+        revealed[q.id] = {
+          answer: q.answer,
+          referenceAnswer: q.referenceAnswer,
+          explanation: q.explanation,
+        }
     }
     sendJson(res, 200, {
       lessonId,
@@ -187,6 +205,9 @@ export async function handleSubmitLesson(
     } satisfies SubmitResult)
     return
   }
+
+  const userId = currentUserId()
+  consumeQuota(userId, 'grade')
 
   const qById = new Map(detail.questions.questions.map((q) => [q.id, q]))
   const records: AnswerRecord[] = []
@@ -199,10 +220,18 @@ export async function handleSubmitLesson(
   for (const a of body.data.answers) {
     const q = qById.get(a.questionId)
     if (!q) continue
-    revealed[q.id] = { answer: q.answer, referenceAnswer: q.referenceAnswer, explanation: q.explanation }
+    revealed[q.id] = {
+      answer: q.answer,
+      referenceAnswer: q.referenceAnswer,
+      explanation: q.explanation,
+    }
 
     if (q.type === 'short') {
-      const record: AnswerRecord = { questionId: q.id, userAnswer: a.userAnswer, submittedAt: nowIso() }
+      const record: AnswerRecord = {
+        questionId: q.id,
+        userAnswer: a.userAnswer,
+        submittedAt: nowIso(),
+      }
       records.push(record)
       shortTasks.push(
         gradeShort(q, a.userAnswer).then((result) => {
@@ -272,10 +301,13 @@ export async function handleRegenerateQuestions(
   lessonId: string,
 ): Promise<void> {
   try {
+    const userId = currentUserId()
+    consumeQuota(userId, 'grade')
     const questions = await regenerateQuestions(lessonId)
     sendJson(res, 200, { questions: stripQuestions(questions) })
   } catch (err) {
-    sendJson(res, 500, { error: errMsg(err) })
+    const status = statusOf(err)
+    sendJson(res, status, { error: status >= 500 ? '服务器内部错误' : errMsg(err) })
   }
 }
 
@@ -303,7 +335,9 @@ export async function handleUpdateLessonContent(
 ): Promise<void> {
   const body = updateContentBodySchema.safeParse(await readBody(req))
   if (!body.success) {
-    sendJson(res, 400, { error: body.data ? '正文过长' : body.error.issues.map((i) => i.message).join('；') })
+    sendJson(res, 400, {
+      error: body.data ? '正文过长' : body.error.issues.map((i) => i.message).join('；'),
+    })
     return
   }
   try {
@@ -387,6 +421,8 @@ export async function handlePostLessonChat(
     return
   }
   try {
+    const userId = currentUserId()
+    consumeQuota(userId, 'chat')
     sendJson(res, 200, await postLessonChat(lessonId, body.data))
   } catch (err) {
     sendJson(res, chatErrorStatus(err), { error: errMsg(err) })

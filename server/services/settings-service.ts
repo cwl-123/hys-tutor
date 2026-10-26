@@ -1,8 +1,8 @@
-import { readFileSync } from 'node:fs'
-import { randomUUID } from 'node:crypto'
-import { dataPath, writeJson } from '../repo/json-store'
+import { HttpError } from '../auth/errors'
 
-// 模型源（provider）：名称 + BaseURL + Key + 模型；激活源决定所有 LLM 调用
+// 公网模式：模型/搜索 key 只来自服务端环境变量，页面设置只读。
+// 刻意不再读写 data/settings.json：那条路径既会把 key 落进用户数据目录，
+// 又会被 GET /api/settings 回传前端，公网环境是明确的泄漏面。
 export interface ProviderConfig {
   id: string
   name: string
@@ -17,7 +17,6 @@ export interface Settings {
   search?: SearchKeys
 }
 
-// 搜索 API key（Tavily / 博查）：页面设置 > .env
 export interface SearchKeys {
   tavilyKey?: string
   bochaKey?: string
@@ -31,57 +30,23 @@ export interface ResolvedLlm {
   source: '页面设置' | '.env'
 }
 
-function settingsFile(): string {
-  return dataPath('settings.json')
-}
-
-function loadRaw(): unknown {
-  try {
-    return JSON.parse(readFileSync(settingsFile(), 'utf-8'))
-  } catch {
-    return null
-  }
-}
-
-// 兼容旧版单配置格式 {baseUrl,apiKey,model} → 单 provider
-function migrate(raw: unknown): Settings {
-  const r = raw as Record<string, unknown> | null
-  if (r && Array.isArray(r.providers)) {
-    const search = r.search as SearchKeys | undefined
-    return {
-      providers: (r.providers as ProviderConfig[]).map((p) => ({ ...p })),
-      activeProviderId: typeof r.activeProviderId === 'string' ? r.activeProviderId : undefined,
-      search: search ? { tavilyKey: search.tavilyKey, bochaKey: search.bochaKey } : undefined,
-    }
-  }
-  if (r && (r.model || r.baseUrl || r.apiKey)) {
-    return {
-      providers: [
-        {
-          id: 'p_default',
-          name: '默认',
-          baseUrl: typeof r.baseUrl === 'string' ? r.baseUrl : undefined,
-          apiKey: typeof r.apiKey === 'string' ? r.apiKey : undefined,
-          model: typeof r.model === 'string' ? r.model : '',
-        },
-      ],
-      activeProviderId: 'p_default',
-    }
-  }
-  return { providers: [], activeProviderId: undefined }
-}
-
-const cache: Settings = migrate(loadRaw())
-
 export function getSettings(): Settings {
+  const model = process.env.LLM_MODEL?.trim()
+  if (!model) return { providers: [] }
   return {
-    providers: cache.providers.map((p) => ({ ...p })),
-    activeProviderId: cache.activeProviderId,
-    search: cache.search ? { ...cache.search } : undefined,
+    providers: [
+      {
+        id: 'platform',
+        name: '平台默认',
+        baseUrl: process.env.LLM_BASE_URL?.trim() || undefined,
+        model,
+      },
+    ],
+    activeProviderId: 'platform',
   }
 }
 
-// 生效搜索 key：页面设置 > .env（纯函数便于测试）
+// 生效搜索 key：页面设置 > .env（保留纯函数，便于测试/未来扩展）
 export function resolveSearchKeys(
   s: Settings,
   env: NodeJS.ProcessEnv = process.env,
@@ -92,74 +57,19 @@ export function resolveSearchKeys(
   }
 }
 
-function isValid(p: ProviderConfig | undefined): p is ProviderConfig {
-  return !!p && !!p.model && !!p.apiKey
-}
-
-// 生效配置：激活的页面 provider > .env
 export function resolveLlm(): ResolvedLlm {
-  const active =
-    cache.providers.find((p) => p.id === cache.activeProviderId) ?? undefined
-  if (isValid(active)) {
-    return {
-      apiKey: active.apiKey!,
-      baseUrl: active.baseUrl || undefined,
-      model: active.model,
-      providerName: active.name,
-      source: '页面设置',
-    }
-  }
   return {
     apiKey: process.env.LLM_API_KEY ?? '',
     baseUrl: process.env.LLM_BASE_URL || undefined,
     model: process.env.LLM_MODEL ?? '',
-    providerName: '默认配置',
+    providerName: process.env.LLM_PROVIDER_NAME || 'DeepSeek 官方',
     source: '.env',
   }
 }
 
-export interface ProviderInput {
-  id?: string
-  name: string
-  baseUrl?: string
-  model: string
-  apiKey?: string // undefined = 保持原 key；空串 = 清除
-}
-
-export async function updateSettings(patch: {
-  providers?: ProviderInput[]
-  activeProviderId?: string | null
-  search?: { tavilyKey?: string; bochaKey?: string } // undefined = 保持原 key；空串 = 清除
-}): Promise<Settings> {
-  if (patch.providers) {
-    const oldById = new Map(cache.providers.map((p) => [p.id, p]))
-    cache.providers = patch.providers.map((inp) => {
-      const existing = inp.id ? oldById.get(inp.id) : undefined
-      return {
-        id: existing?.id ?? `p_${randomUUID().slice(0, 8)}`,
-        name: inp.name.trim() || '未命名',
-        baseUrl: inp.baseUrl?.trim() || undefined,
-        model: inp.model.trim(),
-        apiKey:
-          inp.apiKey === undefined ? existing?.apiKey : inp.apiKey.trim() || undefined,
-      }
-    })
-  }
-  if (patch.activeProviderId !== undefined) {
-    const wanted = patch.activeProviderId || undefined
-    cache.activeProviderId =
-      wanted && cache.providers.some((p) => p.id === wanted) ? wanted : undefined
-  }
-  if (patch.search) {
-    const t = patch.search.tavilyKey
-    const b = patch.search.bochaKey
-    cache.search = {
-      tavilyKey: t === undefined ? cache.search?.tavilyKey : t.trim() || undefined,
-      bochaKey: b === undefined ? cache.search?.bochaKey : b.trim() || undefined,
-    }
-  }
-  await writeJson(settingsFile(), cache)
-  return getSettings()
+// 公网模式不再支持页面改模型源；保留函数签名让路由给出明确 403
+export async function updateSettings(): Promise<Settings> {
+  throw new HttpError(403, '公网版模型配置由服务端统一管理，不支持页面修改')
 }
 
 export function maskKey(key?: string): string {

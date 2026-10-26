@@ -1,10 +1,21 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { Heart, Settings } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { Heart, LogOut, Settings, Shield } from 'lucide-vue-next'
 import SettingsModal from '@/components/SettingsModal.vue'
 import ToastHost from '@/components/ToastHost.vue'
+import { useAuthStore } from '@/stores/auth'
 
+const auth = useAuthStore()
+const router = useRouter()
 const showSettings = ref(false)
+
+const lessonQuota = computed(() => auth.usage?.actions.lesson ?? null)
+
+async function logout(): Promise<void> {
+  await auth.logout()
+  await router.replace('/login')
+}
 </script>
 
 <template>
@@ -58,28 +69,69 @@ const showSettings = ref(false)
           <span class="app-subtitle">AI 自适应私教</span>
         </RouterLink>
         <div class="app-actions">
+          <template v-if="auth.user">
+            <span
+              v-if="lessonQuota"
+              class="app-quota"
+              :title="`今日生成课程 ${lessonQuota.used}/${lessonQuota.limit} 次`"
+            >
+              AI 生成 {{ lessonQuota.used }}/{{ lessonQuota.limit }}
+            </span>
+            <RouterLink
+              to="/preferences"
+              class="app-settings"
+              title="我的偏好"
+            >
+              <Heart :size="14" />
+              偏好
+            </RouterLink>
+            <RouterLink
+              v-if="auth.isAdmin"
+              to="/admin"
+              class="app-settings"
+              title="内测管理"
+            >
+              <Shield :size="14" />
+              管理
+            </RouterLink>
+            <button
+              class="app-settings"
+              title="平台设置"
+              @click="showSettings = true"
+            >
+              <Settings :size="14" />
+              设置
+            </button>
+            <span class="app-user">{{ auth.user.nickname }}</span>
+            <button
+              class="app-settings"
+              title="退出登录"
+              @click="logout"
+            >
+              <LogOut :size="14" />
+              退出
+            </button>
+          </template>
           <RouterLink
-            to="/preferences"
+            v-else
+            to="/login"
             class="app-settings"
-            title="我的偏好"
           >
-            <Heart :size="14" />
-            偏好
+            登录
           </RouterLink>
-          <button
-            class="app-settings"
-            title="模型设置"
-            @click="showSettings = true"
-          >
-            <Settings :size="14" />
-            设置
-          </button>
         </div>
       </div>
     </header>
     <main class="app-main">
       <RouterView />
     </main>
+    <footer class="app-footer">
+      <span>课程与批改内容由 AI 生成，仅供参考，请自行核实。</span>
+      <span class="app-footer__links">
+        <RouterLink to="/terms">用户协议</RouterLink>
+        <RouterLink to="/privacy">隐私政策</RouterLink>
+      </span>
+    </footer>
     <SettingsModal
       :open="showSettings"
       @close="showSettings = false"
@@ -163,5 +215,41 @@ const showSettings = ref(false)
 }
 .app-main {
   flex: 1;
+}
+.app-user {
+  max-width: 120px;
+  overflow: hidden;
+  margin: 0 4px 0 8px;
+  font-size: 13px;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-quota {
+  margin-right: 4px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.app-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  align-items: center;
+  justify-content: center;
+  padding: 18px var(--page-pad) 22px;
+  font-size: 11px;
+  color: var(--text-dim);
+  border-top: 1px solid var(--border);
+}
+.app-footer__links {
+  display: inline-flex;
+  gap: 12px;
+}
+.app-footer a {
+  color: inherit;
+  text-decoration: none;
+}
+.app-footer a:hover {
+  color: var(--text);
 }
 </style>

@@ -8,16 +8,34 @@
 
 | 维度 | 结论 | 关键理由 |
 |---|---|---|
-| 上线形态 | 邀请制公测，单地域、单实例，注册用户 ≤ 200、DAU ≤ 50 | 当前代码是单进程内存态，先验证需求再谈扩展 |
-| 账号体系 | 邀请码 + 邮箱 + 密码，HttpOnly Cookie 会话 | 不引入短信/邮件成本，邀请码就是门槛 |
+| 上线形态 | 邀请制公测（已确认），大陆 ECS + 已备案域名，首批约 10 人 | 当前代码是单进程内存态，先验证需求再谈扩展 |
+| 账号体系 | 邀请码注册 + 昵称密码登录，无邮箱验证（已确认 B 方案） | 10 人内测，邀请码就是门槛；不引入短信/邮件成本 |
 | 数据存储 | **控制面 SQLite + 内容面按用户隔离的 JSON** | 账号/会话/配额需要事务；课程内容继续沿用现有 repo，改造面最小 |
-| 模型配置 | **平台统一 key（服务端 .env），用户零配置** | 目标用户不愿配 key；也避免请求级模型配置贯穿 15 个 prompt |
+| 模型配置 | **平台统一 key，DeepSeek 官方 `deepseek-v4-pro`**，用户零配置 | 已确认不走阿里云 token-plan 额度；避免请求级模型配置贯穿 15 个 prompt |
 | 用户隔离 | `AsyncLocalStorage` 请求上下文，`dataPath()` 自动拼 `users/<uid>/` | 18 个 service、100+ 调用点无需逐个改签名 |
-| 成本控制 | 每用户日配额 + 全局并发 2 + 日预算熔断 | 防止一个链接被转发后账单失控 |
-| 部署 | 阿里云 ECS（2C4G）+ Nginx（TLS/SSE）+ systemd + OSS 备份 | 单机足够，运维复杂度最低 |
-| 合规 | 大陆机器先 ICP 备案；AI 生成标识 + 用户协议/隐私政策 + 举报入口 | 大陆公网服务绕不开；模型用境内百炼可降低跨境风险 |
+| 成本控制 | 每人日配额（宽松）+ 全局并发 2 + 日预算熔断（暂定 ¥50/天） | 10 人内测基本用不满；预算熔断只防链接被转发后账单失控 |
+| 部署 | 阿里云大陆 ECS（2C4G）+ Nginx（TLS/SSE）+ systemd + OSS 备份 | 机器与域名已就绪，可跳过香港内测分支 |
+| 合规 | 域名已完成 ICP 备案；仍需公安备案 + AI 生成标识 + 用户协议/隐私政策 + 举报入口 | 大陆公网服务绕不开；DeepSeek 官方为境内访问 |
+
+已确认的前提：ECS 在大陆、域名已完成 ICP 备案、邀请制、平台统一出 key、用 DeepSeek 官方配置、首批约 10 人、暂不做付费（第一版完全免费）。
 
 一句话：**不要现在上 Postgres、不要做多实例、不要做 BYOK、不要把课程内容迁 SQLite**。先把「账号、隔离、配额、密钥、部署、备份」六件事做扎实。
+
+### 0.1 落地状态（v0.42.0，2026-10-26）
+
+本方案已完成 P0 代码改造，可直接进入部署：
+
+- 认证：`server/db.ts` + `server/auth/*` + `/api/auth/{register,login,logout,me,password}`；单次邀请码、scrypt 密码、30 天滚动会话、5 会话上限、临时密码强制改密。
+- 冷启动：第一个注册用户自动成为管理员；`BOOTSTRAP_INVITE_CODE` 解决「没有管理员就发不了邀请码」的死锁，注册成功后应从 env 删除。
+- 隔离：`AsyncLocalStorage` + `dataPath()` 自动落到 `data/users/<uid>/`；备课后台任务与看门狗都显式 `runAsUser`，避免脱离请求上下文后写错目录。
+- 管理：`/api/admin/{users,invites,stats}` + 前端 `/admin`（生成邀请码、禁用/恢复、重置临时密码、今日花费）。
+- 配额：每日动作配额用「检查并占用」（`consumeQuota`）避免长任务并发穿透；全站日预算熔断；登录/注册/改密进程内限流 + Nginx 双层限流。
+- 密钥：`settings-service` 只读 env；`GET /api/settings` 不再返回 key/baseUrl；本机配置导入默认 404。
+- 安全：请求体 2MB 上限、SSRF 解析后 IP 校验 + 手动逐跳重定向、CSP/安全响应头、5xx 不泄露内部错误。
+- 前端：`/login`、`/register`、`/change-password`、`/terms`、`/privacy`、`/admin`；路由守卫、顶栏用户/退出/额度、AI 生成标识、只读设置弹窗。
+- 部署：`deploy/install.sh`、`deploy/nginx-*.conf`、`deploy/hys-tutor.service`、`deploy/backup.*`、`deploy/README.md`；旧数据迁移 `scripts/migrate-user-data.mjs`。
+- 测试：171+ 单测通过，新增 `tests/auth.test.ts`（注册/邀请码/登录/会话/禁用/配额/隔离）与 `tests/ssrf.test.ts`；`pnpm typecheck && pnpm lint && pnpm test && pnpm build` 全绿。
+
 
 ---
 
@@ -46,7 +64,7 @@
 ### 2.1 用户旅程
 
 ```
-拿到邀请链接 → 注册（邀请码 + 邮箱 + 密码）→ 登录
+拿到邀请链接 → 注册（邀请码 + 昵称 + 密码）→ 登录
   → 首页：创建学习方向（AI 调研 + 生成图谱）
   → 图谱页：看掌握度、和 AI 对话调图谱
   → 备课：SSE 分阶段进度（2~5 分钟）
@@ -87,30 +105,36 @@
 
 不做「课程管理员/内容审核员」等细分角色，Beta 一个 admin 够用。
 
-### 3.2 注册与登录
+### 3.2 注册与登录（已确认 B 方案）
 
-**注册（邀请制）**
+**注册（邀请制，一次性）**
 
 1. 管理员生成邀请码（单次使用、7 天有效），可导出为链接 `https://tutor.example.com/register?code=XXXX`。
-2. 用户填写：邀请码、邮箱、昵称、密码，勾选「已满 18 岁，同意用户协议与隐私政策」。
-3. 服务端事务：校验邀请码 → 创建用户（scrypt 密码哈希 + `terms_accepted_at`）→ 邀请码 `used_count+1` → 创建 session → Set-Cookie。
+2. 用户填写：邀请码、昵称、密码，勾选「已满 18 岁，同意用户协议与隐私政策」。**不收集邮箱，不发验证邮件。**
+3. 服务端事务：校验邀请码 → 创建用户（昵称唯一 + scrypt 密码哈希 + `terms_accepted_at`）→ 邀请码 `used_count+1` → 创建 session → Set-Cookie。
 4. 初始化用户目录 `data/users/<uid>/`。
 
 **登录**
 
-- 邮箱 + 密码；失败统一提示「邮箱或密码错误」，不暴露账号是否存在。
+- 昵称 + 密码；失败统一提示「昵称或密码错误」，不暴露账号是否存在。
 - 成功后创建 session，Cookie 30 天有效；每次请求校验，超过 24h 才更新 `last_seen_at`（避免每请求写库）。
+- 支持多设备同时登录（最多 5 个 session）。
 
-**为什么不用邮箱验证码/魔法链接**
+**忘记密码**
 
-- Beta 阶段没有邮件服务，SMTP 配置、退信、投诉都会拖慢上线。
-- 邀请码是更强的准入控制；邮箱只作为账号标识和后续找回凭据。
-- 后续加邮箱验证时，表结构不用变，只多一个 `email_verified_at` 字段。
+- 不自助找回（没有邮箱）。页面上写「忘记密码请联系管理员重置」。
+- 管理员 CLI `admin reset-password --nickname <昵称>` 生成临时密码，用户首次登录后强制修改。
+
+**为什么不做邮箱**
+
+- 首批 10 人，邮箱验证只会增加摩擦和 SMTP 运维；昵称 + 密码足够。
+- 后续要加邮箱时，`users.email` 字段保留为可空，不影响现有数据。
 
 ### 3.3 密码与会话参数
 
 | 项 | 取值 | 说明 |
 |---|---|---|
+| 昵称 | 2~20 字符，唯一（ASCII 大小写不敏感） | 登录标识，展示用 |
 | 密码哈希 | `scrypt`，N=16384, r=8, p=1, 64 字节 | Node 内置，无新依赖 |
 | 存储格式 | `scrypt$N$r$p$saltB64$hashB64` | 便于以后调参 |
 | 密码长度 | 8~128 | 上限防 scrypt DoS |
@@ -126,8 +150,8 @@
 
 - **CSRF**：`SameSite=Lax` + 对所有非 GET 请求校验 `Origin`（缺失时校验 `Referer`）必须等于 `APP_ORIGIN`；不启用 CORS。
 - **会话固定**：登录成功后重新生成 session，不复用旧 token。
-- **暴力破解**：登录失败按 IP 5 次/15 分钟 + 按账号 10 次/15 分钟锁定；注册按 IP 10 次/小时。
-- **密码重置**：Beta 由管理员 CLI 生成一次性重置 token（15 分钟有效）或临时密码，首次登录强制改密。
+- **暴力破解**：登录失败按 IP 5 次/15 分钟 + 按昵称 10 次/15 分钟锁定；注册按 IP 10 次/小时。
+- **密码重置**：管理员 CLI 生成临时密码，用户首次登录强制改密；不做邮件 token。
 
 ### 3.5 邀请码
 
@@ -150,6 +174,7 @@
 | POST | `/api/feedback` | 体验反馈 |
 | GET | `/api/admin/users` | 用户列表（admin） |
 | PATCH | `/api/admin/users/:id` | 禁用/配额（admin） |
+| POST | `/api/admin/users/:id/reset-password` | 重置密码（admin） |
 | GET | `/api/admin/stats` | DAU/课程数/成本/错误（admin） |
 | GET | `/api/admin/feedback` | 反馈列表（admin） |
 
@@ -201,14 +226,14 @@ PRAGMA busy_timeout = 5000;
 
 CREATE TABLE users (
   id            TEXT PRIMARY KEY,              -- u_ + 8 位随机
-  email         TEXT NOT NULL UNIQUE COLLATE NOCASE,
-  name          TEXT NOT NULL,
+  nickname      TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  email         TEXT UNIQUE COLLATE NOCASE,    -- 可空；Beta 不收集，后续可选
   password_hash TEXT NOT NULL,
   role          TEXT NOT NULL DEFAULT 'user',  -- user | admin
   status        TEXT NOT NULL DEFAULT 'active',-- active | disabled
+  must_change_password INTEGER NOT NULL DEFAULT 0,
   created_at    TEXT NOT NULL,
   last_login_at TEXT,
-  email_verified_at TEXT,
   terms_accepted_at TEXT
 );
 
@@ -345,7 +370,7 @@ export async function handleApi(req, res, next) {
 
 写一个一次性脚本 `scripts/migrate-multiuser.mjs`：
 
-1. 用 CLI 创建管理员账号（邮箱取 `ADMIN_EMAIL`），得到 `u_admin`。
+1. 用 CLI 创建管理员账号（昵称取 `ADMIN_NICKNAME`），得到 `u_admin`。
 2. `mkdir -p data/users/u_admin`
 3. `mv data/topics data/users/u_admin/topics`
 4. `mv data/topics.json data/users/u_admin/topics.json`
@@ -359,17 +384,19 @@ export async function handleApi(req, res, next) {
 
 | 配额 | 默认值 | 位置 |
 |---|---|---|
-| 每日新建方向 | 2 | `QUOTA_TOPICS_PER_DAY` |
-| 每日备课 | 5 | `QUOTA_LESSONS_PER_DAY` |
-| 每日批改 | 40 | `QUOTA_GRADES_PER_DAY` |
-| 每日对话（图谱/课程/AI 优化） | 100 条 | `QUOTA_CHATS_PER_DAY` |
-| 单用户方向总数 | 20 | `MAX_TOPICS_PER_USER` |
-| 单用户存储 | 300MB | `MAX_STORAGE_MB` |
+| 每日新建方向 | 5 | `QUOTA_TOPICS_PER_DAY` |
+| 每日备课 | 10 | `QUOTA_LESSONS_PER_DAY` |
+| 每日批改 | 100 | `QUOTA_GRADES_PER_DAY` |
+| 每日对话（图谱/课程/AI 优化） | 300 条 | `QUOTA_CHATS_PER_DAY` |
+| 单用户方向总数 | 30 | `MAX_TOPICS_PER_USER` |
+| 单用户存储 | 500MB | `MAX_STORAGE_MB` |
 | 全局并发备课 | 2 | `GLOBAL_MAX_LESSON_JOBS` |
 | 全站日预算 | ¥50 | `DAILY_BUDGET_CNY` |
 
+第一版完全免费，以上**只是防滥用和防账单的上限**，不是付费档位；10 个用户正常用基本碰不到。产品文案不要写「免费额度 5 次」这种像试用装的话，直接写「内测期间免费使用」。
+
 - 配额检查在 service 入口做（`assertQuota(userId, 'lesson')`），用 SQLite 当天 `usage_events` 计数；SQLite 写串行，天然防并发超发。
-- 超限返回 `429` + `Retry-After` + 中文提示「今日备课额度已用完（5/5），明天 0 点重置」。
+- 超限返回 `429` + `Retry-After` + 中文提示「今天的生成次数已达上限，明天 0 点恢复；如确需更多请联系管理员」。
 - 存储配额每天凌晨统计一次（`du` 用户目录），超限只禁止新建，不删旧数据。
 
 ### 4.8 备份、恢复、保留
@@ -401,19 +428,21 @@ export async function handleApi(req, res, next) {
 公测用户**完全看不到模型配置**。服务端 `.env` 决定唯一生效模型：
 
 ```bash
-LLM_API_KEY=sk-...
-LLM_BASE_URL=https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
-LLM_MODEL=deepseek-v4.1-flash
-# 可选：便宜模型跑大纲/批改，强模型跑写作
+LLM_API_KEY=sk-...                         # 你的 DeepSeek 官方 key
+LLM_BASE_URL=https://api.deepseek.com/v1
+LLM_MODEL=deepseek-v4-pro                  # 已用你的 key 验证 /models 可用
+# 可选：便宜模型跑大纲/批改，强模型跑写作；先留空，全部走 pro 也行
 LLM_MODEL_FAST=
 # 调用参数
 LLM_TIMEOUT_MS=120000
 LLM_MAX_RETRIES=2
 ```
 
+> 2026-10-26 验证：`GET https://api.deepseek.com/v1/models` 返回 `deepseek-flash`、`deepseek-v4-pro`，你的 key 可用。DeepSeek 官方支持 OpenAI 兼容的流式与 function calling，正好满足备课 Agent 需求；不走阿里云 token-plan 额度。
+
 页面设置里只展示：
 
-> 模型由平台提供 · deepseek-v4.1-flash（阿里云百炼）
+> 模型由平台提供 · DeepSeek deepseek-v4-pro
 > 如需更高配额或自带模型，请联系管理员
 
 **为什么不做 BYOK（现在）**
@@ -540,7 +569,7 @@ Shiki/KaTeX/Mermaid 需要内联样式，所以 `style-src` 保留 `'unsafe-inli
 | 文件/区域 | 改动 |
 |---|---|
 | `src/views/LoginView.vue`（新） | 登录表单、错误提示、`next` 回跳 |
-| `src/views/RegisterView.vue`（新） | 邀请码（可从 URL 预填）、邮箱、昵称、密码 |
+| `src/views/RegisterView.vue`（新） | 邀请码（可从 URL 预填）、昵称、密码 |
 | `src/stores/auth.ts`（新） | `me`、`usage`、`login/logout/refresh` |
 | `src/router.ts` | 加 `/login`、`/register`、`/terms`、`/privacy`；全局守卫 401 跳登录 |
 | `src/utils/api.ts`（新） | fetch 封装：401 跳登录、429 提示配额、统一错误信息 |
@@ -590,31 +619,21 @@ Nginx (aliyun ECS, 公网 IP)
 | Node | 24 LTS（`node:sqlite` 内置）；`packageManager` 固定 pnpm 版本 |
 | 进程 | systemd，`Restart=always`，`User=hys` |
 
-### 8.3 域名与备案（最关键的时间变量）
+### 8.3 域名与备案
 
-```
-ECS 在哪个地域？
-├─ 中国大陆（北京/杭州/上海/深圳…）
-│  ├─ 域名已完成 ICP 备案 → 直接按 8.4 部署
-│  └─ 未备案 → 先提交备案（阿里云初审 1~2 天 + 管局 1~20 个工作日）
-│       ├─ 方案 A（推荐）：另开一台香港 ECS 做内测，不阻塞发邀请
-│       └─ 方案 B：本机 + Cloudflare Tunnel/frp 给 3~5 个内测用户（临时，别长期）
-└─ 香港/海外 → 无需 ICP，直接部署；大陆访问延迟约 30~80ms
-```
+**已确认：ECS 在中国大陆，域名已完成 ICP 备案**，直接走 8.4 之后的主线，不需要香港内测分支。
 
-**备案要点**
+仍需补：
 
-- 大陆 ECS 通过 80/443 提供网站服务，域名必须 ICP 备案；未备案会被阻断。
-- 阿里云备案要求服务器包年包月（通常 ≥3 个月）并申请备案服务号；域名需实名认证。
-- 备案期间网站一般需关闭，所以用香港/本地隧道做内测。
-- ICP 通过后 30 天内做**公安联网备案**，页脚展示两个备案号并链接到官方查询页。
-- 备案主体（个人/公司）和网站类型要与实际服务一致；涉及教育培训/付费，建议先咨询阿里云备案顾问。
+- **公安联网备案**：ICP 通过后 30 天内完成，页脚展示 ICP 备案号 + 公安备案号并链接官方查询页。
+- 备案主体/网站类型与实际服务一致；如后续收费或做教育培训，先确认资质与备案变更。
+- 域名 A 记录指向 ECS EIP，TTL 600；上线前用 `dig` + `curl -I` 确认解析和证书链。
 
 **合规提示（不是法律意见）**
 
 - 生成式 AI 服务面向公众，可能涉及《生成式人工智能服务管理暂行办法》的备案/安全评估；使用已备案的基础模型可简化，但不等于豁免。上线前向阿里云合规顾问确认。
 - 2025-09-01 起《人工智能生成合成内容标识办法》要求显式+隐式标识；至少做到页面显著标识 + 导出内容带标识。
-- 准备《用户协议》《隐私政策》，写清收集哪些数据（邮箱、学习记录、IP 日志）、用途、保留期、第三方（百炼、Tavily/博查）、用户权利（导出/删除）、联系方式。
+- 准备《用户协议》《隐私政策》，写清收集哪些数据（邀请码、昵称、学习记录、IP 日志）、用途、保留期、第三方（DeepSeek 官方、Tavily/博查）、用户权利（导出/删除）、联系方式。
 - 不面向未成年人；不做医疗/法律等专业建议。
 
 ### 8.4 TLS
@@ -797,7 +816,7 @@ chown -R hys:hys /opt/hys-tutor /var/lib/hys-tutor
 # 配置
 install -m 600 -o root -g root .env /etc/hys-tutor/env
 # 初始化 DB + 管理员（CLI 提示输入密码）
-sudo -u hys node scripts/admin.mjs init --email you@example.com
+sudo -u hys node scripts/admin.mjs init --nickname admin
 # 生成 10 个邀请码
 sudo -u hys node scripts/admin.mjs invite --count 10 --days 7
 ```
@@ -813,9 +832,9 @@ HYS_DB_PATH=/var/lib/hys-tutor/control.db
 COOKIE_SECURE=1
 TRUST_PROXY=1
 
-LLM_API_KEY=...
-LLM_BASE_URL=https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
-LLM_MODEL=deepseek-v4.1-flash
+LLM_API_KEY=...                         # DeepSeek 官方
+LLM_BASE_URL=https://api.deepseek.com/v1
+LLM_MODEL=deepseek-v4-pro
 LLM_MODEL_FAST=
 LLM_TIMEOUT_MS=120000
 LLM_MAX_RETRIES=2
@@ -823,15 +842,16 @@ LLM_MAX_RETRIES=2
 TAVILY_API_KEY=...
 BOCHA_API_KEY=...
 
-QUOTA_TOPICS_PER_DAY=2
-QUOTA_LESSONS_PER_DAY=5
-QUOTA_GRADES_PER_DAY=40
-QUOTA_CHATS_PER_DAY=100
-MAX_TOPICS_PER_USER=20
-MAX_STORAGE_MB=300
+# 第一版完全免费；这些只是防滥用上限，不是付费档位
+QUOTA_TOPICS_PER_DAY=5
+QUOTA_LESSONS_PER_DAY=10
+QUOTA_GRADES_PER_DAY=100
+QUOTA_CHATS_PER_DAY=300
+MAX_TOPICS_PER_USER=30
+MAX_STORAGE_MB=500
 GLOBAL_MAX_LESSON_JOBS=2
 DAILY_BUDGET_CNY=50
-MAX_USERS=200
+MAX_USERS=50
 REGISTRATION_MODE=invite
 
 ALERT_WEBHOOK=
@@ -986,7 +1006,7 @@ find /var/lib/hys-tutor/backups -maxdepth 1 -mtime +14 -exec rm -rf {} +
 - 内容安全（黑名单 + 举报处理）0.5 天
 - 数据导出/注销 0.5 天
 - 优雅停机 + 部署不中断备课 0.5 天
-- 邮箱验证/找回密码 1 天
+- 管理员重置密码/账号恢复 0.5 天
 - 跨用户研究缓存 0.5 天
 
 ### P2：有真实需求再做
@@ -999,13 +1019,28 @@ find /var/lib/hys-tutor/backups -maxdepth 1 -mtime +14 -exec rm -rf {} +
 
 ---
 
-## 11. 需要你拍板的 5 件事
+## 11. 已确认的决策
 
-1. **ECS 地域与备案状态**：机器在大陆还是香港？域名是否已备案？这决定是「直接上线」还是「先香港内测 + 并行备案」。
-2. **邀请制还是开放注册**：建议邀请制；开放注册需要加验证码、邮箱验证、更严的限流。
-3. **模型 key 谁出**：建议平台统一出（百炼），用户零配置；如果你希望用户自带 key，P0 就要加请求级配置，工期 +2 天。
-4. **日活与预算上限**：预计首批多少人？每月 LLM/搜索预算多少？我按 50 DAU / ¥50 日预算给了默认配额，可以调。
-5. **邮箱服务**：Beta 是否可以不做邮箱验证/找回（管理员重置）？如果要，需准备阿里云邮件推送或 SMTP。
+1. **部署位置**：ECS 在中国大陆，域名已完成 ICP 备案 → 直接走大陆主线，跳过香港内测；上线后 30 天内补公安联网备案。
+2. **准入方式**：邀请制；不做开放注册。
+3. **登录方式**：邀请码注册 + 昵称 + 密码登录；不收集邮箱、不发验证邮件；忘记密码由管理员 CLI 重置。
+4. **模型 key**：平台统一出，使用 **DeepSeek 官方** `deepseek-v4-pro`（`https://api.deepseek.com/v1`），不走阿里云 token-plan 额度。
+5. **规模与预算**：首批约 10 人，暂不做付费，第一版完全免费；每人日配额只是防滥用上限，全站日预算按 ¥50 熔断。
+
+唯一还需要在部署前提供的信息：**服务器 SSH 地址/登录方式、域名、ECS 规格**。这些只影响上线执行，不影响代码改造，可以边开发边给。
+
+---
+
+## 12. 下一步（P0 落地顺序）
+
+1. 控制面 SQLite + 密码/会话/邀请码 + auth 中间件（含注册/登录 API）
+2. ALS 用户隔离 + `dataPath` 改造 + 现有个人数据迁移脚本
+3. 任务归属 + 配额/用量/预算 + 限流
+4. 密钥收口 + 设置页降级 + import 禁用
+5. 前端登录/注册/守卫/配额提示/协议页
+6. 安全加固（body 上限、SSRF DNS、响应头、错误脱敏）
+7. 阿里云部署脚本与首次上线
+8. 验收清单逐项过
 
 ---
 

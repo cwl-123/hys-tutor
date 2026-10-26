@@ -36,16 +36,25 @@ async function readSseStream(res: Response, handlers: SseHandlers): Promise<void
 export async function postSse(url: string, body: unknown, handlers: SseHandlers): Promise<void> {
   const res = await fetch(url, {
     method: 'POST',
+    credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
+  if (res.status === 401) {
+    window.location.assign(`/login?next=${encodeURIComponent(location.pathname + location.search)}`)
+    throw new Error('登录已过期')
+  }
   if (!res.ok) throw new Error(`SSE 请求失败：${res.status}`)
   await readSseStream(res, handlers)
 }
 
 // GET + SSE（挂接进度流）；signal 用于离开页面/重新挂接时中断旧连接
 export async function getSse(url: string, handlers: SseHandlers, signal?: AbortSignal): Promise<void> {
-  const res = await fetch(url, { signal })
+  const res = await fetch(url, { signal, credentials: 'same-origin' })
+  if (res.status === 401) {
+    window.location.assign(`/login?next=${encodeURIComponent(location.pathname + location.search)}`)
+    throw new Error('登录已过期')
+  }
   if (!res.ok) throw new Error(`SSE 请求失败：${res.status}`)
   await readSseStream(res, handlers)
 }

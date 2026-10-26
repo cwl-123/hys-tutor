@@ -1,10 +1,10 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { sendJson } from '../index'
+import { sendJson } from '../http'
 import { addReport, listReports } from '../services/report-service'
 import { findLesson } from '../services/lesson-service'
 import { safeExtractPreferences } from '../services/preference-service'
 import { reportInputSchema } from '../../shared/types'
-import { readBody } from './topics'
+import { readBody } from '../http'
 
 // POST /api/reports — "这里有错"标记（通过 lessonId 反查课题落盘）
 export async function handleCreateReport(req: IncomingMessage, res: ServerResponse): Promise<void> {

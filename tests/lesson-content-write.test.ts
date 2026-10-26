@@ -7,6 +7,7 @@ import type * as LessonChatModule from '../server/services/lesson-chat-service'
 // DATA_DIR 在 json-store 导入时绑定，必须先设 HYS_DATA_DIR 再动态导入
 let svc: typeof LessonChatModule
 let writeJson: typeof import('../server/repo/json-store').writeJson
+let dataPath: typeof import('../server/repo/json-store').dataPath
 
 const png = Buffer.concat([
   Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
@@ -30,11 +31,8 @@ function lessonStub(contentMd: string) {
 }
 
 async function seed(contentMd: string) {
-  await writeJson(path.join(process.env.HYS_DATA_DIR!, 'topics.json'), [{ id: 't_test', name: '测试' }])
-  await writeJson(
-    path.join(process.env.HYS_DATA_DIR!, 'topics', 't_test', 'lessons', 'l_test.json'),
-    lessonStub(contentMd),
-  )
+  await writeJson(dataPath('topics.json'), [{ id: 't_test', name: '测试' }])
+  await writeJson(dataPath('topics', 't_test', 'lessons', 'l_test.json'), lessonStub(contentMd))
 }
 
 beforeAll(async () => {
@@ -42,6 +40,7 @@ beforeAll(async () => {
   process.env.HYS_DATA_DIR = dir
   const store = await import('../server/repo/json-store')
   writeJson = store.writeJson
+  dataPath = store.dataPath
   svc = await import('../server/services/lesson-chat-service')
 })
 
@@ -68,13 +67,13 @@ describe('updateLessonContent 手动写正文', () => {
     // 落盘 + 版本快照
     const { readJson } = await import('../server/repo/json-store')
     const saved = await readJson<{ contentMd: string; images: unknown[] }>(
-      path.join(process.env.HYS_DATA_DIR!, 'topics', 't_test', 'lessons', 'l_test.json'),
+      dataPath('topics', 't_test', 'lessons', 'l_test.json'),
       { contentMd: '', images: [] },
     )
     expect(saved.contentMd).toBe(result.contentMd)
     expect(saved.images).toHaveLength(1)
     const versions = await readJson<{ summary: string }[]>(
-      path.join(process.env.HYS_DATA_DIR!, 'topics', 't_test', 'lesson-versions', 'l_test.json'),
+      dataPath('topics', 't_test', 'lesson-versions', 'l_test.json'),
       [],
     )
     expect(versions).toHaveLength(1)
@@ -86,7 +85,7 @@ describe('updateLessonContent 手动写正文', () => {
     const stub = lessonStub('# 课')
     stub.status = 'writing'
     await writeJson(
-      path.join(process.env.HYS_DATA_DIR!, 'topics', 't_test', 'lessons', 'l_test.json'),
+      dataPath('topics', 't_test', 'lessons', 'l_test.json'),
       stub,
     )
     await expect(svc.updateLessonContent('l_test', '# 新', '')).rejects.toThrow(/尚未生成完成/)

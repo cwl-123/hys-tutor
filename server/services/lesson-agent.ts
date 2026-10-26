@@ -1,6 +1,7 @@
 import { readdir } from 'node:fs/promises'
 import { dataPath, newId, nowIso, readJson, withLock, writeJson } from '../repo/json-store'
 import { getLLM, getLLMModel, completeJson, completeText } from '../llm/client'
+import { recordLlmUsage } from './quota-service'
 import { runAgent, type AgentTool } from '../agent/loop'
 import { searchWeb } from '../agent/tools/web-search'
 import { searchImages } from '../agent/tools/image-search'
@@ -287,23 +288,32 @@ async function runResearch(
 }
 
 async function streamWriteLesson(system: string, prompt: string, onStage: StageFn): Promise<string> {
+  const model = getLLMModel()
   const stream = await getLLM().chat.completions.create({
-    model: getLLMModel(),
+    model,
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: prompt },
     ],
     temperature: 0.5,
     stream: true,
+    stream_options: { include_usage: true },
   })
   let content = ''
+  let tokensIn = 0
+  let tokensOut = 0
   for await (const chunk of stream) {
+    if (chunk.usage) {
+      tokensIn = chunk.usage.prompt_tokens ?? 0
+      tokensOut = chunk.usage.completion_tokens ?? 0
+    }
     const delta = chunk.choices[0]?.delta?.content
     if (delta) {
       content += delta
       onStage({ stage: 'write-delta', detail: { text: delta } })
     }
   }
+  recordLlmUsage({ model, tokensIn, tokensOut, status: 'ok' })
   if (!content.trim()) throw new Error('写作阶段未产出内容')
   return content
 }
