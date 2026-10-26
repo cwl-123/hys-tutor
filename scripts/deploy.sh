@@ -35,8 +35,8 @@ fi
 
 PORT=$(sed -n 's/^PORT=//p' .env 2>/dev/null | tr -d '"'"'"' ' || true)
 PORT=${PORT:-5180}
-# 冷启动（加载 dist、首次读 data/）可能超过 2s，健康检查重试 10s
-for i in $(seq 1 10); do
+# 冷启动（加载 dist、首次读 data/、SQLite 迁移）可能超过 10s，健康检查重试 20s
+for i in $(seq 1 20); do
   curl -sf "http://127.0.0.1:$PORT/api/health" >/dev/null && { echo "==> 部署完成：http://127.0.0.1:$PORT"; exit 0; }
   sleep 1
 done
