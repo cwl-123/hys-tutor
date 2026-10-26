@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { HttpError, statusOf, messageOf, QuotaError } from './auth/errors'
-import { assertSameOrigin, isPublicApi } from './auth/middleware'
+import { assertSameOrigin, isAuthDisabled, isPublicApi } from './auth/middleware'
 import { requireSession } from './auth/session'
 import { runAsUser } from './repo/context'
 import { sendJson } from './http'
@@ -65,6 +65,10 @@ export async function handleApi(req: IncomingMessage, res: ServerResponse, next:
   const url = (req.url ?? '/').split('?')[0]
   try {
     assertSameOrigin(req)
+    if (isAuthDisabled()) {
+      await runAsUser('local', () => routeApi(req, res, next))
+      return
+    }
     if (isPublicApi(url)) {
       await routeApi(req, res, next)
       return

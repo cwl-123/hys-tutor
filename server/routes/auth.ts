@@ -8,9 +8,10 @@ import {
   optionalSession,
   clientIp,
 } from '../auth/session'
-import { changePassword, loginUser, registerUser } from '../auth/service'
+import { changePassword, getUserById, loginUser, registerUser } from '../auth/service'
 import { getUsage } from '../services/quota-service'
 import { rateLimit } from '../auth/rate-limit'
+import { isAuthDisabled } from '../auth/middleware'
 
 const registerSchema = z.object({
   inviteCode: z.string().trim().min(4).max(32),
@@ -58,11 +59,19 @@ export async function handleLogout(req: IncomingMessage, res: ServerResponse): P
 
 export async function handleMe(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const user = optionalSession(req)
-  if (!user) {
-    sendJson(res, 200, { user: null })
+  if (user) {
+    sendJson(res, 200, { user, usage: getUsage(user.id) })
     return
   }
-  sendJson(res, 200, { user, usage: getUsage(user.id) })
+  // 本地单用户模式：没有会话时返回 local 管理员，前端无需登录
+  if (isAuthDisabled()) {
+    const local = getUserById('local')
+    if (local) {
+      sendJson(res, 200, { user: local, usage: getUsage(local.id) })
+      return
+    }
+  }
+  sendJson(res, 200, { user: null })
 }
 
 const changePasswordSchema = z.object({
