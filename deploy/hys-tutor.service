@@ -9,6 +9,8 @@ User=hys
 Group=hys
 WorkingDirectory=/opt/hys-tutor
 EnvironmentFile=/etc/hys-tutor.env
+Environment=NODE_ENV=production
+Environment=TZ=Asia/Shanghai
 ExecStart=/usr/bin/node /opt/hys-tutor/dist-server/standalone.js
 Restart=always
 RestartSec=3
