@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>hys-tutor 产品介绍</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main id="stage">
+      <div class="ambient" aria-hidden="true">
+        <div class="ambient__orb ambient__orb--one" id="orbOne"></div>
+        <div class="ambient__orb ambient__orb--two" id="orbTwo"></div>
+        <div class="ambient__grid"></div>
+        <div class="ambient__noise"></div>
+      </div>
+
+      <header class="hud" id="hud">
+        <div class="hud__brand">
+          <svg class="logo logo--small" viewBox="0 0 24 24" aria-hidden="true">
+            <rect width="24" height="24" rx="6" fill="currentColor" />
+            <path d="M7.5 16.5 12 7.5l4.5 9" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="12" cy="7.5" r="2.1" fill="#fff" />
+            <circle cx="7.5" cy="16.5" r="2.1" fill="#fff" />
+            <circle cx="16.5" cy="16.5" r="2.1" fill="#fff" />
+          </svg>
+          <strong>hys-tutor</strong>
+          <span>AI 自适应私教</span>
+        </div>
+        <div class="hud__index" id="hudIndex">01 / 08</div>
+      </header>
+
+      <section class="scene scene--hook" data-scene="hook">
+        <div class="hook__copy">
+          <div class="eyebrow" id="hookEyebrow">AI ADAPTIVE TUTOR</div>
+          <div class="hook__product" id="hookProduct">
+            <svg class="logo" viewBox="0 0 24 24" aria-hidden="true">
+              <rect width="24" height="24" rx="6" fill="currentColor" />
+              <path d="M7.5 16.5 12 7.5l4.5 9" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+              <circle cx="12" cy="7.5" r="2.1" fill="#fff" />
+              <circle cx="7.5" cy="16.5" r="2.1" fill="#fff" />
+              <circle cx="16.5" cy="16.5" r="2.1" fill="#fff" />
+            </svg>
+            <span>hys-tutor</span>
+          </div>
+          <h1 id="hookTitle">把任何方向，<br /><em>学成自己的体系。</em></h1>
+          <p class="hook__lead" id="hookLead">不是只生成一节课，<br />而是陪你走完整个课题。</p>
+          <div class="hook__tags" id="hookTags">
+            <span>多轮个性化微课</span><i></i><span>持续迭代的学习者模型</span>
+          </div>
+        </div>
+        <div class="hero" id="hero">
+          <div class="hero__halo"></div>
+          <svg class="hero__graph" viewBox="0 0 640 640" aria-hidden="true">
+            <circle cx="320" cy="320" r="246" class="hero__orbit" />
+            <circle cx="320" cy="320" r="174" class="hero__orbit hero__orbit--inner" />
+            <g id="heroEdges"></g>
+            <g id="heroNodes"></g>
+          </svg>
+          <div class="hero__score" id="heroScore">
+            <span class="status-dot status-dot--green"></span>
+            <div><small>当前掌握分</small><strong><b id="heroScoreValue">0</b><em>/ 100</em></strong></div>
+          </div>
+          <div class="hero__next" id="heroNext"><span>下一课</span><strong>优先补最薄弱的知识点</strong></div>
+        </div>
+      </section>
+
+      <section class="scene scene--problem" data-scene="problem">
+        <div class="problem__copy">
+          <div class="eyebrow" id="problemEyebrow">NOT ANOTHER ONE-OFF GENERATOR</div>
+          <h2 id="problemTitle">一次性生成，<br /><span class="muted">学完就断。</span></h2>
+          <p id="problemLead">真正影响下一课的，<br />应该是你上一课的表现。</p>
+          <div class="memory-card" id="memoryCard">
+            <div class="memory-card__icon">↻</div>
+            <div><strong>持续迭代的学习者模型</strong><span>掌握度 · 错题 · 偏好 · 报错</span></div>
+          </div>
+        </div>
+        <div class="problem__cards" id="problemCards">
+          <article class="problem-card" data-problem-card="0">
+            <span class="problem-card__number">01</span>
+            <div class="problem-card__icon">▤</div>
+            <h3>通用大纲</h3><p>所有人得到同一份目录</p><i></i><b>×</b>
+          </article>
+          <article class="problem-card" data-problem-card="1">
+            <span class="problem-card__number">02</span>
+            <div class="problem-card__icon">✓</div>
+            <h3>孤立题目</h3><p>做错之后，没有后续动作</p><i></i><b>×</b>
+          </article>
+          <article class="problem-card" data-problem-card="2">
+            <span class="problem-card__number">03</span>
+            <div class="problem-card__icon">○</div>
+            <h3>没有记忆</h3><p>下一次对话，又从零开始</p><i></i><b>×</b>
+          </article>
+        </div>
+      </section>
+
+      <section class="scene scene--onboard" data-scene="onboard">
+        <div class="split-copy">
+          <div class="eyebrow" id="onboardEyebrow">01 · 创建学习方向</div>
+          <h2 id="onboardTitle">输入一个方向，<br /><em>得到学习地图。</em></h2>
+          <p id="onboardLead">先研究，再拆知识；先了解你，再生成课程。</p>
+          <ol class="steps" id="onboardSteps">
+            <li data-step="0"><span>01</span><div><strong>联网调研</strong><small>搜索优质资料，形成研究笔记</small></div></li>
+            <li data-step="1"><span>02</span><div><strong>构建知识图谱</strong><small>15–40 个节点，带前置依赖</small></div></li>
+            <li data-step="2"><span>03</span><div><strong>注入个性化设置</strong><small>当前程度、讲解风格与额外要求</small></div></li>
+          </ol>
+        </div>
+        <div class="onboard__visual" id="onboardVisual">
+          <div class="browser">
+            <div class="browser__bar"><i></i><i></i><i></i><span>hys-tutor · 开启学习方向</span></div>
+            <div class="browser__body"><img id="onboardImage" src="../assets/screenshots/home-typed.png" alt="创建学习方向界面" /></div>
+          </div>
+          <div class="floating-chip floating-chip--research" id="researchChip"><span class="pulse-dot"></span>AI 正在研究知识体系</div>
+          <div class="floating-chip floating-chip--profile" id="profileChip">案例驱动 · 有一定基础</div>
+        </div>
+      </section>
+
+      <section class="scene scene--graph" data-scene="graph">
+        <div class="graph__copy">
+          <div class="eyebrow" id="graphEyebrow">02 · 知识图谱与自适应排课</div>
+          <h2 id="graphTitle">你的学习地图，<br /><em>会随掌握度变化。</em></h2>
+          <div class="legend" id="graphLegend">
+            <span><i class="red"></i>未掌握 &lt;40</span>
+            <span><i class="amber"></i>学习中 40–79</span>
+            <span><i class="green"></i>已掌握 ≥80</span>
+          </div>
+          <div class="schedule-card" id="scheduleCard">
+            <div class="schedule-card__label">排课引擎</div>
+            <div class="schedule-card__nodes">
+              <div class="mini-node mini-node--done"><span>前置知识</span><strong>90</strong></div>
+              <b>→</b>
+              <div class="mini-node mini-node--next"><span>最薄弱且已解锁</span><strong>下一课</strong></div>
+            </div>
+            <p>前置 ≥80 解锁下游<br />优先选择当前掌握分最低的知识点</p>
+          </div>
+        </div>
+        <div class="graph__visual" id="graphVisual">
+          <div class="browser browser--graph">
+            <div class="browser__bar"><i></i><i></i><i></i><span>价值投资：ROE 与盈利质量解读</span></div>
+            <div class="browser__body graph__screen">
+              <img id="graphImage" src="../assets/screenshots/graph.png" alt="知识点掌握度图谱" />
+              <img id="graphPanelImage" src="../assets/screenshots/graph-panel.png" alt="知识点详情与历史课程" />
+            </div>
+          </div>
+          <div class="graph__badge" id="graphBadge"><span class="status-dot status-dot--green"></span>掌握分变化，实时回写图谱</div>
+        </div>
+      </section>
+
+      <section class="scene scene--lesson" data-scene="lesson">
+        <div class="lesson__heading">
+          <div>
+            <div class="eyebrow" id="lessonEyebrow">03 · 个性化微课</div>
+            <h2 id="lessonTitle">15 分钟，只讲一到两个知识点。</h2>
+          </div>
+          <div class="lesson__tags" id="lessonTags"><span>KaTeX 公式</span><span>代码高亮</span><span>Mermaid 图表</span><span>来源引用</span></div>
+        </div>
+        <div class="lesson__visual" id="lessonVisual">
+          <div class="browser browser--lesson">
+            <div class="browser__bar"><i></i><i></i><i></i><span>ROE 是什么：股东的钱生钱效率</span><b>15 分钟微课</b></div>
+            <div class="browser__body lesson__screen">
+              <img class="lesson-shot" data-lesson-shot="0" src="../assets/screenshots/lesson-top.png" alt="个性化微课学习目标" />
+              <img class="lesson-shot" data-lesson-shot="1" src="../assets/screenshots/lesson-formula.png" alt="微课公式与图表" />
+              <img class="lesson-shot" data-lesson-shot="2" src="../assets/screenshots/lesson-sources.png" alt="微课参考来源" />
+            </div>
+          </div>
+          <div class="preference-pill" id="preferencePill"><span>✦</span><div><small>已注入你的偏好</small><strong>大白话 · 少公式 · 多讲故事</strong></div></div>
+          <div class="lesson__tools" id="lessonTools"><span>划线标注</span><span>引用段落优化</span><span>AI 局部修改</span></div>
+        </div>
+      </section>
+
+      <section class="scene scene--practice" data-scene="practice">
+        <div class="practice__copy">
+          <div class="eyebrow" id="practiceEyebrow">04 · 练习与反馈</div>
+          <h2 id="practiceTitle">练习不是终点，<br /><em>是下一课的输入。</em></h2>
+          <div class="question-types" id="questionTypes">
+            <div><strong>2</strong><span>单选题</span></div><div><strong>2</strong><span>判断题</span></div><div><strong>1</strong><span>简答题</span></div>
+          </div>
+          <div class="grading-list" id="gradingList">
+            <p><span>⚡</span>客观题提交即判</p><p><span>✦</span>简答题 AI 批改与针对性讲解</p><p><span>↗</span>每次掌握分变化都有原因</p>
+          </div>
+          <div class="score-pop" id="scorePop"><span>本次掌握分</span><strong>0 <i>→</i> 90</strong><b>+90</b></div>
+        </div>
+        <div class="practice__visual" id="practiceVisual">
+          <div class="browser browser--practice">
+            <div class="browser__bar"><i></i><i></i><i></i><span>随堂练习 · 批改与掌握分回写</span></div>
+            <div class="browser__body practice__screen">
+              <img id="practiceImage" src="../assets/screenshots/practice.png" alt="练习批改结果" />
+              <img id="masteryImage" src="../assets/screenshots/mastery.png" alt="掌握分变化及原因" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="scene scene--loop" data-scene="loop">
+        <div class="loop__heading">
+          <div class="eyebrow" id="loopEyebrow">THE ADAPTIVE LEARNING LOOP</div>
+          <h2 id="loopTitle">每一课，都在让下一课更懂你。</h2>
+        </div>
+        <div class="loop__diagram" id="loopDiagram">
+          <svg viewBox="0 0 700 700" aria-hidden="true">
+            <circle cx="350" cy="350" r="245" class="loop__track" />
+            <circle cx="350" cy="350" r="245" class="loop__progress" id="loopProgress" />
+            <circle cx="350" cy="350" r="150" class="loop__inner-ring" />
+          </svg>
+          <div class="loop__center" id="loopCenter"><small>持续迭代</small><strong>学习者模型</strong><span>掌握度 · 错题 · 偏好 · 报错</span></div>
+          <div class="loop-node" data-loop-node="0"><span>01</span><strong>诊断</strong></div>
+          <div class="loop-node" data-loop-node="1"><span>02</span><strong>排课</strong></div>
+          <div class="loop-node" data-loop-node="2"><span>03</span><strong>讲解</strong></div>
+          <div class="loop-node" data-loop-node="3"><span>04</span><strong>练习</strong></div>
+          <div class="loop-node" data-loop-node="4"><span>05</span><strong>反馈</strong></div>
+        </div>
+        <p class="loop__caption" id="loopCaption">今天错的题，会成为明天备课的上下文。</p>
+      </section>
+
+      <section class="scene scene--close" data-scene="close">
+        <div class="close__glow"></div>
+        <div class="close__content">
+          <svg class="logo logo--large" id="closeLogo" viewBox="0 0 24 24" aria-hidden="true">
+            <rect width="24" height="24" rx="6" fill="currentColor" />
+            <path d="M7.5 16.5 12 7.5l4.5 9" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="12" cy="7.5" r="2.1" fill="#fff" />
+            <circle cx="7.5" cy="16.5" r="2.1" fill="#fff" />
+            <circle cx="16.5" cy="16.5" r="2.1" fill="#fff" />
+          </svg>
+          <div class="close__wordmark" id="closeWordmark">hys-tutor</div>
+          <h1 id="closeTitle">把任何方向，<br /><em>学成自己的体系。</em></h1>
+          <p id="closeLead">多轮微课 · 学习者模型 · 本地优先</p>
+          <div class="close__pills" id="closePills"><span>可以完全运行在自己的机器上</span><span>支持邀请制内测</span></div>
+        </div>
+      </section>
+
+      <div class="subtitle" id="subtitle" aria-live="off"></div>
+      <div class="progress" aria-hidden="true"><i id="progressBar"></i></div>
+    </main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
