@@ -63,6 +63,9 @@ chmod 600 /etc/hys-tutor.env
 if ! grep -q '^LLM_API_KEY=.\+' /etc/hys-tutor.env; then
   echo "警告：/etc/hys-tutor.env 还没有 LLM_API_KEY，登录后生成课程会失败。" >&2
 fi
+if ! grep -q '^BOOTSTRAP_INVITE_CODE=.\+' /etc/hys-tutor.env; then
+  echo "提示：BOOTSTRAP_INVITE_CODE 为空，暂时无法注册第一个管理员；填好后重启 hys-tutor。" >&2
+fi
 chown hys:hys "$APP_DIR"
 chown -R hys:hys "$DATA_DIR"
 
