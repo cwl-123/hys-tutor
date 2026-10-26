@@ -3,6 +3,7 @@
 // 用法：
 //   node scripts/migrate-user-data.mjs --user-id u_xxxxxxxx          # 预演
 //   node scripts/migrate-user-data.mjs --user-id u_xxxxxxxx --apply # 执行
+//   node scripts/migrate-user-data.mjs --from-user local --user-id u_xxxxxxxx # 把本地 local 数据搬到某个账号
 import { access, cp, mkdir, readdir, rename, rm } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -12,6 +13,7 @@ function arg(name) {
 }
 
 const userId = arg('user-id')
+const fromUser = arg('from-user')
 const apply = process.argv.includes('--apply')
 if (!userId || !/^[A-Za-z0-9_-]{3,40}$/.test(userId)) {
   console.error('用法：node scripts/migrate-user-data.mjs --user-id u_xxxxxxxx [--apply]')
@@ -22,6 +24,15 @@ const dataDir = process.env.HYS_DATA_DIR
   ? path.resolve(process.env.HYS_DATA_DIR)
   : path.resolve(process.cwd(), 'data')
 const target = path.join(dataDir, 'users', userId)
+const sourceBase = fromUser ? path.join(dataDir, 'users', fromUser) : dataDir
+if (fromUser && !/^[A-Za-z0-9_-]{3,40}$/.test(fromUser)) {
+  console.error('--from-user 不合法')
+  process.exit(1)
+}
+if (fromUser === userId) {
+  console.error('--from-user 与 --user-id 不能相同')
+  process.exit(1)
+}
 const ENTRIES = ['topics', 'topics.json', 'preferences.json']
 
 async function exists(p) {
@@ -56,14 +67,14 @@ async function main() {
   }
   const plan = []
   for (const name of ENTRIES) {
-    const src = path.join(dataDir, name)
+    const src = path.join(sourceBase, name)
     if (await exists(src)) plan.push({ name, src, dest: path.join(target, name) })
   }
   if (plan.length === 0) {
     console.log('没有需要迁移的数据（topics / topics.json / preferences.json 均不存在）')
     return
   }
-  console.log(`数据目录：${dataDir}`)
+  console.log(`数据目录：${sourceBase}`)
   console.log(`目标用户：${userId}`)
   for (const item of plan) console.log(`  ${item.name} -> users/${userId}/${item.name}`)
   if (!apply) {

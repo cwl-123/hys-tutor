@@ -105,6 +105,12 @@ sudo -u hys node scripts/migrate-user-data.mjs --user-id u_xxxxxxxx        # 预
 sudo -u hys node scripts/migrate-user-data.mjs --user-id u_xxxxxxxx --apply
 ```
 
+如果数据已经是本地单用户模式的 `data/users/local/`，用 `--from-user local` 搬到公网账号：
+
+```bash
+sudo -u hys node scripts/migrate-user-data.mjs --from-user local --user-id u_xxxxxxxx --apply
+```
+
 备份：
 
 ```bash
