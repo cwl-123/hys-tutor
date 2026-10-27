@@ -22,6 +22,11 @@ export interface OnboardingReply {
 // 对话轮次上限：达到后强制 AI 收敛出提案，防止无限闲聊
 export const ONBOARDING_MAX_TURNS = 8
 
+function cleanText(v: string | undefined): string | undefined {
+  const t = v?.trim()
+  return t ? t.slice(0, 60) : undefined
+}
+
 function composeProfile(p: {
   style?: string
   level?: string
@@ -33,8 +38,10 @@ function composeProfile(p: {
   if (known.length) parts.push(`已熟悉：${known.join('、')}，相关基础可简要带过`)
   if (p.extra?.trim()) parts.push(p.extra.trim())
   const profile: TopicProfile = {}
-  if (p.style) profile.style = p.style
-  if (p.level) profile.level = p.level
+  const style = cleanText(p.style)
+  const level = cleanText(p.level)
+  if (style) profile.style = style
+  if (level) profile.level = level
   if (parts.length) profile.extra = parts.join('；')
   return profile
 }

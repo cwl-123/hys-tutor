@@ -11,13 +11,27 @@ export const llmOnboardingSchema = z.object({
     .object({
       name: z.string().describe('收敛后的具体学习方向名（可调研的课题名）'),
       scope: z.string().describe('学习范围说明：覆盖哪些板块、按什么顺序学（50 字内）'),
-      style: z.enum(['通俗直观', '严谨推导', '实战代码', '案例驱动']).optional(),
-      level: z.enum(['完全新手', '有一定基础', '比较熟悉想精进']).optional(),
+      style: z
+        .string()
+        .max(60)
+        .optional()
+        .describe(
+          '偏好的讲法/教学风格，可用固定词（通俗直观/严谨推导/实战代码/案例驱动），也可按学科自定义，如「教材同步讲解+例题拆解」',
+        ),
+      level: z
+        .string()
+        .max(60)
+        .optional()
+        .describe(
+          '学习者当前程度，可用固定词（完全新手/有一定基础/比较熟悉想精进），也可按学科自定义，如「初中八/九年级零基础起步」',
+        ),
       extra: z.string().optional().describe('额外学习要求（不含已掌握内容）'),
       knownTopics: z.array(z.string()).default([]).describe('用户已熟悉的内容（基础讲解会跳过）'),
     })
+    // 澄清阶段的回复里模型常显式输出 null，必须允许，否则整轮校验失败
+    .nullable()
     .optional()
-    .describe('信息足够时给出的方向提案；仍需澄清时省略'),
+    .describe('信息足够时给出的方向提案；仍需澄清时省略或输出 null'),
 })
 export type LlmOnboarding = z.infer<typeof llmOnboardingSchema>
 
@@ -31,7 +45,7 @@ export const ONBOARDING_SYSTEM_PROMPT = `你是「课程顾问」，帮一个想
 5. 信息足够（通常 2~4 轮）就输出 proposal：
    - name 要收敛成具体、可调研的课题名（如「价值投资：公司基本面分析」而非「看公司」）
    - scope 说明覆盖板块与学习顺序
-   - style/level 根据对话推断（用户没明说就给最合理的）
+   - style/level 根据对话推断（用户没明说就给最合理的）；这两个字段可用固定词（通俗直观/严谨推导/实战代码/案例驱动、完全新手/有一定基础/比较熟悉想精进），但学科不适用时（如中小学学科、语言、考证）就按学科自定义一句短语，例如 style「教材同步讲解+例题拆解」、level「初中八/九年级零基础起步」
    - knownTopics 记录用户明确表示已熟悉的内容
    - extra 记录其他学习要求（如「多结合真实公司案例」）
 6. 用户继续补充或修正时，更新 proposal 并在 reply 里简要说明改了什么
