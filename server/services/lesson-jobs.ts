@@ -52,6 +52,9 @@ function armWatchdog(job: Job, onTimeout: () => Promise<void>): ReturnType<typeo
 const STAGE_TO_STATUS: Record<string, LessonStatus> = {
   schedule: 'researching',
   researching: 'researching',
+  'research-prefetch': 'researching',
+  'research-prefetch-done': 'researching',
+  'draft-saved': 'writing',
   outline: 'outlining',
   write: 'writing',
   revise: 'revising',

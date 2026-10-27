@@ -729,7 +729,7 @@ onUnmounted(() => {
           :to="`/lesson/${lessonStore.lesson.id}/exercise`"
           class="btn btn--primary btn--lg"
         >
-          去随堂练习（{{ lessonStore.questions.length }} 题）
+          {{ lessonStore.questions.length ? `去随堂练习（${lessonStore.questions.length} 题）` : '去随堂练习（课末题生成中）' }}
         </RouterLink>
       </footer>
 
@@ -760,7 +760,7 @@ onUnmounted(() => {
         class="float-cta"
         :to="`/lesson/${lessonStore.lesson.id}/exercise`"
       >
-        去随堂练习（{{ lessonStore.questions.length }} 题）
+        {{ lessonStore.questions.length ? `去随堂练习（${lessonStore.questions.length} 题）` : '去随堂练习（课末题生成中）' }}
         <ArrowRight :size="15" />
       </RouterLink>
 

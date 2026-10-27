@@ -15,7 +15,7 @@ import {
 import { gradeObjective, gradeShort } from '../services/grading-service'
 import { applyMasteryChanges, type ApplyEntry } from '../services/mastery-service'
 import { appendAttempt, listAttempts } from '../services/attempt-service'
-import { regenerateQuestions } from '../services/lesson-agent'
+import { ensureQuestions, isQuizRunning } from '../services/lesson-agent'
 import { safeExtractPreferences } from '../services/preference-service'
 import {
   applyLessonChat,
@@ -302,8 +302,9 @@ export async function handleRegenerateQuestions(
 ): Promise<void> {
   try {
     const userId = currentUserId()
-    consumeQuota(userId, 'grade')
-    const questions = await regenerateQuestions(lessonId)
+    // 后台自动出题还在跑时复用同一个任务，不重复扣配额
+    if (!isQuizRunning(lessonId)) consumeQuota(userId, 'grade')
+    const questions = await ensureQuestions(lessonId)
     sendJson(res, 200, { questions: stripQuestions(questions) })
   } catch (err) {
     const status = statusOf(err)

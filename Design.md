@@ -39,37 +39,43 @@
 
 ### 1.1 备课 Agent（核心变化）
 
-课程不再是一次 prompt 生成，而是 Agent 多轮工具循环，五个阶段（SSE 逐阶段推进度）：
+课程不再是一次 prompt 生成，而是「代码编排 + 有界 Agent」，SSE 逐阶段推进度：
 
 ```
 schedule(规则选题)
    ↓
-research    Agent 针对知识点自主发起 2~4 次搜索（web-search），
-            挑选优质来源抓正文（web-fetch），提炼成研究笔记：
-            核心概念 / 公式推导 / 典型例题 / 常见误区 / 来源 URL / 配图
-            期间可用 image_search 搜集贴切配图（0~4 张），保存笔记时
-            下载落地到 data/topics/<tid>/assets/，记 localPath
-            ※ 笔记按 nodeId 缓存（data/research/），同知识点二次备课直接复用+增量搜索
+research-prefetch  代码按 3 个角度并行搜索（原理/实战/误区），每个角度留 3 条候选，
+                   剔除 PDF/文档站/付费预览页；搜索结果落盘可复盘。不再让 Agent 自己搜。
    ↓
-outline     结合学习者上下文（掌握度快照、错题摘要、报错记录）+ 研究笔记
-            产出大纲：哪些点详讲、哪些略过、用什么例子贴合个人情况
+research   有界 Agent 从候选里挑 2~3 篇抓正文（web_fetch ≤3 次），
+           可用 image_search 1 次；最多 6 轮，超预算强制收尾。
+           提炼成研究笔记：核心概念 / 公式推导 / 典型例题 / 常见误区 / 来源 URL / 配图
+           ※ 笔记按 nodeId 缓存，同知识点二次备课直接复用
+           ※ 大纲用预搜摘要并行生成，不等研究收尾（outline 与 research 并行）
    ↓
-write       按大纲 + 笔记写课程 markdown（15 分钟篇幅约束），
-            关键结论标注来源引用 [1][2]，流式输出给前端；
-            抽象结构用 ```mermaid 图（1~3 张），配图用 ![图注](localPath)（0~2 张）
+write      按大纲 + 笔记写课程 markdown（2800~3500 字），关键结论标注来源引用 [1][2]，
+           流式输出给前端；抽象结构用 ```mermaid（1~3 张），配图用 ![图注](localPath)（0~2 张）
    ↓
-self-check  对照研究笔记自查一遍：无来源支撑的断言标记/修正，
-            产出 5 道课末题（2 单选 + 2 判断 + 1 简答）（客观题带答案解析，简答带参考答案）
+draft-saved 正文一写完立刻落盘（status=writing）——后续任何一步失败都不丢正文
    ↓
-落图        localizeImages：正文残留外链图下载落地改写为本地引用
-            （下载失败=编造 URL，剔除），生成 lesson.images 配图清单
+后处理      sanitizeCitations（剔除越界引用）→ localizeImages（外链图落地，失败剔除）
+           → 落最终课件（status=generated）→ 立即向用户交付
+   ↓
+done        课末题 / 内容质检 / 案例归档转为后台异步，不阻塞出课
 ```
+
+**异步任务**
+- `ensureQuestions(lessonId)`：后台生成 5 道课末题（2 单选 + 2 判断 + 1 简答），
+  与用户点「生成课末题」共用同一个 in-flight Promise；题目未就绪时课程页显示「生成中」
+- `runQualityPass`：课后对照笔记只找事实性矛盾；只有此类问题才重写一次正文，
+  图片 URL/引用越界/排版类问题交给后处理，不再触发全文重写
+- `recordTaughtForLesson`：归档本课案例，跑失败不影响课件
 
 **为什么这样设计**
 - 搜索解决幻觉：课程事实性内容有网上精华来源背书，且页面展示引用链接，可溯源
 - 决策仍在代码里：排课、掌握分、阶段流转是工程逻辑；Agent 的"自主"限定在研究环节（搜什么、读哪篇、提炼什么）
-- 手写工具循环（openai SDK function calling + while loop），不引 LangChain——备课研究共 4 个工具（web_search / web_fetch / image_search / save_research_note），框架是负资产
-- 成本可控：单课约 5~15 次 LLM 调用 + 2~4 次搜索 API，个人使用完全可接受
+- 手写工具循环（openai SDK function calling + while loop），不引 LangChain——研究 Agent 只保留 3 个工具（web_fetch / image_search / save_research_note），搜索由代码并行完成，框架是负资产
+- 成本可控：单课约 5~7 次 LLM 调用 + 3 次搜索 API（大纲与笔记并行），实测 73~110 秒
 
 **关键设计决策**
 - 排课引擎是纯函数（输入图谱，输出 nodeId + 理由），可单测、页面可解释"为什么讲这个"。
@@ -283,7 +289,7 @@ data/topics/<topicId>/
 | PATCH | /api/topics/:id/graph | 手动编辑保存，全量替换节点（服务端校验无环） |
 | POST | /api/topics/:id/graph/chat | 图谱 AI 对话调整：返回 reply + 修改建议 proposal + diff，前端确认后走 PATCH 应用 |
 | GET | /api/topics/:id/lessons | 课程列表（挂到知识点节点，不含正文） |
-| POST | /api/topics/:id/lessons | 排课 + 备课 Agent，SSE：`stage(schedule/research/outline/write/self-check/done)` + 阶段详情（搜索 query、命中来源）+ 课程流式内容 |
+| POST | /api/topics/:id/lessons | 排课 + 备课 Agent，SSE：`stage(schedule/research-prefetch/research/research-note-saved/outline-done/write/draft-saved/done)`（课末题/质检在后台异步，不占 SSE） + 阶段详情（搜索 query、命中来源）+ 课程流式内容 |
 | GET | /api/lessons/:id | 课程 + 题目（题目不含 answer/explanation，防前端偷看） |
 | POST | /api/lessons/:id/submit | 交卷：客观题本地秒判 + 简答 LLM 批改，同步返回判分/评语/掌握分变化/MasteryLog/答案揭示；可多次交卷（配合再次测验），每次追加一条 attempt |
 | GET | /api/lessons/:id/attempts | 该课全部测验记录（含题目快照/作答/批改/掌握分变化，升序） |
@@ -336,6 +342,6 @@ hys-tutor/
 
 ## 7. 性能与成本预期（Agent 化后调整）
 
-- 备课全流程 2~5 分钟（含 2~4 次搜索、5~15 次 LLM 调用），页面分阶段展示进度 + 中间产物（搜了什么、读了哪篇），等待可感知不焦虑
+- 备课全流程平均 < 2 分钟、最慢 < 3 分钟（3 路预搜 + 5~7 次 LLM 调用），页面分阶段展示进度 + 中间产物（搜了什么、读了哪篇），等待可感知不焦虑
 - 研究笔记按知识点缓存：同知识点第二次备课省去大部分搜索，< 1 分钟
 - 简答批改 < 20s、客观题判分 < 1s 不变

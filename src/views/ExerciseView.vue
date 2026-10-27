@@ -45,6 +45,42 @@ const reviewItems = computed<ReviewItem[]>(() => {
   return a.questions.map((q) => ({ q, record: a.records.find((r) => r.questionId === q.id) }))
 })
 
+let pollTimer: ReturnType<typeof setInterval> | null = null
+function stopPoll() {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+// 出题已改成课后异步：先出课，题目后台生成；这里轮询等它落地，避免用户看到空题页
+function startQuestionPoll() {
+  stopPoll()
+  if (lessonStore.lesson?.status !== 'generated' || questions.value.length > 0) return
+  pollTimer = setInterval(async () => {
+    await lessonStore.load(lessonId.value)
+    if (questions.value.length > 0 || lessonStore.lesson?.status !== 'generated') stopPoll()
+  }, 3000)
+}
+
+async function generateQuestions() {
+  if (regenerating.value) return
+  regenerating.value = true
+  error.value = null
+  try {
+    const ok = await lessonStore.regenerate(lessonId.value)
+    if (!ok) {
+      error.value = lessonStore.error ?? '出题失败，请重试'
+      return
+    }
+    stopPoll()
+    answers.value = {}
+    mode.value = 'answer'
+  } finally {
+    regenerating.value = false
+  }
+}
+
 async function loadAll() {
   answers.value = {}
   error.value = null
@@ -56,9 +92,11 @@ async function loadAll() {
     activeIdx.value = attempts.value.length - 1
     mode.value = 'review'
   }
+  startQuestionPoll()
 }
 
 onMounted(loadAll)
+onUnmounted(stopPoll)
 
 // 组件复用时（/exercise/A → /exercise/B）参数变化需重新加载
 watch(lessonId, (id, prev) => {
@@ -234,8 +272,38 @@ async function submitQuestionReport(q: Question) {
     </div>
 
     <template v-else>
+      <!-- 题目后台生成中/尚未生成：不挡读课，给一个明确的生成入口 -->
+      <div
+        v-if="questions.length === 0 && attempts.length === 0"
+        class="not-ready"
+      >
+        课末题正在后台生成，通常 20~40 秒；也可以现在手动生成。
+        <div style="margin-top: 14px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap">
+          <button
+            class="btn btn--primary"
+            :disabled="regenerating"
+            @click="generateQuestions"
+          >
+            {{ regenerating ? 'AI 出题中…' : '立即生成课末题' }}
+          </button>
+          <button
+            class="btn"
+            @click="loadAll"
+          >
+            刷新
+          </button>
+        </div>
+        <p
+          v-if="error"
+          class="submit-bar__error"
+          style="margin-top: 12px"
+        >
+          {{ error }}
+        </p>
+      </div>
+
       <!-- 答题记录模式 -->
-      <template v-if="mode === 'review' && activeAttempt">
+      <template v-else-if="mode === 'review' && activeAttempt">
         <div class="attempts-bar">
           <button
             v-for="(a, i) in attempts"

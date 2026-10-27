@@ -40,6 +40,18 @@ function stageLabel(stage: string, detail?: unknown): string | null {
       const d = detail as { total: number; kept: number; dropped: number }
       return d.dropped > 0 ? `过滤无关结果：保留 ${d.kept}/${d.total} 条` : null
     }
+    case 'research-prefetch': {
+      const d = detail as { queries: string[] }
+      return `并行搜索 ${d.queries.length} 个角度…`
+    }
+    case 'research-prefetch-done': {
+      const d = detail as { results: number; failed: number }
+      return d.results > 0
+        ? `搜到 ${d.results} 条候选，挑重点精读…`
+        : '联网搜索没有结果，改为基于模型知识备课'
+    }
+    case 'draft-saved':
+      return '正文已保存，正在落图与引用校验…'
     case 'outline':
       return '正在设计课程大纲…'
     case 'outline-done': {
@@ -89,6 +101,8 @@ function stagePhase(stage: string): number | null {
     case 'research-tool-failed':
     case 'research-filtered':
     case 'research-note-saved':
+    case 'research-prefetch':
+    case 'research-prefetch-done':
       return 1
     case 'outline':
     case 'outline-done':
@@ -96,6 +110,7 @@ function stagePhase(stage: string): number | null {
     case 'write':
     case 'write-retry':
     case 'write-delta':
+    case 'draft-saved':
       return 3
     case 'self-check':
     case 'self-check-done':

@@ -1,4 +1,4 @@
-import { dataPath, nowIso, readJson, writeJson } from '../../repo/json-store'
+import { dataPath, nowIso, readJson, withLock, writeJson } from '../../repo/json-store'
 
 // 研究阶段原始记录：搜索命中的全部候选（含是否保留与剔除原因）与抓取过的页面，
 // 供复盘「Agent 挑了哪些源、丢弃了什么」，也便于离线重跑。
@@ -40,7 +40,10 @@ export async function appendTrace(
   entry: Omit<SearchTrace, 'at'> | Omit<FetchTrace, 'at'>,
 ): Promise<void> {
   const file = traceFile(topicId, nodeId)
-  const list = await readJson<TraceEntry[]>(file, [])
-  list.push({ ...entry, at: nowIso() } as TraceEntry)
-  await writeJson(file, list)
+  // 3 路预搜并行落 trace，读-改-写必须串行，否则后写的会覆盖前一条
+  await withLock(file, async () => {
+    const list = await readJson<TraceEntry[]>(file, [])
+    list.push({ ...entry, at: nowIso() } as TraceEntry)
+    await writeJson(file, list)
+  })
 }

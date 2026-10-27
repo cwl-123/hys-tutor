@@ -1,14 +1,13 @@
 import { readdir } from 'node:fs/promises'
 import { dataPath, newId, nowIso, readJson, withLock, writeJson } from '../repo/json-store'
-import { getLLM, getLLMModel, completeJson, completeText } from '../llm/client'
+import { getLLM, getLLMModel, completeJson, completeText, effortParams } from '../llm/client'
 import { recordLlmUsage } from './quota-service'
 import { runAgent, type AgentTool } from '../agent/loop'
-import { searchWeb } from '../agent/tools/web-search'
+import { normalizeUrl, searchWeb } from '../agent/tools/web-search'
 import { searchImages } from '../agent/tools/image-search'
 import { fetchPage } from '../agent/tools/web-fetch'
 import { notePatchSchema, readResearchNote, saveResearchNote } from '../agent/tools/notes'
 import { appendTrace } from '../agent/tools/research-trace'
-import { filterSearchResults } from './search-filter'
 import { downloadImage, localizeImages } from './asset-store'
 import { RESEARCH_SYSTEM_PROMPT, researchUserPrompt } from '../llm/prompts/research'
 import {
@@ -16,13 +15,17 @@ import {
   learnerContextText,
   llmOutlineSchema,
   outlineUserPrompt,
+  type LlmOutline,
 } from '../llm/prompts/outline'
 import { WRITE_SYSTEM_PROMPT, REVISE_SYSTEM_PROMPT, writeLessonPrompt, reviseLessonPrompt } from '../llm/prompts/write'
 import {
   SELFCHECK_SYSTEM_PROMPT,
   CORRECT_CONTENT_SYSTEM_PROMPT,
+  CONTENT_CHECK_SYSTEM_PROMPT,
   llmSelfCheckSchema,
+  llmContentCheckSchema,
   selfCheckPrompt,
+  contentCheckPrompt,
   correctContentPrompt,
   type LlmSelfCheck,
 } from '../llm/prompts/selfcheck'
@@ -44,6 +47,7 @@ import type {
   Lesson,
   Question,
   QuestionSet,
+  ResearchNote,
 } from '../../shared/types'
 
 export interface StageEvent {
@@ -111,67 +115,135 @@ async function buildLearnerContext(topicId: string, nodes: KnowledgeNode[]): Pro
   return { masterySnapshot, wrongAnswers, reports, nodeNames, profileText: '' }
 }
 
-// 研究阶段：Agent 自主搜索+精读+保存笔记；已有笔记则跳过（缓存命中，备课 < 1 分钟的关键）
+// 研究阶段：代码先并行搜 3 个角度，Agent 只负责挑 2~3 篇精读 + 写笔记 + 顺带出大纲。
+// 硬预算：抓取≤3、图片≤1、工具总调用≤4、最多 6 轮；超预算立即强制 save_research_note。
+const RESEARCH_TOOL_BUDGET: Record<string, number> = { web_fetch: 3, image_search: 1 }
+const RESEARCH_MAX_TOOL_CALLS = 4
+const RESEARCH_MAX_ROUNDS = 6
+
+function researchQueries(topicName: string, node: KnowledgeNode): string[] {
+  const base = node.name.trim()
+  // 节点名常常有歧义：「建表与字段布局设计」会被搜成数据库建表。
+  // 拼上方向名（如「Excel 数据透视表」）把语义锚回当前课题。
+  const scope = topicName.trim().replace(/\s+/g, ' ').slice(0, 24)
+  const anchor = scope && !base.includes(scope) ? `${scope} ${base}` : base
+  return [`${anchor} 原理 公式 推导`, `${anchor} 实战 案例 工程实践`, `${anchor} 常见误区 易混淆`]
+}
+
+interface PrefetchResult {
+  text: string
+  count: number
+  items: { title: string; url: string; snippet: string }[]
+}
+
+// 搜索里混进 PDF/文档站/付费预览页，抓取必失败，白耗抓取预算——预搜阶段直接剔除
+const SKIP_RESULT_HOST = /(book118|doc88|docin|renrendoc|wenku\.baidu|360doc|max\.book118)/i
+const SKIP_RESULT_EXT = /\.(pdf|doc|docx|ppt|pptx|xls|xlsx)(\?|$)/i
+
+function usableSearchResult(url: string): boolean {
+  return !SKIP_RESULT_HOST.test(url) && !SKIP_RESULT_EXT.test(url)
+}
+
+// 3 路 query 并行搜（searchWeb 内部已是双 provider 并行）；每个角度最多留 3 条，按 URL 去重
+async function prefetchResearch(
+  topicId: string,
+  node: KnowledgeNode,
+  queries: string[],
+  onStage: StageFn,
+): Promise<PrefetchResult> {
+  onStage({ stage: 'research-prefetch', detail: { queries } })
+  const settled = await Promise.allSettled(queries.map((q) => searchWeb(q)))
+  const seen = new Set<string>()
+  const picked: { title: string; url: string; snippet: string }[] = []
+  for (let i = 0; i < settled.length; i++) {
+    const r = settled[i]
+    if (r.status !== 'fulfilled') continue
+    let kept = 0
+    for (const item of r.value) {
+      if (!usableSearchResult(item.url)) continue
+      const key = normalizeUrl(item.url)
+      if (seen.has(key)) continue
+      seen.add(key)
+      picked.push({ title: item.title, url: item.url, snippet: item.snippet })
+      kept++
+      if (kept >= 3) break
+    }
+    void appendTrace(topicId, node.id, {
+      kind: 'search',
+      query: queries[i],
+      results: r.value.map((x) => ({
+        title: x.title,
+        url: x.url,
+        provider: x.provider,
+        snippet: x.snippet,
+        kept: true,
+      })),
+    }).catch(() => {})
+  }
+  const failed = settled.filter((r) => r.status === 'rejected').length
+  onStage({
+    stage: 'research-prefetch-done',
+    detail: { queries: queries.length, results: picked.length, failed },
+  })
+  return {
+    text: picked
+      .map((r, i) => `[${i + 1}] ${r.title}\n${r.url}\n${r.snippet.slice(0, 220)}`)
+      .join('\n\n'),
+    count: picked.length,
+    items: picked,
+  }
+}
+
+interface ResearchOutcome {
+  note: ResearchNote
+  outline: LlmOutline | null
+}
+
 async function runResearch(
   topicId: string,
   topicName: string,
   node: KnowledgeNode,
+  learnerCtx: string,
   onStage: StageFn,
-) {
+): Promise<ResearchOutcome> {
   const existing = await readResearchNote(topicId, node.id)
   if (existing) {
     onStage({ stage: 'research', detail: { cached: true, version: existing.version, nodeId: node.id } })
-    return existing
+    return { note: existing, outline: null }
   }
 
   onStage({ stage: 'research', detail: { cached: false, nodeId: node.id } })
-  const searchedQueries: string[] = []
+  const queries = researchQueries(topicName, node)
+  const prefetched = await prefetchResearch(topicId, node, queries, onStage)
+
+  // 大纲与笔记并行生成：不等 Agent 收尾，省掉串行的一次 20s+ 往返；
+  // 用预搜摘要做大纲输入，深度内容仍由 Agent 抓取后写进笔记供写作使用。
+  const prefetchNote: ResearchNote = {
+    id: `prefetch_${node.id}`,
+    nodeId: node.id,
+    concepts: prefetched.items.map((i) => i.snippet.trim()).filter(Boolean),
+    derivations: [],
+    examples: [],
+    pitfalls: [],
+    sources: prefetched.items.map((i) => ({ title: i.title, url: i.url, fetchedAt: nowIso() })),
+    images: [],
+    searchQueries: queries,
+    version: 0,
+    updatedAt: nowIso(),
+  }
+  const outlinePromise = completeJson({
+    system: OUTLINE_SYSTEM_PROMPT,
+    prompt: outlineUserPrompt(node, prefetchNote, learnerCtx),
+    schema: llmOutlineSchema,
+  }).catch((err) => {
+    console.warn('[research] 并行大纲失败，稍后串行补一次', errMsg(err))
+    return null
+  })
+
   const tools: AgentTool[] = [
     {
-      name: 'web_search',
-      description: '联网搜索（Tavily + 博查双路合并），返回标题/URL/摘要列表',
-      parameters: {
-        type: 'object',
-        properties: { query: { type: 'string', description: '搜索关键词（中文或英文）' } },
-        required: ['query'],
-      },
-      execute: async (args) => {
-        const query = String(args.query ?? '').trim()
-        if (!query) return '搜索词为空'
-        const raw = await searchWeb(query)
-        const { kept, drops } = await filterSearchResults({
-          query,
-          nodeName: node.name,
-          nodeDescription: node.description,
-          results: raw,
-        })
-        const dropByUrl = new Map(drops.map((d) => [d.url, d.reason]))
-        await appendTrace(topicId, node.id, {
-          kind: 'search',
-          query,
-          results: raw.map((r) => ({
-            title: r.title,
-            url: r.url,
-            provider: r.provider,
-            snippet: r.snippet,
-            kept: !dropByUrl.has(r.url),
-            dropReason: dropByUrl.get(r.url),
-          })),
-        })
-        onStage({
-          stage: 'research-filtered',
-          detail: { query, total: raw.length, kept: kept.length, dropped: drops.length },
-        })
-        searchedQueries.push(query)
-        return kept
-          .slice(0, 8)
-          .map((r, i) => `[${i + 1}] (${r.provider}) ${r.title}\n${r.url}\n${r.snippet}`)
-          .join('\n\n')
-      },
-    },
-    {
       name: 'web_fetch',
-      description: '抓取网页并提取正文（markdown 化前的纯文本，最长 6000 字），并附本页配图候选',
+      description: '抓取网页并提取正文（最长 6000 字），附本页配图候选。最多抓 3 篇，抓够就收尾',
       parameters: {
         type: 'object',
         properties: { url: { type: 'string', description: '网页 URL' } },
@@ -196,10 +268,10 @@ async function runResearch(
     },
     {
       name: 'image_search',
-      description: '搜索配图（示意图/架构图/流程图/案例截图），返回图片直链与出处网页；用于给课件配图',
+      description: '搜索配图（示意图/架构图/流程图），最多 1 次；没有贴切的图就跳过',
       parameters: {
         type: 'object',
-        properties: { query: { type: 'string', description: '图片搜索关键词（中文或英文）' } },
+        properties: { query: { type: 'string', description: '图片搜索关键词' } },
         required: ['query'],
       },
       execute: async (args) => {
@@ -207,7 +279,7 @@ async function runResearch(
         if (!query) return '搜索词为空'
         const images = await searchImages(query)
         return images
-          .slice(0, 8)
+          .slice(0, 6)
           .map(
             (img, i) =>
               `[${i + 1}] (${img.provider}) ${img.title ?? '（无标题）'}\n${img.url}${
@@ -237,20 +309,23 @@ async function runResearch(
             items: {
               type: 'object',
               properties: {
-                url: { type: 'string', description: '图片直链（来自 image_search 或页面配图候选）' },
+                url: { type: 'string', description: '图片直链' },
                 title: { type: 'string', description: '图片说明' },
                 pageUrl: { type: 'string', description: '图片出处网页' },
               },
               required: ['url'],
             },
-            description: '给课件配图收藏的图片（0~4 张，宁缺毋滥：必须与本知识点讲解直接相关）',
+            description: '给课件配图收藏的图片（0~2 张，宁缺毋滥）',
           },
         },
         required: ['concepts', 'derivations', 'examples', 'pitfalls', 'sources'],
       },
       execute: async (args) => {
         const patch = notePatchSchema.parse(args)
-        // 配图下载落地（原图可能失效，下载成功才进笔记；下载时顺带建立本地引用）
+        if (patch.concepts.length === 0) {
+          return '保存失败：concepts 不能为空。请用已抓取正文和候选摘要把 concepts/derivations/examples/pitfalls/sources 填完整后重新调用，不要传空对象。'
+        }
+        // 配图下载落地（原图可能失效，下载成功才进笔记）
         patch.images = (
           await Promise.all(
             patch.images.map(async (img) => {
@@ -262,10 +337,14 @@ async function runResearch(
             }),
           )
         ).filter((img): img is NonNullable<typeof img> => img !== null)
-        const note = await saveResearchNote(topicId, node.id, patch, searchedQueries)
+        const note = await saveResearchNote(topicId, node.id, patch, queries)
         onStage({
           stage: 'research-note-saved',
-          detail: { noteId: note.id, sources: note.sources.length, images: note.images?.length ?? 0 },
+          detail: {
+            noteId: note.id,
+            sources: note.sources.length,
+            images: note.images?.length ?? 0,
+          },
         })
         return '笔记已保存，可以收尾了'
       },
@@ -274,20 +353,48 @@ async function runResearch(
 
   await runAgent({
     system: RESEARCH_SYSTEM_PROMPT,
-    prompt: researchUserPrompt(topicName, node, existing),
+    prompt: researchUserPrompt(topicName, node, existing, {
+      prefetched: prefetched.text,
+      learnerCtx,
+    }),
     tools,
+    maxRounds: RESEARCH_MAX_ROUNDS,
+    maxToolCalls: RESEARCH_MAX_TOOL_CALLS,
+    toolBudgets: RESEARCH_TOOL_BUDGET,
     // 研究做完了却没调用 save_research_note 是 flash 的高频失误：
     // 强制收尾一轮把已有上下文落成笔记，别让整节课作废
     requireTool: 'save_research_note',
     onEvent: (e) => {
       if (e.type === 'tool_call') onStage({ stage: 'research-tool', detail: { tool: e.name, args: e.args } })
-      else if (e.type === 'tool_result' && !e.ok) onStage({ stage: 'research-tool-failed', detail: { tool: e.name, preview: e.preview } })
+      else if (e.type === 'tool_result' && !e.ok)
+        onStage({ stage: 'research-tool-failed', detail: { tool: e.name, preview: e.preview } })
     },
   })
 
-  const note = await readResearchNote(topicId, node.id)
-  if (!note) throw new Error('研究阶段未产出笔记（Agent 未调用 save_research_note）')
-  return note
+  let note = await readResearchNote(topicId, node.id)
+  // 兜底：模型把 save_research_note 传了空对象 / 完全没保存时，至少用预搜候选摘要落一版笔记，
+  // 保证课件引用有来源，而不是拿一份空笔记去写作。
+  if (!note || note.concepts.length === 0) {
+    note = await saveResearchNote(
+      topicId,
+      node.id,
+      {
+        concepts: prefetched.items.map((i) => i.snippet.trim()).filter(Boolean).slice(0, 8),
+        derivations: [],
+        examples: [],
+        pitfalls: [],
+        sources: prefetched.items.map((i) => ({ title: i.title, url: i.url })).slice(0, 8),
+        images: [],
+      },
+      queries,
+    )
+    onStage({
+      stage: 'research-fallback',
+      detail: { sources: note.sources.length, concepts: note.concepts.length },
+    })
+  }
+  const outline = await outlinePromise
+  return { note, outline }
 }
 
 async function streamWriteOnce(system: string, prompt: string, onStage: StageFn): Promise<string> {
@@ -301,6 +408,9 @@ async function streamWriteOnce(system: string, prompt: string, onStage: StageFn)
     temperature: 0.5,
     stream: true,
     stream_options: { include_usage: true },
+    // 软限长：提示词已压到 2800~3500 字，这里再兜一层，避免 6k 字的长文把后续全部拖慢
+    max_tokens: Number(process.env.LLM_WRITE_MAX_TOKENS || 4096),
+    ...effortParams(),
   })
   let content = ''
   let tokensIn = 0
@@ -413,20 +523,41 @@ export async function prepareLesson(
     taughtText,
   })
 
-  // 2. 研究（Agent 工具循环，笔记缓存命中则跳过）
-  const note = await runResearch(topicId, topic.name, node, onStage)
+  // 2. 研究：3 路并行预搜 + 有界 Agent（笔记缓存命中则跳过）
+  const research = await runResearch(topicId, topic.name, node, learnerCtx, onStage)
+  const note = research.note
 
-  // 3. 大纲
-  onStage({ stage: 'outline' })
-  const outline = await completeJson({
-    system: OUTLINE_SYSTEM_PROMPT,
-    prompt: outlineUserPrompt(node, note, learnerCtx),
-    schema: llmOutlineSchema,
-  })
-  onStage({
-    stage: 'outline-done',
-    detail: { focus: outline.focus, sections: outline.sections.length, difficulty: outline.difficulty, objectives: outline.objectives.length },
-  })
+  // 3. 大纲：研究收尾时已顺带产出则直接复用，省一次 LLM 往返
+  let outline: LlmOutline
+  if (research.outline) {
+    outline = research.outline
+    onStage({
+      stage: 'outline-done',
+      detail: {
+        focus: outline.focus,
+        sections: outline.sections.length,
+        difficulty: outline.difficulty,
+        objectives: outline.objectives.length,
+        merged: true,
+      },
+    })
+  } else {
+    onStage({ stage: 'outline' })
+    outline = await completeJson({
+      system: OUTLINE_SYSTEM_PROMPT,
+      prompt: outlineUserPrompt(node, note, learnerCtx),
+      schema: llmOutlineSchema,
+    })
+    onStage({
+      stage: 'outline-done',
+      detail: {
+        focus: outline.focus,
+        sections: outline.sections.length,
+        difficulty: outline.difficulty,
+        objectives: outline.objectives.length,
+      },
+    })
+  }
 
   // 4. 写作（流式）
   onStage({ stage: 'write' })
@@ -436,62 +567,10 @@ export async function prepareLesson(
     onStage,
   )
 
-  // 5. 自查 + 出题（出题做语义级结构校验：坏题不能进课件，否则客观题永远判不对）
-  onStage({ stage: 'self-check' })
-  let check: LlmSelfCheck | null = null
-  let quizDropReasons: string[] = []
-  let quizValid: LlmSelfCheck['questions'] = []
-  for (let attempt = 0; attempt < 3; attempt++) {
-    check = await completeJson({
-      system: SELFCHECK_SYSTEM_PROMPT,
-      prompt: selfCheckPrompt(node, note, draft, outline.objectives, quizDropReasons),
-      schema: llmSelfCheckSchema,
-      temperature: 0.2,
-    })
-    const part = partitionQuestionDrafts(check.questions)
-    quizValid = part.valid
-    quizDropReasons = part.dropped
-    if (quizDropReasons.length === 0) break
-    onStage({ stage: 'self-check-retry', detail: { reasons: quizDropReasons } })
-  }
-  if (!check) throw new Error('出题失败：模型未返回自查结果')
-  if (quizDropReasons.length) {
-    // 个别题结构不合法不该废掉整节课（正文已生成）：够 3 题就用合法题继续，坏题不入库
-    if (quizValid.length < 3) {
-      throw new Error(`出题结构校验未通过：${quizDropReasons.join('；')}`)
-    }
-    console.warn('[self-check] 剔除坏题后继续（未中断备课）', {
-      dropped: quizDropReasons,
-      kept: quizValid.length,
-    })
-    check = { ...check, questions: quizValid }
-  }
-  const contentMd =
-    check.needsCorrection && check.issues.length
-      ? await completeText({
-          system: CORRECT_CONTENT_SYSTEM_PROMPT,
-          prompt: correctContentPrompt(node, draft, check.issues),
-          temperature: 0.2,
-        })
-      : draft
-  const corrected = contentMd !== draft
-  onStage({
-    stage: 'self-check-done',
-    detail: { issues: check.issues, corrected },
-  })
-
-  // 引用落地校验：剔除越界来源引用 [n]，再落图（外链落地、失败剔除）
-  const cited = sanitizeCitations(stripTrailingSourceBlock(contentMd), note.sources.length)
-  if (cited.removed.length) {
-    onStage({ stage: 'citations-sanitized', detail: { removed: cited.removed.length } })
-  }
-  const localized = await localizeImages(topicId, cited.md, {
-    dropFailed: true,
-  })
-
-  // 落盘
+  // 5. 写作一完成立刻落草稿：后面任何一步失败都不会把 3 分钟的正文丢掉
   const lessonId = opts.lessonId ?? newId('l')
-  const lesson: Lesson = {
+  const file = dataPath('topics', topicId, 'lessons', `${lessonId}.json`)
+  const base: Lesson = {
     id: lessonId,
     topicId,
     nodeIds: [node.id],
@@ -500,37 +579,105 @@ export async function prepareLesson(
     injectedReports: ctx.reports.filter((r) => r.nodeId === node.id).map((r) => r.id),
     researchNoteIds: [note.id],
     sources: note.sources.map((s, i) => ({ idx: i + 1, title: s.title, url: s.url })),
-    images: localized.images,
     objectives: outline.objectives,
     difficulty: outline.difficulty,
-    contentMd: localized.contentMd,
-    status: 'generated',
+    contentMd: draft,
+    status: 'writing',
     createdAt: nowIso(),
   }
-  const questions: QuestionSet = {
-    generatedAt: nowIso(),
-    questions: check.questions.map<Question>((q, i) => ({
-      id: `q_${i + 1}`,
-      nodeId: node.id,
-      type: q.type,
-      prompt: q.prompt,
-      options: q.options,
-      answer: q.answer,
-      referenceAnswer: q.referenceAnswer,
-      explanation: q.explanation,
-    })),
+  await withLock(file, () => writeJson(file, base))
+  onStage({ stage: 'draft-saved', detail: { lessonId, wordCount: draft.length } })
+
+  // 6. 引用落地校验 + 配图落地：这些是纯后处理，不需要模型，也不该阻塞出题
+  const cited = sanitizeCitations(stripTrailingSourceBlock(draft), note.sources.length)
+  if (cited.removed.length) {
+    onStage({ stage: 'citations-sanitized', detail: { removed: cited.removed.length } })
+  }
+  const localized = await localizeImages(topicId, cited.md, { dropFailed: true })
+  const lesson: Lesson = {
+    ...base,
+    images: localized.images,
+    contentMd: localized.contentMd,
+    status: 'generated',
   }
   // 与 lesson-jobs 的状态回写共用同一把文件锁，防止占位状态覆盖成品
-  await withLock(dataPath('topics', topicId, 'lessons', `${lessonId}.json`), () =>
-    writeJson(dataPath('topics', topicId, 'lessons', `${lessonId}.json`), lesson),
-  )
-  await writeJson(dataPath('topics', topicId, 'lessons', `${lessonId}.questions.json`), questions)
-
-  // 归档本课案例，供后续课程避免重复（失败不影响备课）
-  await recordTaughtForLesson(topicId, lessonId, node, outline.objectives, localized.contentMd, onStage)
+  await withLock(file, () => writeJson(file, lesson))
 
   onStage({ stage: 'done', detail: { lessonId, nodeId: node.id, wordCount: localized.contentMd.length } })
+
+  // 7. 出题 / 质检 / 案例归档串行后台跑：先让用户读课；串行避免同一节课并发打 3 路 LLM
+  void (async () => {
+    try {
+      await ensureQuestions(lessonId)
+    } catch (err) {
+      console.error('[lesson] 后台出题失败', lessonId, err)
+    }
+    try {
+      await runQualityPass(topicId, lesson, note, node, outline)
+    } catch (err) {
+      console.error('[lesson] 后台质检失败', lessonId, err)
+    }
+    try {
+      await recordTaughtForLesson(topicId, lessonId, node, outline.objectives, localized.contentMd, () => {})
+    } catch (err) {
+      console.error('[lesson] 后台归档失败', lessonId, err)
+    }
+  })()
+
+  // 题目稍后由后台写入；先返回空题集，调用方不会因为「没题」判定备课失败
+  const questions: QuestionSet = { generatedAt: nowIso(), questions: [] }
   return { lesson, questions }
+}
+
+const FORMAT_ISSUE_RE =
+  /图片|配图|链接|url|引用|来源标注|\[\d+\]|格式|排版|markdown|标题层级|字数|篇幅|重复|标点|拼写/i
+const FACTUAL_ISSUE_RE = /矛盾|事实|不符|不准确|错误|编造|虚构|无依据|缺乏依据|依据不足|无来源|无法支撑|无法对应|与笔记|误导/
+
+// 质检 issue 分类：图片 URL / 引用越界 / 排版属于后处理能修的，不触发全文重写
+export function isFactualIssue(issue: string): boolean {
+  return FACTUAL_ISSUE_RE.test(issue) && !FORMAT_ISSUE_RE.test(issue)
+}
+
+// 课后异步质检：只对「与笔记事实矛盾」的实质问题重写一次正文，其余问题交给后处理
+async function runQualityPass(
+  topicId: string,
+  lesson: Lesson,
+  note: ResearchNote,
+  node: KnowledgeNode,
+  outline: LlmOutline,
+): Promise<void> {
+  const check = await completeJson({
+    system: CONTENT_CHECK_SYSTEM_PROMPT,
+    prompt: contentCheckPrompt(node, note, lesson.contentMd, outline.objectives),
+    schema: llmContentCheckSchema,
+    temperature: 0.2,
+  })
+  const factual = check.issues.filter(isFactualIssue).slice(0, 5)
+  if (!check.needsCorrection || factual.length === 0) {
+    if (check.issues.length) {
+      console.info('[quality] 仅格式类问题，已交给后处理，不重写正文', { issues: check.issues.length })
+    }
+    return
+  }
+
+  const rewritten = await completeText({
+    system: CORRECT_CONTENT_SYSTEM_PROMPT,
+    prompt: correctContentPrompt(node, lesson.contentMd, factual),
+    temperature: 0.2,
+  })
+  if (!rewritten.trim()) return
+  const cited = sanitizeCitations(stripTrailingSourceBlock(rewritten), lesson.sources.length)
+  const localized = await localizeImages(topicId, cited.md, { dropFailed: true })
+  const file = dataPath('topics', topicId, 'lessons', `${lesson.id}.json`)
+  await withLock(file, async () => {
+    const current = await readJson<Lesson | null>(file, null)
+    if (!current || current.status !== 'generated') return
+    current.contentMd = localized.contentMd
+    current.images = localized.images
+    current.revisedAt = nowIso()
+    await writeJson(file, current)
+  })
+  console.info('[quality] 已按事实性问题修正正文', { lessonId: lesson.id, issues: factual.length })
 }
 
 // AI 优化课件：基于研究笔记 + 用户意见重写正文，重跑自查出题，原地覆盖
@@ -646,20 +793,51 @@ export async function reviseLesson(
 }
 
 // 再次测验：围绕本课知识点重新出一套新题（避开历史出过的题），覆盖当前题集
+// 同一节课只跑一个出题任务：后台自动出题和用户点「生成课末题」共用同一个 Promise
+const quizJobs = new Map<string, Promise<QuestionSet>>()
+
+export function isQuizRunning(lessonId: string): boolean {
+  return quizJobs.has(lessonId)
+}
+
+export function ensureQuestions(lessonId: string): Promise<QuestionSet> {
+  const running = quizJobs.get(lessonId)
+  if (running) return running
+  const job = regenerateQuestions(lessonId).finally(() => {
+    quizJobs.delete(lessonId)
+  })
+  quizJobs.set(lessonId, job)
+  return job
+}
+
 export async function regenerateQuestions(lessonId: string): Promise<QuestionSet> {
   const detail = await findLesson(lessonId)
-  if (!detail?.questions) throw new Error('课程不存在或题目缺失')
+  if (!detail) throw new Error('课程不存在')
   const { topic, lesson, questions: current } = detail
   if (lesson.status !== 'generated') throw new Error('课程尚未生成完成，暂不能出题')
 
   const graph = await getGraph(topic.id)
   const node = graph?.nodes.find((n) => n.id === lesson.nodeIds[0])
   if (!node) throw new Error('知识点不存在')
-  const note = await readResearchNote(topic.id, node.id)
+  const storedNote = await readResearchNote(topic.id, node.id)
+  // 老课件可能没有研究笔记：给一个空笔记，课程正文本身仍可出题
+  const note = storedNote ?? {
+    id: '',
+    nodeId: node.id,
+    concepts: [],
+    derivations: [],
+    examples: [],
+    pitfalls: [],
+    sources: [],
+    images: [],
+    searchQueries: [],
+    version: 0,
+    updatedAt: nowIso(),
+  }
 
   const attempts = await listAttempts(topic.id, lessonId)
   const avoidPrompts = [
-    ...current.questions.map((q) => q.prompt),
+    ...(current?.questions ?? []).map((q) => q.prompt),
     ...attempts.flatMap((a) => a.questions.map((q) => q.prompt)),
   ]
 

@@ -36,6 +36,27 @@ export function getLLM(): OpenAI {
   return cached.client
 }
 
+// 推理档位：flash/pro 都支持 low/high/max，默认 high 会为「选哪个 URL」这类小事想上千 token。
+// 备课链路默认 low；需要更深推理时用 LLM_REASONING_EFFORT=high 覆盖。
+export type LlmEffort = 'low' | 'high' | 'max'
+
+export function llmEffort(): LlmEffort | undefined {
+  const raw = (process.env.LLM_REASONING_EFFORT ?? 'low').trim().toLowerCase()
+  if (!raw || raw === 'off' || raw === 'none' || raw === 'disabled') return undefined
+  if (raw === 'low' || raw === 'high' || raw === 'max') return raw
+  return 'low'
+}
+
+export function effortParams(effort: LlmEffort | undefined = llmEffort()): Record<string, unknown> {
+  return effort ? { reasoning_effort: effort } : {}
+}
+
+// 工具循环只做「挑哪篇/传什么参数」这类结构化决策，思考模式纯浪费时间：
+// 显式关闭后，研究首轮从 ~50s 降到几秒；大纲/写作仍保留 low 思考。
+export function thinkingDisabledParams(): Record<string, unknown> {
+  return { thinking: { type: 'disabled' } }
+}
+
 export function getLLMModel(): string {
   const model = resolveLlmConfig().model
   if (!model) throw new Error('缺少 LLM 模型：请在服务端 .env 中配置')
@@ -202,6 +223,7 @@ export async function completeJson<T>(opts: {
         temperature: opts.temperature ?? 0.3,
         // 强约束成 JSON：模型少吐一句解释，就少一类「JSON 里混碎片」的报废
         ...(wantJsonMode ? { response_format: { type: 'json_object' as const } } : {}),
+        ...effortParams(),
       })
       if (wantJsonMode) jsonModeCapability = true
     } catch (err) {
@@ -263,6 +285,7 @@ export async function completeText(opts: {
       model,
       messages,
       temperature: opts.temperature ?? 0.5,
+      ...effortParams(),
     })
     recordLlmUsage({
       model,

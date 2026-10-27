@@ -51,6 +51,51 @@ export const llmSelfCheckSchema = z.object({
 })
 export type LlmSelfCheck = z.infer<typeof llmSelfCheckSchema>
 
+// 课后异步质检：只要事实性问题，不重复出题；图片 URL/引用越界/排版一律交给后处理，
+// 避免为「图片路径写错」再花一次全文重写。
+export const llmContentCheckSchema = z.object({
+  issues: z
+    .array(z.unknown())
+    .default([])
+    .transform((arr) => arr.map(issueToString).filter((s) => s.length > 0)),
+  needsCorrection: z.boolean().default(false).describe('是否真的存在与笔记矛盾/无来源支撑的实质问题'),
+})
+export type LlmContentCheck = z.infer<typeof llmContentCheckSchema>
+
+export const CONTENT_CHECK_SYSTEM_PROMPT = `你是一位严格的内容质检员。你只输出合法 JSON，不输出任何解释。字符串值内部如需引用词句，一律用中文引号「」，严禁出现未转义的英文双引号。`
+
+export function contentCheckPrompt(
+  node: KnowledgeNode,
+  note: ResearchNote,
+  contentMd: string,
+  objectives: string[] = [],
+): string {
+  const objectivesBlock = objectives.length
+    ? `\n本课学习目标：\n${objectives.map((o, i) => `${i + 1}. ${o}`).join('\n')}\n`
+    : ''
+  return `质检以下课程正文。
+${objectivesBlock}
+目标知识点：${node.name}
+
+研究笔记（事实依据）：
+${JSON.stringify(note, null, 2)}
+
+课程正文：
+<<<CONTENT
+${contentMd}
+CONTENT>>>
+
+只做一件事：对照研究笔记找出「事实性」问题——与笔记矛盾、笔记完全无法支撑的关键断言、编造的数据/引用结论。
+不要报告：图片链接/配图缺失、来源引用编号格式、markdown 排版/标题层级/字数篇幅、内容重复。这些由系统后处理，不用你管。
+
+输出 JSON：
+{
+  "issues": ["位置：问题（一句话）"],
+  "needsCorrection": false
+}
+issues 全部是字符串，不要放对象。没有事实性问题就返回空数组 + false。`
+}
+
 export const SELFCHECK_SYSTEM_PROMPT = `你是一位严格的内容质检员和出题老师。你只输出合法 JSON，不输出任何解释。字符串值内部如需引用词句，一律用中文引号「」，严禁出现未转义的英文双引号。`
 
 export function selfCheckPrompt(
