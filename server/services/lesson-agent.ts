@@ -847,7 +847,7 @@ export async function regenerateQuestions(lessonId: string): Promise<QuestionSet
   for (let attempt = 0; attempt < 3; attempt++) {
     const result = await completeJson({
       system: QUIZ_SYSTEM_PROMPT,
-      prompt: quizPrompt(node, note, lesson.contentMd, [...new Set(avoidPrompts)], dropReasons),
+      prompt: quizPrompt(node, note, lesson.contentMd, [...new Set(avoidPrompts)], dropReasons, lesson.objectives ?? []),
       schema: llmQuizSchema,
       temperature: 0.7,
     })

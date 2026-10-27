@@ -17,6 +17,7 @@ export function quizPrompt(
   contentMd: string,
   avoidPrompts: string[],
   previousIssues: string[] = [],
+  objectives: string[] = [],
 ): string {
   const avoid =
     avoidPrompts.length > 0
@@ -25,8 +26,11 @@ export function quizPrompt(
   const retryBlock = previousIssues.length
     ? `\n⚠️ 上一轮出题有以下结构问题（本次必须修正，否则出题失败）：\n${previousIssues.map((r) => `- ${r}`).join('\n')}\n`
     : ''
+  const objectivesBlock = objectives.length
+    ? `\n本课学习目标（5 道题要覆盖这些目标，不要只考边角知识）：\n${objectives.map((o, i) => `${i + 1}. ${o}`).join('\n')}\n`
+    : ''
   return `围绕知识点「${node.name}」出 5 道全新的随堂练习题。
-${retryBlock}
+${retryBlock}${objectivesBlock}
 知识点描述：${node.description}
 
 ${note ? `研究笔记（事实依据）：\n${JSON.stringify({ concepts: note.concepts, derivations: note.derivations, examples: note.examples, pitfalls: note.pitfalls }, null, 2)}\n` : ''}
