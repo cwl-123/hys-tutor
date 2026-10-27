@@ -3,9 +3,14 @@ import { computed, ref, watch } from 'vue'
 import { X } from 'lucide-vue-next'
 import { applyTheme, themePref } from '@/utils/theme'
 import type { ThemePref } from '@/utils/theme'
+import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
+
+const auth = useAuthStore()
+// 手机端顶栏收成图标后不再显示额度，这里兜底展示，避免「每日次数」无处可查
+const lessonQuota = computed(() => auth.usage?.actions.lesson ?? null)
 
 const THEME_OPTIONS: { k: ThemePref; label: string }[] = [
   { k: 'auto', label: '跟随系统' },
@@ -90,6 +95,20 @@ watch(
         </div>
       </section>
 
+      <section
+        v-if="lessonQuota"
+        class="block"
+      >
+        <h3>今日用量</h3>
+        <p class="model-line">
+          <span>AI 生成课程</span>
+          <code>{{ lessonQuota.used }} / {{ lessonQuota.limit }}</code>
+        </p>
+        <p class="muted">
+          每天 0 点重置。手机端顶栏不再显示次数，可在这里查看。
+        </p>
+      </section>
+
       <section class="block">
         <h3>AI 模型</h3>
         <p
@@ -105,7 +124,7 @@ watch(
           </p>
           <p class="muted">
             模型与密钥由平台统一配置，你无需填写 API Key。生成课程会消耗平台额度，
-            每日次数见首页或顶栏。
+            每日额度见上方「今日用量」。
           </p>
         </template>
         <p
