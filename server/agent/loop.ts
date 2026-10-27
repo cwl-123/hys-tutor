@@ -29,6 +29,8 @@ export interface RunAgentOptions {
   maxToolCalls?: number
   /** 单个工具的调用次数上限（requireTool 不受限） */
   toolBudgets?: Record<string, number>
+  /** 连续工具失败达到该次数就跳过剩余轮次，直接强制收尾（避免反复抓 403/超时站点） */
+  maxToolFailures?: number
   /** 循环结束时若该工具仍未被调用，强制再要一轮并指定该 function（用于「必须落成结果」的收尾工具） */
   requireTool?: string
   onEvent?: (e: AgentEvent) => void
@@ -91,6 +93,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<string> {
   const calledTools = new Set<string>()
   const perTool = new Map<string, number>()
   let totalToolCalls = 0
+  let failureCount = 0
   let finalContent = ''
   let budgetExhausted = false
 
@@ -147,6 +150,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<string> {
         }
       }
     }
+    if (!ok) failureCount++
     opts.onEvent?.({ type: 'tool_result', name: call.function.name, ok, preview: resultText.slice(0, 200) })
     return { ok, resultText }
   }
@@ -188,8 +192,16 @@ export async function runAgent(opts: RunAgentOptions): Promise<string> {
       })
     }
 
-    // 预算已耗尽且没拿到收尾结果：不再给模型空转的机会，直接进入强制收尾
+    // 预算已耗尽 / 连续抓取失败：不再给模型空转的机会，直接进入强制收尾
     if (budgetExhausted && requireTool && !calledTools.has(requireTool)) break
+    if (
+      opts.maxToolFailures !== undefined &&
+      failureCount >= opts.maxToolFailures &&
+      requireTool &&
+      !calledTools.has(requireTool)
+    ) {
+      break
+    }
     if (totalToolCalls >= maxToolCalls && requireTool && !calledTools.has(requireTool)) break
   }
 

@@ -216,30 +216,6 @@ async function runResearch(
   const queries = researchQueries(topicName, node)
   const prefetched = await prefetchResearch(topicId, node, queries, onStage)
 
-  // 大纲与笔记并行生成：不等 Agent 收尾，省掉串行的一次 20s+ 往返；
-  // 用预搜摘要做大纲输入，深度内容仍由 Agent 抓取后写进笔记供写作使用。
-  const prefetchNote: ResearchNote = {
-    id: `prefetch_${node.id}`,
-    nodeId: node.id,
-    concepts: prefetched.items.map((i) => i.snippet.trim()).filter(Boolean),
-    derivations: [],
-    examples: [],
-    pitfalls: [],
-    sources: prefetched.items.map((i) => ({ title: i.title, url: i.url, fetchedAt: nowIso() })),
-    images: [],
-    searchQueries: queries,
-    version: 0,
-    updatedAt: nowIso(),
-  }
-  const outlinePromise = completeJson({
-    system: OUTLINE_SYSTEM_PROMPT,
-    prompt: outlineUserPrompt(node, prefetchNote, learnerCtx),
-    schema: llmOutlineSchema,
-  }).catch((err) => {
-    console.warn('[research] 并行大纲失败，稍后串行补一次', errMsg(err))
-    return null
-  })
-
   const tools: AgentTool[] = [
     {
       name: 'web_fetch',
@@ -361,6 +337,9 @@ async function runResearch(
     maxRounds: RESEARCH_MAX_ROUNDS,
     maxToolCalls: RESEARCH_MAX_TOOL_CALLS,
     toolBudgets: RESEARCH_TOOL_BUDGET,
+    // 两家搜索源难免给出 403/付费墙；连续 2 次抓不到就收手，用候选摘要落笔记，
+    // 不为了「再试一篇」多跑一轮 30s 的 LLM 决策
+    maxToolFailures: 2,
     // 研究做完了却没调用 save_research_note 是 flash 的高频失误：
     // 强制收尾一轮把已有上下文落成笔记，别让整节课作废
     requireTool: 'save_research_note',
@@ -393,8 +372,9 @@ async function runResearch(
       detail: { sources: note.sources.length, concepts: note.concepts.length },
     })
   }
-  const outline = await outlinePromise
-  return { note, outline }
+  // 大纲不在这里并行跑：high 档下一次大纲调用要 30~40s，和 Agent 抢同一个模型队列
+  // 反而把每一轮工具决策拖慢。交给 prepareLesson 在笔记完成后串行生成，总时长更短。
+  return { note, outline: null }
 }
 
 async function streamWriteOnce(system: string, prompt: string, onStage: StageFn): Promise<string> {

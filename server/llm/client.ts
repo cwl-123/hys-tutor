@@ -36,15 +36,16 @@ export function getLLM(): OpenAI {
   return cached.client
 }
 
-// 推理档位：flash/pro 都支持 low/high/max，默认 high 会为「选哪个 URL」这类小事想上千 token。
-// 备课链路默认 low；需要更深推理时用 LLM_REASONING_EFFORT=high 覆盖。
+// 推理档位：flash/pro 都支持 low/high/max，默认 high（正常推理）。
+// 只有明确要压速度时才设 low；工具循环内部会单独关闭 thinking。
 export type LlmEffort = 'low' | 'high' | 'max'
 
 export function llmEffort(): LlmEffort | undefined {
-  const raw = (process.env.LLM_REASONING_EFFORT ?? 'low').trim().toLowerCase()
+  const raw = (process.env.LLM_REASONING_EFFORT ?? 'high').trim().toLowerCase()
   if (!raw || raw === 'off' || raw === 'none' || raw === 'disabled') return undefined
   if (raw === 'low' || raw === 'high' || raw === 'max') return raw
-  return 'low'
+  if (raw === 'normal' || raw === 'default' || raw === 'medium') return 'high'
+  return 'high'
 }
 
 export function effortParams(effort: LlmEffort | undefined = llmEffort()): Record<string, unknown> {

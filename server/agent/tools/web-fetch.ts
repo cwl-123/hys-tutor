@@ -14,7 +14,8 @@ export interface PageImage {
   title?: string
 }
 
-const FETCH_TIMEOUT_MS = 20_000
+// 5s 抓不到基本就是反爬/不可达；继续等到 20s 只会把整轮研究拖慢
+const FETCH_TIMEOUT_MS = 5_000
 export const MAX_TEXT_CHARS = 6000
 export const MAX_PAGE_IMAGES = 6
 const UA =
