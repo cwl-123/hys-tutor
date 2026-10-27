@@ -461,4 +461,31 @@ function confirmDelete(id: string) {
 .learn-btn {
   width: 100%;
 }
+
+/* ---------- 手机端：侧栏改为全宽抽屉 ---------- */
+@media (max-width: 720px) {
+  .panel {
+    left: 0;
+    width: 100%;
+    border-left: none;
+  }
+  .panel__header {
+    padding: 14px 16px 12px;
+  }
+  .panel__section {
+    padding: 14px 16px;
+  }
+  .panel__footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    padding: 12px 16px calc(14px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+  }
+  /* 触屏没有 hover，删除入口常驻 */
+  .lesson-item__del {
+    opacity: 1;
+  }
+}
 </style>

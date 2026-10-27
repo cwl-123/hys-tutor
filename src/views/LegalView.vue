@@ -188,4 +188,19 @@ const updatedAt = '2026-10-26'
 .legal strong {
   color: var(--text);
 }
+
+@media (max-width: 720px) {
+  .legal {
+    padding: 24px var(--page-pad) calc(56px + env(safe-area-inset-bottom));
+    font-size: 14px;
+    line-height: 1.8;
+  }
+  .legal-head h1 {
+    font-size: 22px;
+  }
+  .legal h2 {
+    margin-top: 24px;
+    font-size: 15px;
+  }
+}
 </style>

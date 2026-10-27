@@ -198,4 +198,20 @@ async function submit(): Promise<void> {
 .auth-legal a {
   color: inherit;
 }
+
+@media (max-width: 720px) {
+  .auth-page {
+    padding: 24px var(--page-pad) calc(32px + env(safe-area-inset-bottom));
+  }
+  .auth-card {
+    padding: 24px 20px 20px;
+  }
+  .auth-field input {
+    height: 44px;
+    font-size: 16px;
+  }
+  .auth-submit {
+    height: 44px;
+  }
+}
 </style>

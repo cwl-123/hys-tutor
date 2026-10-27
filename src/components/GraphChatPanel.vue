@@ -341,4 +341,25 @@ function applyProposal(msg: ChatMsg) {
   border-color: var(--primary-soft);
   box-shadow: 0 0 0 3px rgb(var(--primary-rgb) / 12%);
 }
+
+/* ---------- 手机端：侧栏改为全宽抽屉 ---------- */
+@media (max-width: 720px) {
+  .chat {
+    left: 0;
+    width: 100%;
+    border-left: none;
+  }
+  .chat__header {
+    padding: 12px 16px;
+  }
+  .chat__list {
+    padding: 12px;
+  }
+  .chat__inputbox {
+    padding: 10px 12px calc(12px + env(safe-area-inset-bottom));
+  }
+  .chat__inputbox input {
+    font-size: 16px;
+  }
+}
 </style>

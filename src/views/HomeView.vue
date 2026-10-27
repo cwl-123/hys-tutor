@@ -141,7 +141,7 @@ async function onChatCreate(payload: { name: string; profile: TopicProfile }) {
               v-model="topicName"
               class="composer__title"
               type="text"
-              placeholder="想学什么？如：CTR/CVR 预估模型、Kubernetes 网络、期权定价"
+              placeholder="想学什么？如：CTR/CVR 预估模型、期权定价"
               :disabled="creating"
             >
 
@@ -739,13 +739,13 @@ async function onChatCreate(payload: { name: string; profile: TopicProfile }) {
   color: var(--text-dim);
 }
 
-/* ---------- 窄屏回退（仅桌面端，覆盖小窗口） ---------- */
+/* ---------- 窄窗口回退 ---------- */
 @media (max-width: 1080px) {
   .page-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .hero {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 40px;
     padding-top: 64px;
   }
@@ -756,9 +756,154 @@ async function onChatCreate(payload: { name: string; profile: TopicProfile }) {
     grid-column: auto;
   }
 }
+
+/* ---------- 手机端 ---------- */
 @media (max-width: 720px) {
+  .home {
+    --gap: 12px;
+    --card-pad: 16px;
+
+    padding: 0 var(--page-pad) calc(64px + env(safe-area-inset-bottom));
+    min-height: calc(100vh - var(--header-h));
+  }
   .page-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--gap);
+  }
+  .hero {
+    gap: 30px;
+    padding: 34px 0 40px;
+  }
+  .hero__copy {
+    gap: 26px;
+  }
+  .hero__copy h1 {
+    margin-top: 0;
+    font-size: clamp(30px, 9vw, 36px);
+    line-height: 1.24;
+  }
+  .hero__sub {
+    margin-top: 14px;
+    max-width: none;
+    font-size: 14px;
+    line-height: 1.75;
+  }
+  .step {
+    height: auto;
+    min-height: 46px;
+    padding: 9px 0;
+    align-items: flex-start;
+    gap: 10px;
+    line-height: 1.55;
+    white-space: normal;
+  }
+  .step__no {
+    width: 18px;
+    padding-top: 1px;
+    line-height: 1.55;
+  }
+  .step__title {
+    width: auto;
+    min-width: 62px;
+    line-height: 1.55;
+  }
+  .step__desc {
+    line-height: 1.55;
+    white-space: normal;
+  }
+
+  .composer {
+    min-height: 0;
+    border-radius: 12px;
+  }
+  .composer__head {
+    height: auto;
+    padding: 8px;
+  }
+  .seg {
+    width: 100%;
+  }
+  .seg__item {
+    flex: 1;
+    justify-content: center;
+    height: 34px;
+    font-size: 13px;
+  }
+  .composer__body {
+    padding: 16px;
+  }
+  .composer__title {
+    height: 34px;
+    font-size: 16px;
+  }
+  .fields {
+    margin-top: 14px;
+    padding-top: 16px;
+    gap: 14px;
+  }
+  .field {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 8px;
+    min-height: 0;
+  }
+  .chips {
+    gap: 8px;
+  }
+  .chip {
+    height: 34px;
+    padding: 0 13px;
+    font-size: 13px;
+  }
+  .field--area {
+    flex: none;
+  }
+  .field--area .field__label {
+    padding-top: 0;
+  }
+  .field__textarea {
+    min-height: 92px;
+    font-size: 16px;
+    line-height: 1.6;
+  }
+  .composer__foot {
+    height: auto;
+    padding: 12px 16px calc(14px + env(safe-area-inset-bottom));
+    justify-content: stretch;
+  }
+  .composer__hint {
+    display: none;
+  }
+  .submit {
+    width: 100%;
+    height: 44px;
+    justify-content: center;
+    font-size: 14px;
+    border-radius: 8px;
+  }
+  .submit__kbd {
+    display: none;
+  }
+  .composer__status {
+    padding: 12px 16px;
+  }
+  .progress {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .progress__sub {
+    width: 100%;
+    margin-left: 0;
+    line-height: 1.6;
+  }
+  .topics__head {
+    margin-top: 8px;
+  }
+  .topics__empty {
+    padding: 40px 20px;
+  }
+  .card--skeleton {
+    padding: 16px;
   }
 }
 </style>

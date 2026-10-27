@@ -29,6 +29,12 @@ export default defineConfig({
       '@shared': fileURLToPath(new URL('./shared', import.meta.url)),
     },
   },
+  build: {
+    // 手机端常经微信/QQ 等内置 WebView（Chrome 87 左右）访问。
+    // 默认 CSS 目标会输出 `@media (width<=720px)` 这类新语法，旧 WebView 直接忽略，
+    // 响应式样式会整体失效（顶栏又退回挤成一堆的桌面布局），因此降到 Chrome 87 / Safari 15。
+    cssTarget: ['chrome87', 'safari15'],
+  },
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],

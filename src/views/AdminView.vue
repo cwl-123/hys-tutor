@@ -275,47 +275,49 @@ onMounted(reload)
       <p v-if="loading">
         加载中…
       </p>
-      <table
+      <div
         v-else
-        class="users"
+        class="users-wrap"
       >
-        <thead>
-          <tr>
-            <th>昵称</th>
-            <th>角色</th>
-            <th>状态</th>
-            <th>注册</th>
-            <th>最近登录</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="u in users"
-            :key="u.id"
-          >
-            <td>{{ u.nickname }}</td>
-            <td>{{ u.role === 'admin' ? '管理员' : '用户' }}</td>
-            <td>{{ u.status === 'active' ? '正常' : '已禁用' }}</td>
-            <td>{{ fmt(u.createdAt) }}</td>
-            <td>{{ fmt(u.lastLoginAt) }}</td>
-            <td class="ops">
-              <button
-                class="link"
-                @click="resetPassword(u)"
-              >
-                重置密码
-              </button>
-              <button
-                class="link"
-                @click="toggleStatus(u)"
-              >
-                {{ u.status === 'active' ? '禁用' : '恢复' }}
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+        <table class="users">
+          <thead>
+            <tr>
+              <th>昵称</th>
+              <th>角色</th>
+              <th>状态</th>
+              <th>注册</th>
+              <th>最近登录</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="u in users"
+              :key="u.id"
+            >
+              <td>{{ u.nickname }}</td>
+              <td>{{ u.role === 'admin' ? '管理员' : '用户' }}</td>
+              <td>{{ u.status === 'active' ? '正常' : '已禁用' }}</td>
+              <td>{{ fmt(u.createdAt) }}</td>
+              <td>{{ fmt(u.lastLoginAt) }}</td>
+              <td class="ops">
+                <button
+                  class="link"
+                  @click="resetPassword(u)"
+                >
+                  重置密码
+                </button>
+                <button
+                  class="link"
+                  @click="toggleStatus(u)"
+                >
+                  {{ u.status === 'active' ? '禁用' : '恢复' }}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </section>
   </div>
 </template>
@@ -515,5 +517,71 @@ onMounted(reload)
   margin-top: 6px;
   color: var(--text-dim);
   font-size: 11px;
+}
+
+/* ---------- 手机端 ---------- */
+@media (max-width: 720px) {
+  .admin {
+    padding: 20px var(--page-pad) calc(64px + env(safe-area-inset-bottom));
+  }
+  .admin-head h1 {
+    font-size: 22px;
+  }
+  .stat-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .stat {
+    padding: 10px 12px;
+    min-width: 0;
+  }
+  .stat strong {
+    font-size: 18px;
+  }
+  .panel {
+    padding: 14px;
+  }
+  .invite-form {
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 10px;
+  }
+  .invite-form label {
+    flex: 1 1 80px;
+    min-width: 0;
+  }
+  .invite-form input {
+    width: 100%;
+    font-size: 16px;
+  }
+  .codes li {
+    flex-wrap: wrap;
+    gap: 4px 10px;
+  }
+  /* 用户表在窄屏内横向滚动，避免「状态/最近登录」被逐字折行 */
+  .users-wrap {
+    margin: 0 -4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .users {
+    min-width: 620px;
+  }
+  .users th,
+  .users td {
+    padding: 8px;
+    white-space: nowrap;
+  }
+  .users .ops {
+    display: table-cell;
+    white-space: nowrap;
+  }
+  .users .ops .link + .link {
+    margin-left: 10px;
+  }
+  .feedback-list__head {
+    flex-direction: column;
+    gap: 2px;
+  }
 }
 </style>

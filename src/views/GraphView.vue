@@ -721,4 +721,65 @@ async function deleteLesson(lessonId: string) {
   border-color: var(--mastery-yellow);
   color: var(--amber-text);
 }
+
+/* ---------- 手机端 ---------- */
+@media (max-width: 720px) {
+  .toolbar {
+    gap: 8px;
+    padding: 8px 12px 10px;
+  }
+  .toolbar > strong {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 14px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .toolbar__count {
+    display: none;
+  }
+  .view-toggle {
+    order: 3;
+    width: 100%;
+  }
+  .view-toggle__btn {
+    flex: 1;
+    justify-content: center;
+    padding: 6px 8px;
+  }
+  .toolbar__actions {
+    order: 4;
+    width: 100%;
+    margin-left: 0;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .toolbar__actions > * {
+    flex: 1 1 auto;
+    justify-content: center;
+    padding-right: 8px;
+    padding-left: 8px;
+    font-size: 12px;
+  }
+  .done-toast {
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    left: 12px;
+    align-items: flex-start;
+    padding: 10px 12px;
+  }
+  .done-toast__text {
+    flex: 1;
+    min-width: 0;
+    white-space: normal;
+  }
+  .done-toast__go,
+  .done-toast__close {
+    flex: none;
+  }
+  .toolbar__error {
+    padding: 6px 12px;
+  }
+}
 </style>

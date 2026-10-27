@@ -279,4 +279,23 @@ async function submit(): Promise<void> {
   color: var(--text-dim);
   font-size: 13px;
 }
+
+@media (max-width: 720px) {
+  .fb-mask {
+    padding: 12px;
+  }
+  .fb {
+    max-height: 90dvh;
+    overflow-y: auto;
+    padding: 16px;
+  }
+  .fb__body,
+  .fb__contact {
+    font-size: 16px;
+  }
+  .fb__submit {
+    height: 40px;
+    padding: 0 18px;
+  }
+}
 </style>

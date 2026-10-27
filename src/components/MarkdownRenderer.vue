@@ -406,4 +406,50 @@ html[data-theme='dark'] .md-body :deep(.shiki span) {
     box-shadow: inset 0 -2px 0 var(--mastery-green);
   }
 }
+
+/* ---------- 手机端正文 ---------- */
+@media (max-width: 720px) {
+  .md-body {
+    max-width: 100%;
+    font-size: 15px;
+    line-height: 1.85;
+    overflow-wrap: anywhere;
+  }
+  .md-body :deep(h1) {
+    font-size: 21px;
+  }
+  .md-body :deep(h2) {
+    font-size: 18px;
+    margin-top: 24px;
+  }
+  /* 触屏没有 hover，引用角标的悬浮卡无法使用，且其绝对定位会撑宽页面 */
+  .md-body :deep(.md-cite)::after {
+    display: none;
+  }
+  .md-body :deep(pre) {
+    max-width: 100%;
+    padding: 12px;
+    font-size: 12.5px;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* 宽表格在正文内横向滚动，不把整页撑宽 */
+  .md-body :deep(table) {
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .md-body :deep(th),
+  .md-body :deep(td) {
+    padding: 6px 10px;
+    white-space: nowrap;
+  }
+  .md-body :deep(.mermaid-diagram) {
+    padding: 10px;
+  }
+  .md-body :deep(.md-figure) {
+    margin: 14px 0;
+  }
+}
 </style>

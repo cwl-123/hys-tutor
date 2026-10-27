@@ -266,4 +266,25 @@ async function save() {
   border-top: 1px solid var(--border);
   background: var(--bg);
 }
+
+/* ---------- 手机端：侧栏改为全宽抽屉 ---------- */
+@media (max-width: 720px) {
+  .settings {
+    left: 0;
+    width: 100%;
+    border-left: none;
+  }
+  .settings__header {
+    padding: 12px 16px;
+  }
+  .settings__body {
+    padding: 16px;
+  }
+  .field__extra {
+    font-size: 16px;
+  }
+  .settings__footer {
+    padding: 12px 16px calc(14px + env(safe-area-inset-bottom));
+  }
+}
 </style>

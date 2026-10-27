@@ -240,7 +240,7 @@ function quoteLabel(q?: LessonQuote | null): string {
           从哪里改起？
         </div>
         <p class="chat__empty-desc">
-          直接描述想怎么改；想只改一处，把鼠标移到某个小节点<b>「改本节」</b>，或选中一段话点<b>「引用这段让 AI 优化」</b>。
+          直接描述想怎么改；想只改一处，点小节右上角的<b>「改本节」</b>，或选中一段话点<b>「引用这段让 AI 优化」</b>。
         </p>
         <div class="chat__chips">
           <button
@@ -812,5 +812,55 @@ function quoteLabel(q?: LessonQuote | null): string {
   display: flex;
   gap: 8px;
   flex-shrink: 0;
+}
+
+/* ---------- 手机端：对话改为全屏浮层 ---------- */
+@media (max-width: 720px) {
+  .chat {
+    width: 100%;
+    max-width: 100%;
+    border-left: none;
+  }
+  .chat__header {
+    padding: 12px 14px 10px;
+  }
+  .chat__title-sub {
+    font-size: 11px;
+  }
+  .chat__list {
+    padding: 12px;
+  }
+  .chat__empty {
+    padding: 12px;
+  }
+  .chat__composer {
+    padding: 8px 12px calc(10px + env(safe-area-inset-bottom));
+  }
+  .preview-mask {
+    padding: 12px;
+  }
+  .preview-modal {
+    width: 100%;
+    max-height: 92vh;
+    border-radius: 12px;
+  }
+  .preview-modal__head {
+    padding: 12px 14px;
+  }
+  .preview-modal__body {
+    padding: 14px 16px 20px;
+  }
+  .preview-modal__foot {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 14px calc(12px + env(safe-area-inset-bottom));
+  }
+  .preview-modal__hint {
+    width: 100%;
+  }
+  .preview-modal__actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 </style>

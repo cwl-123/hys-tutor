@@ -38,4 +38,15 @@ import { toasts } from '@/utils/toast'
   box-shadow: var(--shadow-lg);
   animation: toast-in var(--dur) var(--ease);
 }
+
+@media (max-width: 720px) {
+  .toast-host {
+    top: calc(var(--header-h) + 8px);
+    width: calc(100vw - 24px);
+  }
+  .toast-host__item {
+    max-width: 100%;
+    text-align: center;
+  }
+}
 </style>

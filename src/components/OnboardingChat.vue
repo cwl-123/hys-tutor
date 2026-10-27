@@ -534,4 +534,43 @@ const activeQuickReplies = () => {
   box-shadow: inset 0 0 0 1px var(--border);
   cursor: not-allowed;
 }
+
+/* ---------- 手机端 ---------- */
+@media (max-width: 720px) {
+  .ob__list {
+    min-height: 220px;
+    padding: 10px;
+  }
+  .ob-msg {
+    max-width: 96%;
+    font-size: 13px;
+  }
+  .ob-proposal {
+    padding: 12px;
+  }
+  .ob-proposal__row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .ob-proposal__label {
+    width: auto;
+  }
+  .ob-proposal__foot {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .ob-proposal__hint {
+    display: none;
+  }
+  .ob-proposal__go {
+    justify-content: center;
+    width: 100%;
+    height: 42px;
+  }
+  .ob__inputbox input {
+    font-size: 16px;
+  }
+}
 </style>

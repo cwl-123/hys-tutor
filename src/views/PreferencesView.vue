@@ -325,4 +325,37 @@ function sourceLabel(p: Preference): string {
 .pref__btn--danger:hover {
   color: var(--mastery-red);
 }
+
+/* ---------- 手机端 ---------- */
+@media (max-width: 720px) {
+  .prefs {
+    padding: 24px var(--page-pad) calc(64px + env(safe-area-inset-bottom));
+  }
+  .prefs__head h1 {
+    font-size: 22px;
+  }
+  .prefs__add {
+    gap: 8px;
+    margin-top: 20px;
+  }
+  .prefs__add input {
+    font-size: 16px;
+    padding: 10px 12px;
+  }
+  .prefs__add button {
+    padding: 0 14px;
+    font-size: 13px;
+  }
+  .prefs__empty {
+    margin-top: 20px;
+    padding: 28px 16px;
+  }
+  .pref {
+    padding: 12px;
+  }
+  .pref__btn {
+    width: 34px;
+    height: 34px;
+  }
+}
 </style>

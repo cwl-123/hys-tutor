@@ -354,3 +354,24 @@ textarea:focus-visible {
   border-color: var(--primary);
   box-shadow: var(--ring-primary);
 }
+
+/* ============================================================
+ * 移动端基础适配（≤720px）
+ * 只缩小页面留白与顶栏高度，不改桌面端视觉；具体页面各自在
+ * 自己的 <style scoped> 里处理网格/面板形态。
+ * ============================================================ */
+@media (max-width: 720px) {
+  :root {
+    --header-h: 54px;
+    --page-pad: 16px;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    overflow-x: clip;
+  }
+}

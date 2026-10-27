@@ -503,4 +503,49 @@ function fmtRelative(days: number): string {
   }
 }
 
+/* 触屏没有 hover：删除入口必须常驻，否则手机端无法删除方向 */
+@media (hover: none) {
+  .card__arrow,
+  .card__del {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 720px) {
+  .card {
+    --card-pad: 16px;
+
+    padding: 16px 16px 0;
+  }
+  .card__name {
+    font-size: 14px;
+  }
+  .card__arrow {
+    display: none;
+  }
+  .card__del {
+    width: 32px;
+    height: 32px;
+    margin-left: auto;
+  }
+  .metrics {
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .metric + .metric {
+    padding-left: 10px;
+  }
+  .metric__value {
+    font-size: 18px;
+  }
+  .card__foot {
+    height: 54px;
+  }
+  .card__confirm-text {
+    font-size: 11px;
+  }
+  .card__cta {
+    margin-right: -6px;
+  }
+}
 </style>

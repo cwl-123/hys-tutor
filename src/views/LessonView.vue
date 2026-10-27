@@ -1546,4 +1546,100 @@ onUnmounted(() => {
     bottom: 16px;
   }
 }
+
+/* ---------- 手机端 ---------- */
+@media (max-width: 720px) {
+  .lesson-view {
+    padding: 18px var(--page-pad) calc(72px + env(safe-area-inset-bottom));
+  }
+  /* 对话面板改为全屏浮层，正文不再为它让出右侧空间 */
+  .lesson-view--chat {
+    max-width: none;
+    padding-right: var(--page-pad);
+  }
+  .lesson__crumb {
+    flex-wrap: wrap;
+    gap: 4px 10px;
+  }
+  .lesson__header h1 {
+    margin: 6px 0 0;
+    font-size: 24px;
+    line-height: 1.35;
+  }
+  .lesson__goals {
+    gap: 8px;
+    padding: 10px 12px;
+    font-size: 12.5px;
+  }
+  .lesson__goals ul {
+    padding-left: 16px;
+  }
+  .lesson__actions {
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .lesson__done-banner {
+    gap: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+  .lesson__sources {
+    margin-top: 28px;
+  }
+  .editor {
+    flex-direction: column;
+  }
+  .editor__ta {
+    min-height: 45vh;
+  }
+  .editor__preview {
+    padding: 0;
+    border-left: none;
+  }
+  .revise-modal {
+    width: calc(100vw - 32px);
+    max-height: 88vh;
+    padding: 18px;
+    overflow-y: auto;
+  }
+  .mermaid-modal {
+    width: calc(100vw - 24px);
+    max-height: 90vh;
+    padding: 16px;
+    overflow-y: auto;
+  }
+  .mermaid-modal__panes {
+    flex-direction: column;
+  }
+  .mermaid-modal__ta {
+    min-height: 180px;
+  }
+  .mermaid-modal__preview {
+    max-height: 220px;
+  }
+  .progress__head {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .progress__head .btn {
+    align-self: flex-start;
+  }
+  .progress__hint {
+    font-size: 12.5px;
+  }
+  .state {
+    padding: 40px 0;
+  }
+  .hl-panel {
+    right: 8px;
+    left: 8px;
+    top: calc(var(--header-h) + 8px);
+    width: auto;
+    max-height: calc(100vh - var(--header-h) - 24px);
+  }
+  .float-cta {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+}
 </style>

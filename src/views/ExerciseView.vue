@@ -1074,4 +1074,71 @@ async function submitQuestionReport(q: Question) {
   color: var(--mastery-red);
   font-size: 13px;
 }
+
+/* ---------- 手机端 ---------- */
+@media (max-width: 720px) {
+  .exercise-view {
+    padding: 18px var(--page-pad) calc(64px + env(safe-area-inset-bottom));
+  }
+  .crumb {
+    flex-wrap: wrap;
+    gap: 6px 14px;
+  }
+  .exercise-view h1 {
+    margin: 6px 0 12px;
+    font-size: 24px;
+  }
+  .attempts-bar {
+    gap: 6px;
+  }
+  .attempt-pill {
+    padding: 7px 11px;
+    font-size: 12px;
+  }
+  .question {
+    padding: 14px;
+    margin: 12px 0;
+  }
+  .question__head {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .question__report {
+    margin-left: 0;
+  }
+  .option {
+    align-items: flex-start;
+    padding: 10px 11px;
+  }
+  .option input[type='radio'] {
+    margin-top: 3px;
+  }
+  .short-input,
+  .report-inline textarea {
+    font-size: 16px;
+  }
+  .report-inline {
+    flex-wrap: wrap;
+  }
+  .report-inline textarea {
+    width: 100%;
+  }
+  .mastery {
+    padding: 14px;
+  }
+  .mastery__actions {
+    flex-wrap: wrap;
+  }
+  .submit-bar .btn {
+    width: 100%;
+    height: 44px;
+  }
+  .report-toast {
+    right: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    left: 16px;
+    transform: none;
+    text-align: center;
+  }
+}
 </style>

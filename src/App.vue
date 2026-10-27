@@ -77,41 +77,45 @@ async function logout(): Promise<void> {
               class="app-quota"
               :title="`今日生成课程 ${lessonQuota.used}/${lessonQuota.limit} 次`"
             >
-              AI 生成 {{ lessonQuota.used }}/{{ lessonQuota.limit }}
+              <span class="app-quota__label">AI 生成 </span>{{ lessonQuota.used }}/{{ lessonQuota.limit }}
             </span>
             <RouterLink
               to="/preferences"
               class="app-settings"
               title="我的偏好"
+              aria-label="我的偏好"
             >
-              <Heart :size="14" />
-              偏好
+              <Heart :size="15" />
+              <span class="app-action__label">偏好</span>
             </RouterLink>
             <RouterLink
               v-if="auth.isAdmin"
               to="/admin"
               class="app-settings"
               title="内测管理"
+              aria-label="内测管理"
             >
-              <Shield :size="14" />
-              管理
+              <Shield :size="15" />
+              <span class="app-action__label">管理</span>
             </RouterLink>
             <button
               class="app-settings"
               title="平台设置"
+              aria-label="平台设置"
               @click="showSettings = true"
             >
-              <Settings :size="14" />
-              设置
+              <Settings :size="15" />
+              <span class="app-action__label">设置</span>
             </button>
             <span class="app-user">{{ auth.user.nickname }}</span>
             <button
               class="app-settings"
               title="退出登录"
+              aria-label="退出登录"
               @click="logout"
             >
-              <LogOut :size="14" />
-              退出
+              <LogOut :size="15" />
+              <span class="app-action__label">退出</span>
             </button>
           </template>
           <RouterLink
@@ -155,7 +159,9 @@ async function logout(): Promise<void> {
 
 <style scoped>
 .app {
+  /* 手机浏览器地址栏会吃掉 vh，dvh 可取真实可视高度（旧浏览器回退到 vh） */
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }
@@ -170,13 +176,20 @@ async function logout(): Promise<void> {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   height: var(--header-h);
-  padding: 0 var(--page-pad);
+  padding-left: max(var(--page-pad), env(safe-area-inset-left));
+  padding-right: max(var(--page-pad), env(safe-area-inset-right));
 }
 .app-brand {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  /* 品牌可被压缩：空间不够时优先截断品牌，而不是把右侧按钮挤成竖排文字 */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
   text-decoration: none;
 }
 .app-brand__mark {
@@ -186,30 +199,42 @@ async function logout(): Promise<void> {
   color: var(--primary-btn);
 }
 .app-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
   font-size: 14px;
   font-weight: 600;
   letter-spacing: -0.1px;
   color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .app-subtitle {
+  flex: none;
   font-size: 12px;
   color: var(--text-dim);
   padding-left: 10px;
   border-left: 1px solid var(--border);
+  white-space: nowrap;
 }
 .app-actions {
   display: flex;
   align-items: center;
+  flex: none;
   gap: 2px;
+  margin-left: auto;
+  white-space: nowrap;
   /* 抵消按钮内边距，让文字右缘与内容区右缘对齐 */
   margin-right: -10px;
 }
 .app-settings {
   display: inline-flex;
   align-items: center;
+  flex: none;
   gap: 5px;
   font: inherit;
   font-size: 13px;
+  white-space: nowrap;
   color: var(--text-dim);
   background: none;
   border: 1px solid transparent;
@@ -230,6 +255,8 @@ async function logout(): Promise<void> {
   flex: 1;
 }
 .app-user {
+  flex: 0 1 auto;
+  min-width: 0;
   max-width: 120px;
   overflow: hidden;
   margin: 0 4px 0 8px;
@@ -239,9 +266,11 @@ async function logout(): Promise<void> {
   white-space: nowrap;
 }
 .app-quota {
+  flex: none;
   margin-right: 4px;
   font-size: 11px;
   color: var(--text-dim);
+  white-space: nowrap;
 }
 .app-footer {
   display: flex;
@@ -271,5 +300,93 @@ async function logout(): Promise<void> {
 .app-footer__feedback:hover,
 .app-footer a:hover {
   color: var(--text);
+}
+
+/* ---------- 顶栏响应式 ----------
+ * 按可用宽度逐级收敛：品牌块可压缩、操作区永不收缩，
+ * 任何宽度都不会把按钮文字挤成竖排（旧版在窄屏会把「偏好/管理」竖着排）。
+ * 收敛顺序：副标题 → 昵称/配额说明 → 按钮文案 → 触控尺寸。
+ */
+@media (max-width: 1120px) {
+  .app-header__inner {
+    gap: 12px;
+  }
+  .app-actions {
+    gap: 0;
+  }
+  .app-settings {
+    padding: 5px 8px;
+  }
+}
+@media (max-width: 960px) {
+  .app-subtitle {
+    display: none;
+  }
+}
+@media (max-width: 860px) {
+  /* 昵称长度不可控，优先让位给功能按钮 */
+  .app-user {
+    display: none;
+  }
+}
+/* 手机：操作区图标化，保持顶栏单行 */
+@media (max-width: 720px) {
+  .app-header__inner {
+    gap: 10px;
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+  .app-brand {
+    gap: 8px;
+  }
+  .app-title {
+    font-size: 15px;
+  }
+  .app-brand__mark {
+    width: 24px;
+    height: 24px;
+  }
+  .app-quota {
+    display: none;
+  }
+  .app-actions {
+    gap: 2px;
+    margin-right: -7px;
+  }
+  .app-settings {
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border-radius: 8px;
+  }
+  .app-action__label {
+    display: none;
+  }
+  .app-footer {
+    gap: 8px 14px;
+    padding: 16px var(--page-pad) calc(18px + env(safe-area-inset-bottom));
+    line-height: 1.6;
+    text-align: center;
+  }
+}
+/* 超窄屏（320px 及以下）：再压一档，5 个操作仍能单行 */
+@media (max-width: 360px) {
+  .app-header__inner {
+    gap: 8px;
+    padding-left: max(10px, env(safe-area-inset-left));
+    padding-right: max(10px, env(safe-area-inset-right));
+  }
+  .app-settings {
+    width: 34px;
+    height: 34px;
+  }
+  .app-title {
+    font-size: 14px;
+  }
+  .app-brand__mark {
+    width: 22px;
+    height: 22px;
+  }
 }
 </style>

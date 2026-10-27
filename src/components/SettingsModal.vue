@@ -246,4 +246,17 @@ watch(
 .muted a {
   color: var(--primary-btn);
 }
+
+@media (max-width: 720px) {
+  .modal-mask {
+    padding: 12px;
+  }
+  .modal {
+    max-height: 90dvh;
+    padding: 16px;
+  }
+  .theme-btn {
+    height: 40px;
+  }
+}
 </style>

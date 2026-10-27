@@ -243,6 +243,16 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll, true))
   border-color: var(--primary-soft);
   background: var(--primary-bg);
 }
+
+/* 手机端没有 hover：把小节级「改本节」改成常驻小按钮，放到标题右上角 */
+@media (hover: none), (max-width: 720px) {
+  .lesson-body__tool {
+    position: static;
+    float: right;
+    margin: -2px 0 6px 8px;
+    opacity: 1;
+  }
+}
 </style>
 
 <style>
