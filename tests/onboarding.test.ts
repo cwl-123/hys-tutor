@@ -16,6 +16,8 @@ const { completeJson } = await import('../server/llm/client')
 const { chatOnboarding, ONBOARDING_MAX_TURNS } = await import(
   '../server/services/onboarding-service'
 )
+const { saveOnboardingAttachment } = await import('../server/services/onboarding-attachments')
+const { runAsUser } = await import('../server/repo/context')
 
 const mockJson = vi.mocked(completeJson)
 
@@ -84,5 +86,70 @@ describe('chatOnboarding', () => {
 
     const prompt = mockJson.mock.calls[0][0].prompt
     expect(prompt).toContain('本轮必须')
+  })
+
+  it('文本附件正文注入 prompt，文件名进历史', async () => {
+    mockJson.mockResolvedValue({ reply: '看到你的大纲了', quickReplies: [] })
+    const meta = await runAsUser('local', () =>
+      saveOnboardingAttachment({
+        name: '课程大纲.txt',
+        buf: Buffer.from('第 1 章 财务分析\n第 2 章 估值方法'),
+      }),
+    )
+
+    await chatOnboarding([
+      {
+        role: 'user',
+        content: '照着这个大纲学',
+        attachments: [{ id: meta.id, name: meta.name, kind: 'text' }],
+      },
+    ])
+
+    const opts = mockJson.mock.calls[0][0]
+    expect(opts.prompt).toContain('课程大纲.txt')
+    expect(opts.prompt).toContain('第 2 章 估值方法')
+    expect(opts.imageDataUrls).toEqual([])
+  })
+
+  it('图片附件以 data URL 走多模态，不再重复注入正文', async () => {
+    mockJson.mockResolvedValue({ reply: '图里是财报', quickReplies: [] })
+    const png = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.from('fake'),
+    ])
+    const meta = await runAsUser('local', () =>
+      saveOnboardingAttachment({ name: '财报截图.png', buf: png }),
+    )
+
+    await chatOnboarding([
+      {
+        role: 'user',
+        content: '',
+        attachments: [{ id: meta.id, name: meta.name, kind: 'image' }],
+      },
+    ])
+
+    const opts = mockJson.mock.calls[0][0]
+    const urls = opts.imageDataUrls ?? []
+    expect(urls).toHaveLength(1)
+    expect(urls[0]).toMatch(/^data:image\/png;base64,/)
+    expect(opts.prompt).toContain('只上传了附件')
+    expect(opts.prompt).toContain('直接查看图片')
+  })
+
+  it('附件已被清理时提示模型让用户重传，不抛出', async () => {
+    mockJson.mockResolvedValue({ reply: '附件过期了', quickReplies: [] })
+
+    await chatOnboarding([
+      {
+        role: 'user',
+        content: '看看这份',
+        attachments: [{ id: 'att_deadbeef', name: '旧文件.pdf', kind: 'text' }],
+      },
+    ])
+
+    const opts = mockJson.mock.calls[0][0]
+    expect(opts.prompt).toContain('已过期')
+    expect(opts.imageDataUrls).toEqual([])
   })
 })

@@ -200,16 +200,27 @@ function isUnsupportedParamError(err: unknown): boolean {
 }
 
 // 单轮 JSON 完成：输出经 zod 校验，失败带错误信息重试（共 3 次）
+// imageDataUrls 非空时走多模态：图片和文本放进同一条 user 消息
 export async function completeJson<T>(opts: {
   system: string
   prompt: string
   schema: z.ZodType<T>
   temperature?: number
+  imageDataUrls?: string[]
 }): Promise<T> {
   const llm = getLLM()
+  const content: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
+    { type: 'text', text: opts.prompt },
+    ...(opts.imageDataUrls ?? []).map(
+      (url): OpenAI.Chat.Completions.ChatCompletionContentPart => ({
+        type: 'image_url',
+        image_url: { url },
+      }),
+    ),
+  ]
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     { role: 'system', content: opts.system },
-    { role: 'user', content: opts.prompt },
+    { role: 'user', content: opts.imageDataUrls?.length ? content : opts.prompt },
   ]
   let lastErr: unknown
   let attempt = 0

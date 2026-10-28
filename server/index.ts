@@ -45,7 +45,12 @@ import {
   handleListHighlights,
 } from './routes/highlights'
 import { handleCreateReport, handleListReports } from './routes/reports'
-import { handleOnboardingChat } from './routes/onboarding'
+import {
+  handleDeleteOnboardingAttachment,
+  handleGetOnboardingAttachment,
+  handleOnboardingChat,
+  handleUploadOnboardingAttachment,
+} from './routes/onboarding'
 import {
   handleCreatePreference,
   handleDeletePreference,
@@ -324,6 +329,25 @@ async function routeApi(req: IncomingMessage, res: ServerResponse, next: Next) {
     // POST /api/onboarding/chat — 开课对话（AI 引导理清学习方向）
     if (url === '/onboarding/chat' && req.method === 'POST') {
       await handleOnboardingChat(req, res)
+      return
+    }
+
+    // POST /api/onboarding/attachments — 开课对话附件上传
+    if (url === '/onboarding/attachments' && req.method === 'POST') {
+      await handleUploadOnboardingAttachment(req, res)
+      return
+    }
+
+    // GET/HEAD/DELETE /api/onboarding/attachments/:id — 图片预览 / 移除待发送附件
+    const onboardingAttachmentMatch = url.match(/^\/onboarding\/attachments\/([^/]+)$/)
+    if (onboardingAttachmentMatch) {
+      if (req.method === 'GET' || req.method === 'HEAD') {
+        await handleGetOnboardingAttachment(req, res, onboardingAttachmentMatch[1])
+      } else if (req.method === 'DELETE') {
+        await handleDeleteOnboardingAttachment(req, res, onboardingAttachmentMatch[1])
+      } else {
+        sendJson(res, 405, { error: 'Method Not Allowed' })
+      }
       return
     }
 

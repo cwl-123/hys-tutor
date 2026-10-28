@@ -248,6 +248,31 @@ export const preferenceSchema = z.object({
 })
 export type Preference = z.infer<typeof preferenceSchema>
 
+// ---------- 开课对话附件 ----------
+// 图片走多模态直传模型；文档在服务端抽取成文本再注入对话
+export const onboardingAttachmentKindSchema = z.enum(['image', 'text'])
+export type OnboardingAttachmentKind = z.infer<typeof onboardingAttachmentKindSchema>
+
+// 对话消息里只带引用，内容仍留在服务端，避免每次请求重复搬运大段文本
+export const onboardingAttachmentRefSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  kind: onboardingAttachmentKindSchema,
+})
+export type OnboardingAttachmentRef = z.infer<typeof onboardingAttachmentRefSchema>
+
+// 上传接口返回的元信息（不含正文；文本只给预览片段）
+export const onboardingAttachmentMetaSchema = onboardingAttachmentRefSchema.extend({
+  mime: z.string(),
+  size: z.number(),
+  format: z.string().optional(), // pdf / docx / pptx / txt...
+  chars: z.number().optional(), // 抽取到的正文字数
+  truncated: z.boolean().optional(),
+  preview: z.string().optional(), // 文本附件预览
+  url: z.string().optional(), // 图片预览地址
+})
+export type OnboardingAttachmentMeta = z.infer<typeof onboardingAttachmentMetaSchema>
+
 // ---------- 通用工具 ----------
 // 掌握分 <40 为未掌握（红）
 export const MASTERY_LOW_THRESHOLD = 40

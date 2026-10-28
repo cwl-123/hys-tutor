@@ -95,7 +95,7 @@ done        课末题 / 内容质检 / 案例归档转为后台异步，不阻�
 | 内容渲染 | markdown-it + Shiki + KaTeX + Mermaid | 课程页；Shiki 预加载常用语言；Mermaid 懒加载渲染 SVG（按代码文本缓存） |
 | 配图素材 | 本地素材库 data/topics/&lt;tid&gt;/assets/（内容哈希命名去重）+ assets.json 清单记原图来源 | 下载/上传共用 asset-store；拒 SVG（图示走 Mermaid），限 5MB |
 | 后端 | Vite middleware（自写路由，不引入框架） | 路由量小，用 `connect` 风格 handler 足够 |
-| LLM | OpenAI 兼容 SDK（openai 包），stream + function calling | 供应商实现时通过 .env 切换 |
+| LLM | OpenAI 兼容 SDK（openai 包），stream + function calling + 图片多模态 | 供应商实现时通过 .env 切换；deepseek-flash 原生支持 image_url 输入 |
 | Agent 运行时 | 手写工具循环（while + tool_calls），不引 LangChain | 备课研究 4 个工具，框架是负资产 |
 | 搜索 API | **Tavily + 博查双接**：并行搜索、结果按 URL 去重合并（Tavily 英文/LLM 友好，博查中文生态好，CTR/CVR 中文精华多） | 单家故障时自动降级为另一家；key 进 .env |
 | 网页抓取 | fetch + @mozilla/readability + jsdom 提正文 | 备课 Agent 的 web-fetch 工具 |
@@ -272,6 +272,27 @@ data/topics/<topicId>/
 - 锚点用「章节 + 文字 + 出现次序」描述：正文重渲染/编辑后在前端重新定位包裹 `<mark class="lesson-hl">`；定位不到仅不画绿标，记录保留
 - 删除课件时一并清除；删除学习方向时随 `data/topics/<tid>/` 整体清除
 
+### 3.11 onboarding/attachments/<id>.json (+ 原图) — 开课对话附件（临时）
+```jsonc
+{
+  "id": "att_ab12cd34",
+  "name": "课程大纲.pdf",           // 展示名，已去路径/控制字符
+  "kind": "image | text",
+  "mime": "application/pdf",
+  "size": 123456,
+  "format": "pdf | docx | pptx | text | png...",
+  "chars": 8321,                    // 文档抽取字数
+  "truncated": false,               // 超过 2 万字只保留前 2 万字
+  "text": "……",                     // 文档正文（图片不存这里）
+  "imageFile": "att_ab12cd34.png",  // 图片原文件名（内容哈希无关，仅随机 id）
+  "createdAt": "..."
+}
+```
+- 目录按用户隔离：`data/users/<uid>/onboarding/attachments/`；图片保留原文件供预览与多模态输入，文档只留抽取文本
+- 单文件 ≤10MB（图片 ≤8MB）、单条消息最多 3 个；落盘 24 小时后在下一次上传时清理，每人最多保留 20 个
+- 只服务开课对话，不并入课题素材库，不做长期资料/RAG；对话消息里只传引用（id/name/kind），正文每次从服务端读取
+- PDF 用 zlib 解析内容流 + ToUnicode CMap，DOCX/PPTX 走 ZIP + XML，纯文本按 UTF-8/GB18030 解码；扫描件读不出文字时返回可执行提示
+
 ### 掌握分算法规则（mastery-service，MVP 版）
 - 客观题：答对 +20，答错 -8（clamp 到 0~100）；每题满分 20
 - 简答题：`delta = round((score - 0.2) * 25)`，即 0.2 分及格线（答出点东西就不扣分），满分 +20、0.7 分 +12、零分 -5
@@ -283,6 +304,10 @@ data/topics/<topicId>/
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
+| POST | /api/onboarding/chat | 开课对话（多轮引导 → 方向提案）；messages 可带附件引用，图片以多模态 image_url 送入模型 |
+| POST | /api/onboarding/attachments | 上传开课附件（原始字节 + `X-File-Name` 头）；图片落原文件，文档抽取正文后只存文本 |
+| GET | /api/onboarding/attachments/:id | 图片附件预览（仅当前用户，`nosniff`） |
+| DELETE | /api/onboarding/attachments/:id | 移除待发送附件（发送后仍保留 24h，供对话引用） |
 | GET | /api/topics | 学习方向列表 |
 | POST | /api/topics | 输入方向名 → Agent 联网调研（researching/research-tool 阶段）→ 生成 DAG（SSE 推进度）→ 返回 topic+graph |
 | GET | /api/topics/:id/graph | 读取图谱 |
@@ -317,14 +342,14 @@ hys-tutor/
 │  └─ styles/
 ├─ server/
 │  ├─ routes/               # topics.ts, lessons.ts, reports.ts, health.ts
-│  ├─ services/             # graph / graph-chat / scheduler / lesson-agent / lesson / grading / mastery / report
+│  ├─ services/             # graph / graph-chat / scheduler / lesson-agent / lesson / grading / mastery / report / onboarding-attachments / document-text
 │  ├─ agent/                # loop.ts（工具循环）, tools/（web-search / web-fetch / notes）
 │  ├─ llm/                  # client.ts, prompts/（topic-research/图谱/graph-chat/研究/大纲/写作/自查/批改）
 │  └─ repo/                 # json 读写 + 原子写
 ├─ shared/                  # types.ts（领域模型 zod）, api.ts（接口 DTO）, dag.ts, mastery.ts
 ├─ scripts/                 # try-lesson-agent.ts（备课 CLI 冒烟）
 ├─ tests/                   # vitest 单测
-├─ data/                    # 运行时生成，git 忽略：topics.json + topics/<id>/{topic,graph,topic-research,mastery-log,reports}.json + lessons/ attempts/ research/
+├─ data/                    # 运行时生成，git 忽略：topics.json + topics/<id>/{...}.json + 每用户 users/<uid>/{topics,onboarding/attachments}/
 ├─ vite.config.ts           # 挂载 server middleware（ssrLoadModule 热载后端）
 └─ .env                     # LLM_API_KEY / LLM_BASE_URL / LLM_MODEL / TAVILY_API_KEY / BOCHA_API_KEY
 ```
